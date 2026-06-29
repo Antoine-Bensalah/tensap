@@ -298,63 +298,6 @@ class TSpace:
             result.is_orth = True
         return result, M_matrices
 
-    def truncate(self, dims=None, tol=1e-16):
-        """Truncate basis ranks via orth + SVD(R) with tolerance.
-
-        Calls :meth:`orth` to obtain ``(Q_space, R_list)``, then for
-        each dimension performs an SVD of ``R`` with energy-based
-        truncation to rank ``m``. Returns the truncated space
-        ``Q @ U[:, :m]`` and the composite transformation
-        ``M = diag(s[:m]) @ Vh[:m, :]`` (where ``R = U @ diag(s) @ Vh``).
-        The caller should absorb ``M`` into the core.
-
-        Parameters
-        ----------
-        dims : int or list of int, optional
-            Dimensions to truncate. A single integer is also accepted.
-            Defaults to all.
-        tol : float, optional
-            Tolerance for rank truncation. Defaults to 1e-16.
-
-        Returns
-        -------
-        TSpace
-            Space with truncated ranks and orthonormalised bases.
-        list of numpy.ndarray
-            Transformation matrices M for each dimension.
-        """
-        if dims is None:
-            dims = range(self.order)
-        dims = np.atleast_1d(dims)
-
-        Q_space, R_list = self.orth(dims)
-
-        tol_sq = tol ** 2
-        new_spaces = list(self.spaces)
-        M_matrices = []
-        for i, mu in enumerate(dims):
-            U_r, s, Vh = np.linalg.svd(R_list[i], full_matrices=False)
-            s_sq = s ** 2
-            total = np.sum(s_sq)
-            if total == 0:
-                m = 1
-            else:
-                err_sq = 1 - np.cumsum(s_sq) / total
-                m = np.where(err_sq < tol_sq)[0]
-                if len(m) == 0:
-                    m = len(s)
-                else:
-                    m = m[0] + 1
-            N_out, N_in, _ = self.spaces[mu].shape
-            new_Q = Q_space.spaces[mu].reshape(N_out * N_in, -1) @ U_r[:, :m]
-            new_spaces[mu] = new_Q.reshape(N_out, N_in, m)
-            M_matrices.append(np.diag(s[:m]) @ Vh[:m, :])
-
-        result = self.__class__(new_spaces, is_orth=False)
-        if len(dims) == self.order:
-            result.is_orth = True
-        return result, M_matrices
-
     # ---- Factor operations ----
 
     def vectorize_factors(self):

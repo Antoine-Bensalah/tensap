@@ -217,21 +217,6 @@ class TestTuckerLikeTensor:
         tbt = t.tree_based_tensor()
         assert isinstance(tbt, tensap.TreeBasedTensor)
 
-    def test_truncate_tight(self):
-        t = self._make_tucker(3)
-        expected_norm = t.norm()
-        space, M = t.space.truncate(tol=1e-16)
-        t2 = tensap.TuckerLikeTensor(t.core, space)
-        t2.core = t2.core.tensor_matrix_product(M)
-        assert np.isclose(t2.norm(), expected_norm)
-        assert space.is_orth
-
-    def test_truncate_reduces_rank(self):
-        t = self._make_tucker(3)
-        space, M = t.space.truncate(tol=0.9)
-        assert np.all(space.ranks <= t.ranks)
-        assert np.any(space.ranks < t.ranks)
-
     def test_abs(self):
         t = self._make_tucker(2)
         assert np.allclose(abs(t).core.data, abs(t.core.data))

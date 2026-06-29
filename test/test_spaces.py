@@ -223,22 +223,6 @@ class TestTSpace:
         assert not q.is_orth
         assert len(mats) == 1
 
-    def test_truncate_tight(self):
-        rng = _rng(0)
-        spaces = [rng.rand(5, 1, 3), rng.rand(7, 1, 4)]
-        s = tensap.TSpace(spaces)
-        t, mats = s.truncate(tol=1e-16)
-        assert t.is_orth
-        assert np.all(t.ranks == [3, 4])
-
-    def test_truncate_loose(self):
-        rng = _rng(0)
-        spaces = [rng.rand(5, 1, 3), rng.rand(7, 1, 4)]
-        s = tensap.TSpace(spaces)
-        t, mats = s.truncate(tol=0.5)
-        assert np.all(t.ranks <= [3, 4])
-        assert np.any(t.ranks < [3, 4])
-
     def test_permute(self):
         spaces = [np.random.rand(5, 1, 3), np.random.rand(7, 1, 4),
                   np.random.rand(9, 1, 2)]
