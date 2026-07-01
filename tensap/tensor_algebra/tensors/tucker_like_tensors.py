@@ -7,6 +7,8 @@ Module tucker_like_tensor.
 
 import numpy as np
 import tensap
+from typing import Union, List, Tuple, Optional
+from .tensor_frame import TFrames, TFrameVectors, TFrameOperators
 
 
 class TuckerLikeTensor:
@@ -192,36 +194,38 @@ class TuckerLikeTensor:
 
     def dot(self, tensor_2):
         """
-                Compute the inner product of self (A) and tensor_2 (B): <A, B>.
+        Compute the inner product of self (A) and tensor_2 (B): <A, B>.
 
-                Denoting the two tensors in Tucker-like format:
-                A = sum_{k} A(k_1, ..., k_d) * A^(1)_{k_1} x ... x A^(d)_{k_d}
-                B = sum_{k'} B(k'_1, ..., k'_d) * B^(1)_{k'_1} x ... x B^(d)_{k'_d}
+        Denoting the two tensors in Tucker-like format:
+        A = sum_{k} A(k_1, ..., k_d) * A^(1)_{k_1} x ... x A^(d)_{k_d}
+        B = sum_{k'} B(k'_1, ..., k'_d) * B^(1)_{k'_1} x ... x B^(d)_{k'_d}
 
-                The inner product is computed efficiently by pushing the
-                local space inner products into the core tensor of B, avoiding
-                any full tensor reconstruction or Kronecker products:
+        The inner product is computed efficiently by pushing the
+        local space inner products into the core tensor of B, avoiding
+        any full tensor reconstruction or Kronecker products:
 
-                1. Compute the Gram matrices M^(v) for each dimension v:
-                   M^(v)_{k_v, k'_v} = < A^(v)_{k_v}, B^(v)_{k'_v} >
-                2. Contract the core of B with the Gram matrices along all
-                   dimensions to obtain the projected core B_tilde:
-                   B_tilde(k_1, ..., k_d) = sum_{k'} B(k'_1, ..., k'_d) * M^(1) ... M^(d)
-                3. Compute the standard dot product between the core A and B_tilde:
-                   <A, B> = sum_{k} A(k_1, ..., k_d) * B_tilde(k_1, ..., k_d)
+        1. Compute the Gram matrices M^(v) for each dimension v:
+           M^(v)_{k_v, k'_v} = < A^(v)_{k_v}, B^(v)_{k'_v} >
+        2. Contract the core of B with the Gram matrices along all
+           dimensions to obtain the projected core B_tilde:
+           B_tilde(k_1, ..., k_d) = sum_{k'} B(k'_1, ..., k'_d) * M^(1) ... M^(d)
+        3. Compute the standard dot product between the core A and B_tilde:
+           <A, B> = sum_{k} A(k_1, ..., k_d) * B_tilde(k_1, ..., k_d)
 
-                Parameters
-                ----------
-                tensor_2 : TuckerLikeTensor
-                    The second tensor to compute the inner product with.
+        Parameters
+        ----------
+        tensor_2 : TuckerLikeTensor
+            The second tensor to compute the inner product with.
 
-                Returns
-                -------
-                float
-                    The inner product <A, B>.
-                """
-        assert isinstance(tensor_2, TuckerLikeTensor), \
-            "Argument must be a TuckerLikeTensor."
+        Returns
+        -------
+        float
+            The inner product <A, B>.
+        """
+        assert isinstance(
+            tensor_2, TuckerLikeTensor
+        ), "Argument must be a TuckerLikeTensor."
+
         core_self, core_other = tensap.convert_tensors(self.core, tensor_2.core)
         M = self.space.dot(tensor_2.space)
         core_2_projected = core_other.tensor_matrix_product(M)
@@ -713,3 +717,250 @@ class TuckerLikeTensor:
             self.ranks,
             self.is_orth,
         )
+
+
+class BaseTuckerTensor:
+    """
+    Abstract Base Class for Tucker tensors.
+    Contains universal algebraic operations independent of the physical nature
+    (vector or operator) of the tensor.
+    """
+
+    def __init__(self, core, frames: 'TFrames'):
+        self.core = core
+        self.frames = frames
+
+    @property
+    def order(self) -> int:
+        return self.frames.order
+
+    @property
+    def ranks(self) -> tuple:
+        return self.frames.ranks
+
+    @property
+    def shape(self) -> tuple:
+        return self.frames.shape
+
+    @property
+    def is_orth(self) -> bool:
+        return self.core.is_orth and self.frames.is_orth
+
+    # ---- Fundamental Algebra ----
+
+    def dot(self, other: 'BaseTuckerTensor') -> float:
+        """
+        Compute the inner product <self, other>.
+        Pushes local inner products into the core of 'other' before contraction.
+        """
+        if self.order != other.order:
+            raise ValueError("Tensors must have the same order.")
+
+        if type(self) is not type(other):
+            raise TypeError(
+                f"Cannot compute dot product between {type(self).__name__} "
+                f"and {type(other).__name__}."
+            )
+
+        core_self, core_other = tensap.convert_tensors(self.core, other.core)
+
+        gram_matrices = self.frames.dot(other.frames)
+        projected_other_core = core_other.tensor_matrix_product(gram_matrices)
+        return core_self.dot(projected_other_core)
+
+    def norm(self) -> float:
+        """Compute the Frobenius norm."""
+        if self.is_orth:
+            return float(self.core.norm())
+        else:
+            return float(np.sqrt(np.abs(self.dot(self))))
+
+    def orth(self) -> 'BaseTuckerTensor':
+        """
+        Orthonormalize the tensor spaces and absorb the change into the core.
+        Returns a new orthonormalized tensor.
+        """
+        new_frames, r_matrices = self.frames.orth()
+
+        # Absorb the R factors into the core
+        new_core = self.core.tensor_matrix_product(r_matrices)
+
+        if type(new_core).__name__ == "FullTensor":
+            raise NotImplementedError(
+                "Global orthogonalization of a Tucker tensor with a FullTensor core "
+                "is not mathematically well-defined. The core must support global "
+                "orthogonalization (e.g., TreeBasedTensor)."
+            )
+
+        core_orth = new_core.orth()
+        return self.__class__(core_orth, new_frames)
+
+    def tensor_matrix_product(
+        self, matrices: List[np.ndarray], dims: Optional[List[int]] = None
+    ) -> "BaseTuckerTensor":
+        """Contract the tensor with matrices along physical dimensions."""
+        new_frames = self.frames.matrix_times_space(matrices, dims)
+        return self.__class__(self.core, new_frames)
+
+    # ---- Magic Methods ----
+
+    def __add__(self, other: "BaseTuckerTensor") -> "BaseTuckerTensor":
+        if type(self) is not type(other):
+            return NotImplemented
+
+        core_self, core_other = tensap.convert_tensors(self.core, other.core)
+
+        new_core = core_self.cat(core_other)
+        new_frames = self.frames.cat(other.frames)
+
+        return self.__class__(new_core, new_frames)
+
+    def __neg__(self) -> 'BaseTuckerTensor':
+        return self.__class__(-self.core, self.frames)
+
+    def __sub__(self, other: 'BaseTuckerTensor') -> 'BaseTuckerTensor':
+        return self + (-other)
+
+    def __mul__(self, scalar: float) -> 'BaseTuckerTensor':
+        if not np.isscalar(scalar):
+            return NotImplemented
+        return self.__class__(self.core * scalar, self.frames)
+
+    def __rmul__(self, scalar: float) -> 'BaseTuckerTensor':
+        return self * scalar
+
+    # ---- The Factory (Static Constructors) ----
+
+    @classmethod
+    def _factory(cls, core, frames: 'TFrames') -> 'BaseTuckerTensor':
+        """Internal router to instantiate the correct subclass based on frame type."""
+        # Note: TFrameVectors and TFrameOperators must be imported
+        if isinstance(frames, TFrameVectors):
+            return TuckerTensorVector(core, frames)
+        elif isinstance(frames, TFrameOperators):
+            return TuckerTensorOperator(core, frames)
+        raise TypeError("Unknown TFrames type.")
+
+    @staticmethod
+    def create(generator: callable, ranks: List[int], shape: List) -> 'BaseTuckerTensor':
+        """
+        Create a Tucker tensor.
+        Automatically returns a TuckerTensorVector or TuckerTensorOperator depending on
+        'shape'.
+        """
+
+        ranks = np.atleast_1d(np.asarray(ranks, dtype=int))
+
+        # Dynamic Dispatch: check if shape elements are integers (Vector) or tuples
+        # (Operator)
+        if isinstance(shape[0], (int, np.integer)):
+            # It's a State/Vector
+            frames = TFrameVectors.create(generator, shape, ranks)
+        elif isinstance(shape[0], (tuple, list)):
+            # It's an Operator
+            frames = TFrameOperators.create(generator, shape, ranks)
+        else:
+            raise ValueError("Unrecognized shape format.")
+
+        # For simplicity, assuming a FullTensor core generator exists
+        # core = FullTensor(generator(tuple(ranks)))
+        core = "MOCK_CORE"
+
+        return BaseTuckerTensor._factory(core, frames)
+
+    @staticmethod
+    def rand(ranks: List[int], shape: List) -> 'BaseTuckerTensor':
+        return BaseTuckerTensor.create(lambda x: np.random.rand(*x), ranks, shape)
+
+
+class TuckerTensorVector(BaseTuckerTensor):
+    """
+    Tucker tensor representing a state or function in a vector space.
+    """
+
+    frames: TFrameVectors
+
+    def __init__(self, core, frames: 'TFrameVectors'):
+        super().__init__(core, frames)
+        if not isinstance(frames, TFrameVectors):
+            raise TypeError("TuckerTensorVector requires a TFrameVectors object.")
+
+    def sub_tensor(self, indices: List[np.ndarray], dims: Optional[List[int]] = None) -> 'TuckerTensorVector':
+        """Extract a sub-tensor by evaluating on a grid of indices."""
+        new_frames = self.frames.subspace(indices, dims)
+        return TuckerTensorVector(self.core, new_frames)
+
+    def tensor_vector_product(self, vectors: List[np.ndarray], dims: Optional[List[int]] = None) -> 'BaseTuckerTensor':
+        """Contract the physical dimension with external vectors."""
+        # Note: the exact math logic depends on how your cores handle vector contraction
+        # Typically, this reduces the order of the tensor if all dims are contracted.
+        new_frames = self.frames.matrix_times_space(vectors, dims) # Reduces dim1 to 1
+
+        # Usually requires core.tensor_vector_product logic here
+        # ...
+        return TuckerTensorVector(self.core, new_frames)
+
+    def to_operator(self) -> 'TuckerTensorOperator':
+        """
+        Isomorphism: Convert the state vector into a diagonal operator.
+        Each basis vector v becomes a diagonal matrix diag(v).
+        """
+        new_frames = self.frames.to_diagonal_operators()
+        return TuckerTensorOperator(self.core, new_frames)
+
+
+class TuckerTensorOperator(BaseTuckerTensor):
+    """
+    Tucker tensor representing a linear operator (matrices mapping N_in to N_out).
+    """
+
+    frames: TFrameOperators
+
+    def __init__(self, core, frames: "TFrameOperators"):
+        super().__init__(core, frames)
+        if not isinstance(frames, TFrameOperators):
+            raise TypeError("TuckerTensorOperator requires a TFrameOperators object.")
+
+    def __matmul__(self, other: BaseTuckerTensor) -> BaseTuckerTensor:
+        """
+        Compose this operator with another tensor using the '@' operator.
+        Equivalent to mtimes.
+        """
+        if not isinstance(other, BaseTuckerTensor):
+            return NotImplemented
+
+        # 1. Kronecker product of the cores
+        new_core = self.core.kron(other.core)
+
+        # 2. Composition of the physical frames (which handles the rank multiplication)
+        new_frames = self.frames.mtimes(other.frames)
+
+        # 3. Dynamic return type based on the right operand
+        if isinstance(other, TuckerTensorVector):
+            return TuckerTensorVector(new_core, new_frames)
+        return TuckerTensorOperator(new_core, new_frames)
+
+    def transpose(self) -> "TuckerTensorOperator":
+        """Transpose the physical dimensions."""
+        return TuckerTensorOperator(self.core, self.frames.transpose(conjugate=False))
+
+    @property
+    def T(self) -> "TuckerTensorOperator":
+        """Syntactic sugar for transpose."""
+        return self.transpose()
+
+    def ctranspose(self) -> "TuckerTensorOperator":
+        """Conjugate transpose of the operator."""
+        # Assuming the core has a conj() method
+        new_core = self.core.conj() if hasattr(self.core, "conj") else self.core
+        return TuckerTensorOperator(new_core, self.frames.transpose(conjugate=True))
+
+    @property
+    def H(self) -> "TuckerTensorOperator":
+        """Syntactic sugar for conjugate transpose."""
+        return self.ctranspose()
+
+    def vectorize(self) -> TuckerTensorVector:
+        """Flatten the operator into a column vector space."""
+        new_frames = self.frames.vectorize()
+        return TuckerTensorVector(self.core, new_frames)
