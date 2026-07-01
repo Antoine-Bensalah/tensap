@@ -112,6 +112,8 @@ class TFrames:
 class TFrameVectors(TFrames):
     """Orchestrates tensor product of vector spaces (states, functions)."""
 
+    frames: List[FrameVector]
+
     def __init__(self, frames: List[FrameVector]):
         super().__init__(frames)
 
@@ -145,6 +147,8 @@ class TFrameVectors(TFrames):
 
 class TFrameOperators(TFrames):
     """Orchestrates tensor product of operator spaces."""
+
+    frames: List[FrameOperator]
 
     def __init__(self, frames: List[FrameOperator]):
         super().__init__(frames)
