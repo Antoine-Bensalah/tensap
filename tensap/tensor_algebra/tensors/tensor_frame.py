@@ -28,6 +28,10 @@ class TFrames:
         """Tuple containing the physical shape (dim1, dim2) of each frame."""
         return tuple(frame.shape for frame in self.frames)
 
+    @property
+    def is_orth(self):
+        return all(frame.is_orth for frame in self.frames)
+
     def matrix_times_space(
         self, matrices: List[np.ndarray], dims: Optional[List[int]] = None
     ) -> "TFrames":
