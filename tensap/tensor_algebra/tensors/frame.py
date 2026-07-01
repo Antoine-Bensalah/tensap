@@ -107,6 +107,14 @@ class FrameVector(Frame):
 
         return FrameOperator(new_data)
 
+    def to_diagonal_operator(self) -> 'FrameOperator':
+        """Convert the vector frame into an operator frame (diagonal matrices)."""
+        # (R, N1, 1) -> (R, N1, N1)
+        new_data = np.zeros((self.rank, self.dim1, self.dim1), dtype=self.data.dtype)
+        idx = np.arange(self.dim1)
+        new_data[:, idx, idx] = self.data[:, :, 0]
+        return FrameOperator(new_data)
+
 
 class FrameOperator(Frame):
     """
