@@ -297,18 +297,6 @@ class BaseTuckerTensor:
             f"\tis_orth = {self.is_orth}>"
         )
 
-    # ---- The Factory (Static Constructors) ----
-
-    @classmethod
-    def _factory(cls, core, frames: 'TFrame') -> 'BaseTuckerTensor':
-        """Internal router to instantiate the correct subclass based on frame type."""
-        # Note: TFrameVectors and TFrameOperators must be imported
-        if isinstance(frames, TFrameVector):
-            return TuckerTensorVector(core, frames)
-        elif isinstance(frames, TFrameOperator):
-            return TuckerTensorOperator(core, frames)
-        raise TypeError("Unknown TFrames type.")
-
     @staticmethod
     def create(generator: callable, ranks: List[int], shape: List) -> 'BaseTuckerTensor':
         """
