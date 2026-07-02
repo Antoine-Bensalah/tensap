@@ -59,7 +59,7 @@ class TestConstruction:
     @staticmethod
     def test_from_tree_based_tensor():
         rng = np.random.RandomState(0)
-        t1 = tensap.TuckerLikeTensor.randn([2, 3], [5, 6])
+        t1 = BaseTuckerTensor.randn([2, 3], [5, 6])
         tbt = t1.tree_based_tensor()
         t2 = BaseTuckerTensor.from_tree_based_tensor(tbt)
         assert isinstance(t2, TuckerTensorVector)
