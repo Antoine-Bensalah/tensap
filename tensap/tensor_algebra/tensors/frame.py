@@ -87,6 +87,27 @@ class Frame:
         new_data = Q.T.reshape(self.rank, self.dim1, self.dim2)
         return self.__class__(new_data, is_orth=True), R_fact
 
+    def cat(self, other: "Frame") -> "Frame":
+        """Concatenates the elements (sum of corresponding subspaces)."""
+        if self.dim1 != other.dim1 or self.dim2 != other.dim2:
+            raise ValueError(
+                "Physical dimensions must match for standard concatenation."
+            )
+
+        # concatenate the on the ranks axis
+        new_data = np.concatenate((self.data, other.data), axis=0)
+        return self.__class__(new_data, is_orth=False)
+
+    def eval_in_space(self, coefs: np.ndarray) -> np.ndarray:
+        """
+        Evaluates a vector/operator from its coefficients on the basis.
+        y = sum_i c_i * space[i]
+        """
+        if coefs.ndim != 1 or len(coefs) != self.rank:
+            raise ValueError(f"Coefficients must be 1D array of size {self.rank}.")
+
+        return np.tensordot(coefs, self.data, axes=(0, 0))
+
 
 class FrameVector(Frame):
     """
@@ -126,6 +147,45 @@ class FrameVector(Frame):
         idx = np.arange(self.dim1)
         new_data[:, idx, idx] = self.data[:, :, 0]
         return FrameOperator(new_data)
+
+    def dot_with_metric(
+        self, other: "FrameVector", metric: "FrameOperator"
+    ) -> np.ndarray:
+        """
+        Inner product of basis vectors with a given metric.
+        M[m, i, j] = self[i]^T * metric[m] * other[j]
+        """
+        if metric.dim1 != self.dim1 or metric.dim2 != other.dim1:
+            raise ValueError("Incompatible physical dimensions for metric contraction.")
+
+        # apply metrics to other
+        # metric: (R3, N2, M2)
+        # other: (R2, M2, 1)
+        # tmp: (R3, N1, R2, 1)
+        temp = np.tensordot(metric.data, other.data, axes=(2, 1))
+
+        # compute the inner products
+        # self_conj: (R1, N1, 1)
+        # temp: (R3, N1, R2, 1)
+        # res: (R1, R3, R2)
+        res = np.tensordot(np.conj(self.data), temp, axes=([1, 2], [1, 3]))
+
+        # target output shape: (R3, R1, R2)
+        gram = res.swapaxes(0, 1)
+
+        return gram
+
+    def diag_cat(self, other: "FrameVector") -> "FrameVector":
+        new_rank = self.rank + other.rank
+        new_dim1 = self.dim1 + other.dim1
+        new_dim2 = 1
+
+        new_data = np.zeros((new_rank, new_dim1, new_dim2), dtype=self.data.dtype)
+        new_data[0 : self.rank, 0 : self.dim1, 0] = self.data[:, :, 0]
+        new_data[self.rank :, self.dim1 :, 0] = other.data[:, :, 0]
+
+        return self.__class__(new_data, is_orth=False)
+
 
 
 class FrameOperator(Frame):

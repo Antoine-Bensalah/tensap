@@ -119,6 +119,20 @@ class TFrames:
 
         return self.__class__(new_frames), r_matrices
 
+    def cat(self, other: "TFrames") -> "TFrames":
+        """Concatenates the elements of two TFrames."""
+        if self.order != other.order:
+            raise ValueError("Spaces must have the same order.")
+
+        new_frames = [
+            f_self.cat(f_other) for f_self, f_other in zip(self.frames, other.frames)
+        ]
+        return self.__class__(new_frames)
+
+    def eval_in_space(self, dim: int, coefs: np.ndarray) -> np.ndarray:
+        """Evaluates a vector/operator from its coefficients on the basis."""
+        return self.frames[dim].eval_in_space(coefs)
+
     def permute(self, dims: Sequence[int]) -> "TFrames":
         """
         Reorder the tensor dimensions.
@@ -213,6 +227,38 @@ class TFrameVectors(TFrames):
             new_frames[dim] = self.frames[dim].subspace(idx)
 
         return TFrameVectors(new_frames)
+
+    def dot_with_metrics(
+        self,
+        other: "TFrameVectors",
+        metrics: "TFrameOperators",
+        dims: Optional[List[int]] = None,
+    ) -> List[np.ndarray]:
+        """
+        Inner products of basis vectors with a given metric provided by a TFrameOperators.
+        Returns a list of 3D arrays of shape (Rank_metric, Rank_self, Rank_other).
+        """
+        if dims is None:
+            dims = list(range(self.order))
+
+        gram_matrices = []
+        for dim in dims:
+            gram_matrices.append(
+                self.frames[dim].dot_with_metric(other.frames[dim], metrics.frames[dim])
+            )
+
+        return gram_matrices
+
+    def diag_cat(self, other: "TFrameVectors") -> "TFrameVectors":
+        """Concatenates the elements of two TFrames in a block-diagonal way."""
+        if self.order != other.order:
+            raise ValueError("Spaces must have the same order.")
+
+        new_frames = [
+            f_self.diag_cat(f_other)
+            for f_self, f_other in zip(self.frames, other.frames)
+        ]
+        return self.__class__(new_frames)
 
     def unvectorize(
         self, dims1: List[int], dims2: List[int]
