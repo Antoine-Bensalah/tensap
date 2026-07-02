@@ -36,6 +36,14 @@ class Frame:
     def is_orth(self):
         return self._is_orth
 
+    def storage(self) -> int:
+        """Return the storage complexity (total number of elements) of this frame"""
+        return self.data.size
+
+    def sparse_storage(self) -> int:
+        """Return the number of non-zero entries of this frame"""
+        return int(np.count_nonzero(self.data))
+
     # --- fundamental tensorial algebra ---
     def matrix_times_space(self, mat) -> 'Frame':
         """Left multiplication of the frame elements"""

@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Sequence, Callable
 import numpy as np
 
 from .frame import Frame, FrameVector, FrameOperator
@@ -19,7 +19,7 @@ class TFrames:
         return len(self.frames)
 
     @property
-    def ranks(self) -> Tuple[int, ...]:
+    def representation_ranks(self) -> Tuple[int, ...]:
         """Tuple of the representation ranks for each dimension."""
         return tuple(frame.rank for frame in self.frames)
 
@@ -31,6 +31,14 @@ class TFrames:
     @property
     def is_orth(self):
         return all(frame.is_orth for frame in self.frames)
+
+    def storage(self) -> int:
+        """Return the total storage complexity of all tensor spaces combined"""
+        return sum(frame.storage() for frame in self.frames)
+
+    def sparse_storage(self) -> int:
+        """Return the total number of non-zero entries across all spaces"""
+        return sum(frame.storage() for frame in self.frames)
 
     def matrix_times_space(
         self, matrices: List[np.ndarray], dims: Optional[List[int]] = None
@@ -111,6 +119,73 @@ class TFrames:
 
         return self.__class__(new_frames), r_matrices
 
+    def permute(self, dims: Sequence[int]) -> "TFrames":
+        """
+        Reorder the tensor dimensions.
+
+        Parameters
+        ----------
+        dims: Sequence[int]
+            A permutation of the integers from 0 to order-1
+
+        Returns
+        -------
+        TFrames
+            A new TFrames instance with reordered frames
+        """
+
+        if len(dims) != self.order:
+            raise ValueError(
+                f"permute: 'dims' must have the same lenght as the tensor oder"
+                f"(expected {self.order}, got {len(dims)}"
+            )
+
+        if set(dims) != set(range(self.order)):
+            raise ValueError(
+                "permute: 'dims' must be a valid permutation of indices from 0 to "
+                f"order - 1, got {dims}"
+            )
+
+        new_frames = [self.frames[i] for i in dims]
+        return self.__class__(new_frames)
+
+    def keep_space(self, dims: Sequence[int]) -> "TFrames":
+        """
+        Keep only the specified dimensions, reducing the tensor order.
+
+        Parameters
+        ----------
+        dims: Sequence[int]
+            The indices of the dimensions to keep
+
+        Returns
+        -------
+        TFrames
+            A new TFrames instance containing only the kept dimensions
+        """
+        if any(i < 0 or i >= self.order for i in dims):
+            raise IndexError("keep_space: dimension index out of bounds.")
+
+        new_frames = [self.frames[i] for i in dims]
+        return self.__class__(new_frames)
+
+    def remove_space(self, dims: Sequence[int]) -> "TFrames":
+        """
+        Remove the specified dimensions, reducing the tensor order.
+
+        Parameters
+        ----------
+        dims : Sequence[int]
+            The indices of the dimensions to remove.
+
+        Returns
+        -------
+        TFrames
+            A new TFrames instance without the specified dimensions.
+        """
+        keep = [i for i in range(self.order) if i not in dims]
+        return self.keep_space(keep)
+
 
 class TFrameVectors(TFrames):
     """Orchestrates tensor product of vector spaces (states, functions)."""
@@ -158,6 +233,49 @@ class TFrameVectors(TFrames):
         new_frames = [frame.to_diagonal_operator() for frame in self.frames]
         return TFrameOperators(new_frames)
 
+    @classmethod
+    def _generate(
+        cls, dims: Sequence[int], ranks: Sequence[int], generator: Callable
+    ) -> "TFrameVectors":
+        """Utility method to generate TFrameVectors."""
+        if len(dims) != len(ranks):
+            raise ValueError("Length of 'dims' and 'ranks' must match.")
+
+        frames = []
+        for d, r in zip(dims, ranks):
+            # convention (Rank, dim1, dim2=1)
+            data = generator((r, d, 1))
+            frames.append(FrameVector(data))
+        return cls(frames)
+
+    @classmethod
+    def zeros(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+        return cls._generate(dims, ranks, np.zeros)
+
+    @classmethod
+    def ones(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+        return cls._generate(dims, ranks, np.ones)
+
+    @classmethod
+    def rand(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+        return cls._generate(dims, ranks, lambda shape: np.random.uniform(size=shape))
+
+    @classmethod
+    def randn(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+        return cls._generate(dims, ranks, lambda shape: np.random.normal(size=shape))
+
+    @classmethod
+    def eye(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+        """Canonical basis for each Frame"""
+        if len(dims) != len(ranks):
+            raise ValueError("Length of 'dims' and 'ranks' must match.")
+
+        frames = []
+        for d, r in zip(dims, ranks):
+            data = np.eye(r, d).reshape(r, d, 1)
+            frames.append(FrameVector(data))
+        return cls(frames)
+
 
 class TFrameOperators(TFrames):
     """Orchestrates tensor product of operator spaces."""
@@ -195,3 +313,67 @@ class TFrameOperators(TFrames):
         """Flatten all operators into column vector spaces."""
         new_frames = [frame.vectorize() for frame in self.frames]
         return TFrameVectors(new_frames)
+
+    @classmethod
+    def _generate(
+        cls,
+        dims1: Sequence[int],
+        dims2: Sequence[int],
+        ranks: Sequence[int],
+        generator: Callable,
+    ) -> "TFrameOperators":
+        if not (len(dims1) == len(dims2) == len(ranks)):
+            raise ValueError("Lengths of dims1, dims2 and ranks must match.")
+
+        frames = []
+        for d1, d2, r in zip(dims1, dims2, ranks):
+            # convention (Rank, dim1, dim2)
+            data = generator((r, d1, d2))
+            frames.append(FrameOperator(data))
+        return cls(frames)
+
+    @classmethod
+    def zeros(
+        cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
+    ) -> "TFrameOperators":
+        return cls._generate(dims1, dims2, ranks, np.zeros)
+
+    @classmethod
+    def ones(
+        cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
+    ) -> "TFrameOperators":
+        return cls._generate(dims1, dims2, ranks, np.ones)
+
+    @classmethod
+    def rand(
+        cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
+    ) -> "TFrameOperators":
+        return cls._generate(
+            dims1, dims2, ranks, lambda shape: np.random.uniform(size=shape)
+        )
+
+    @classmethod
+    def randn(
+        cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
+    ) -> "TFrameOperators":
+        return cls._generate(
+            dims1, dims2, ranks, lambda shape: np.random.normal(size=shape)
+        )
+
+    @classmethod
+    def eye(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameOperators":
+        """
+        Create an identity operator on the tensor space.
+        The frames are generated by only one operator for each dimension: the identity.
+        If ranks are more than 1, one completes by zero operators.
+        """
+        if len(dims) != len(ranks):
+            raise ValueError("Length of 'dims' and 'ranks' must match.")
+
+        frames = []
+        for d, r in zip(dims, ranks):
+            # (Rank, dim1, dim2) -> (r, d, d)
+            data = np.zeros((r, d, d))
+            data[0, :, :] = np.eye(d)
+            frames.append(FrameOperator(data))
+        return cls(frames)
