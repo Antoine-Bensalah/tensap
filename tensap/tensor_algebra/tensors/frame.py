@@ -12,6 +12,7 @@ class Frame:
         self._dim1 = data.shape[1]
         self._dim2 = data.shape[2]
         self.data = data
+        self.data.flags.writeable = False # immutable object
         self._is_orth = is_orth
 
     # --- geometric properties ---
@@ -38,7 +39,6 @@ class Frame:
     # --- fundamental tensorial algebra ---
     def matrix_times_space(self, mat) -> 'Frame':
         """Left multiplication of the frame elements"""
-        # todo : rename contract_physical ?
         if mat.shape[1] != self.dim1:
             raise ValueError(f"Matrix shape {mat.shape} incompatible with "
                              f"dim1 of the Frame: {self.dim1}")
@@ -51,7 +51,6 @@ class Frame:
 
     def space_times_matrix(self, mat) -> 'Frame':
         """Change of frame by linear combination"""
-        # todo: rename contract_rank
         if mat.shape[0] != self.rank:
             raise ValueError(f"Matrix shape {mat.shape[0]} is incompatible "
                              f"with the representation rank of the "
@@ -136,20 +135,21 @@ class FrameOperator(Frame):
                              f"self.dim2={self.dim2} != other.dim1={other.dim1}")
 
         # self.data  : (R_a, N1, N2)
-        # other.data : (R_b, N2, M)
-        # new_data: (R_a, R_b, N1, M)
+        # other.data : (R_b, M1, M2) with M1 = N2
+        # new_data: (R_a, R_b, N1, M2)
         new_data = np.tensordot(self.data, other.data,
                                 axes=(2, 1)).swapaxes(1, 2)
 
         new_rank = self.rank * other.rank
-        # lexicographic ordering on (R_a, R_b) -> new_data (R_a.R_b, N1, M)
+        # lexicographic ordering on (R_a, R_b) -> new_data (R_a.R_b, N1, M2)
         new_data = new_data.reshape(new_rank, self.dim1, other.dim2)
         return other.__class__(new_data)
 
     def transpose(self, conjugate: bool=False) -> 'FrameOperator':
-        """Transpose (or conjugate transpose) the physical dimensions."""
-        # data: (R, N1, N2)
-        # Keep the rank axis (0) intact, swap the physical axes (1 and 2)
+        """Transpose (or conjugate transpose) the physical dimensions.
+        data: (R, N1, N2)
+        Keep the rank axis (0) intact, swap the physical axes (1 and 2)
+        """
         t_data = self.data.transpose(0, 2, 1)
 
         if conjugate:
@@ -168,8 +168,9 @@ class FrameOperator(Frame):
         return self.transpose(conjugate=True)
 
     def vectorize(self) -> 'FrameVector':
-        """Flatten the operator into a column vector space."""
-        # Reshape from (R, N1, N2) to (R, N1 * N2, 1)
+        """Flatten the operator into a column vector space.
+        Reshape from (R, N1, N2) to (R, N1 * N2, 1) and transform into a FrameVector.
+        """
         new_dim = self.dim1 * self.dim2
         new_data = self.data.reshape(self.rank, new_dim, 1)
 

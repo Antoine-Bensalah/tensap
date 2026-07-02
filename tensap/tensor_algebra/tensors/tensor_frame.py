@@ -36,17 +36,15 @@ class TFrames:
         self, matrices: List[np.ndarray], dims: Optional[List[int]] = None
     ) -> "TFrames":
         """Apply physical contraction on specified dimensions."""
-        # todo: rename contract_physical ?
         if dims is None:
             dims = list(range(self.order))
 
         if len(matrices) != len(dims):
             raise ValueError(
-                "The number of matrices must match the number of "
-                "specified dimensions."
+                "The number of matrices must match the number of specified dimensions."
             )
 
-        new_frames = list(self.frames)
+        new_frames = list(self.frames) # shallow copy
         for dim, mat in zip(dims, matrices):
             new_frames[dim] = self.frames[dim].matrix_times_space(mat)
 
@@ -58,15 +56,15 @@ class TFrames:
             dims: Optional[List[int]] = None
     ) -> 'TFrames':
         """Apply rank contraction (change of basis) on specified dimensions."""
-        # todo: rename contract_rank ?
         if dims is None:
             dims = list(range(self.order))
 
         if len(matrices) != len(dims):
-            raise ValueError("The number of matrices must match the number of "
-                             "specified dimensions.")
+            raise ValueError(
+                "The number of matrices must match the number of specified dimensions."
+            )
 
-        new_frames = list(self.frames)
+        new_frames = list(self.frames) # shallow copy
         for dim, mat in zip(dims, matrices):
             new_frames[dim] = self.frames[dim].space_times_matrix(mat)
 
@@ -105,10 +103,11 @@ class TFrames:
             dims = list(range(self.order))
 
         new_frames = list(self.frames)
-        r_matrices = [None] * self.order
+        r_matrices = []
 
         for dim in dims:
-            new_frames[dim], r_matrices[dim] = self.frames[dim].orth()
+            new_frames[dim], r_mat = self.frames[dim].orth()
+            r_matrices.append(r_mat)
 
         return self.__class__(new_frames), r_matrices
 
@@ -128,19 +127,30 @@ class TFrameVectors(TFrames):
         if dims is None:
             dims = list(range(self.order))
 
+        if len(indices) != len(dims):
+            raise ValueError(
+                "The number of index arrays must match the number of specified "
+                "dimensions."
+            )
+
         new_frames = list(self.frames)
-        for i, dim in enumerate(dims):
-            new_frames[dim] = self.frames[dim].subspace(indices[i])
+        for idx, dim in zip(indices, dims):
+            new_frames[dim] = self.frames[dim].subspace(idx)
 
         return TFrameVectors(new_frames)
 
     def unvectorize(
-        self, shapes_out: List[int], shapes_in: List[int]
+        self, dims1: List[int], dims2: List[int]
     ) -> "TFrameOperators":
         """Reshape the vector spaces into operator spaces."""
+        if len(dims1) != self.order or len(dims2) != self.order:
+            raise ValueError(
+                "The length of dims1 and dims2 must match the order of the tensor."
+            )
+
         new_frames = []
         for i, frame in enumerate(self.frames):
-            new_frames.append(frame.unvectorize(shapes_out[i], shapes_in[i]))
+            new_frames.append(frame.unvectorize(dims1[i], dims2[i]))
         return TFrameOperators(new_frames)
 
     def to_diagonal_operators(self) -> "TFrameOperators":
