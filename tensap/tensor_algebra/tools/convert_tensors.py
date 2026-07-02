@@ -7,6 +7,15 @@ and ``kron`` can proceed.  Based on MATLAB's ``convertTensors``.
 import tensap
 
 
+def _canonical_to_tucker(canonical: "tensap.CanonicalTensor") -> "tensap.TuckerTensorVector":
+    """Wrap a CanonicalTensor into a TuckerTensorVector."""
+    frames = tensap.TFrameVector([
+        tensap.FrameVector(f.T.reshape(f.shape[1], f.shape[0], 1))
+        for f in canonical.space
+    ])
+    return tensap.TuckerTensorVector(canonical.core, frames)
+
+
 def convert_tensors(x, y):
     """Align two tensors to a common type for binary operations.
 
@@ -26,7 +35,7 @@ def convert_tensors(x, y):
         If no conversion path exists between the two types.
     """
     _TYPES = (tensap.FullTensor, tensap.DiagonalTensor, tensap.SparseTensor,
-              tensap.CanonicalTensor, tensap.TreeBasedTensor, tensap.TuckerLikeTensor)
+              tensap.CanonicalTensor, tensap.TreeBasedTensor, tensap.BaseTuckerTensor)
 
     if not isinstance(x, _TYPES) or not isinstance(y, _TYPES):
         raise NotImplementedError(
@@ -55,18 +64,18 @@ def convert_tensors(x, y):
     if isinstance(y, tensap.SparseTensor) and isinstance(x, tensap.DiagonalTensor):
         return x.sparse(), y
 
-    # CanonicalTensor + TuckerLikeTensor → TLT(canonical)
-    if isinstance(x, tensap.CanonicalTensor) and isinstance(y, tensap.TuckerLikeTensor):
-        x = tensap.TuckerLikeTensor(x.core, x.space)
+    # CanonicalTensor + BaseTuckerTensor → TuckerTensorVector(canonical)
+    if isinstance(x, tensap.CanonicalTensor) and isinstance(y, tensap.BaseTuckerTensor):
+        x = _canonical_to_tucker(x)
         return convert_tensors(x, y)
-    if isinstance(y, tensap.CanonicalTensor) and isinstance(x, tensap.TuckerLikeTensor):
-        y = tensap.TuckerLikeTensor(y.core, y.space)
+    if isinstance(y, tensap.CanonicalTensor) and isinstance(x, tensap.BaseTuckerTensor):
+        y = _canonical_to_tucker(y)
         return convert_tensors(x, y)
 
-    # TuckerLikeTensor + TuckerLikeTensor — align cores
-    if isinstance(x, tensap.TuckerLikeTensor) and isinstance(y, tensap.TuckerLikeTensor):
+    # BaseTuckerTensor + BaseTuckerTensor — align cores
+    if isinstance(x, tensap.BaseTuckerTensor) and isinstance(y, tensap.BaseTuckerTensor):
         cx, cy = convert_tensors(x.core, y.core)
-        return tensap.TuckerLikeTensor(cx, x.space), tensap.TuckerLikeTensor(cy, y.space)
+        return type(x)._factory(cx, x.tensor_frame), type(y)._factory(cy, y.tensor_frame)
 
     raise NotImplementedError(
         f"Cannot convert {type(x).__name__} and {type(y).__name__} "
