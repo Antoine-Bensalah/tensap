@@ -122,7 +122,7 @@ class FrameVector(Frame):
                 f"A FrameVector must have an input dimension (dim2) of 1, "
                 f"but got {self.dim2}.")
 
-    def subspace(self, dim1_idx) -> 'FrameVector':
+    def eval_at_indices(self, dim1_idx) -> 'FrameVector':
         """Extract a sub-frame (evaluate at specific indices)."""
         # self.data: (R, N1, 1)
         # new_data: (R, N2, 1) with N2 = #dim1_idx

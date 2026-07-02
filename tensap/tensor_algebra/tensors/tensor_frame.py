@@ -209,7 +209,7 @@ class TFrameVectors(TFrames):
     def __init__(self, frames: List[FrameVector]):
         super().__init__(frames)
 
-    def subspace(
+    def eval_at_indices(
         self, indices: List[np.ndarray], dims: Optional[List[int]] = None
     ) -> "TFrameVectors":
         """Extract a sub-tensor space (evaluate at specific indices)."""
@@ -224,7 +224,7 @@ class TFrameVectors(TFrames):
 
         new_frames = list(self.frames)
         for idx, dim in zip(indices, dims):
-            new_frames[dim] = self.frames[dim].subspace(idx)
+            new_frames[dim] = self.frames[dim].eval_at_indices(idx)
 
         return TFrameVectors(new_frames)
 

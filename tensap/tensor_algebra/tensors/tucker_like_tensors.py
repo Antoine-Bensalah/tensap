@@ -887,7 +887,7 @@ class TuckerTensorVector(BaseTuckerTensor):
 
     def sub_tensor(self, indices: List[np.ndarray], dims: Optional[List[int]] = None) -> 'TuckerTensorVector':
         """Extract a sub-tensor by evaluating on a grid of indices."""
-        new_frames = self.frames.subspace(indices, dims)
+        new_frames = self.frames.eval_at_indices(indices, dims)
         return TuckerTensorVector(self.core, new_frames)
 
     def tensor_vector_product(self, vectors: List[np.ndarray], dims: Optional[List[int]] = None) -> 'BaseTuckerTensor':
