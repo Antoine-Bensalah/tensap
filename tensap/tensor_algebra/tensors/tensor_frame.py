@@ -38,7 +38,7 @@ class TFrames:
 
     def sparse_storage(self) -> int:
         """Return the total number of non-zero entries across all spaces"""
-        return sum(frame.storage() for frame in self.frames)
+        return sum(frame.sparse_storage() for frame in self.frames)
 
     def matrix_times_space(
         self, matrices: List[np.ndarray], dims: Optional[List[int]] = None
