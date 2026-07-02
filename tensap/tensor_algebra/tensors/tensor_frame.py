@@ -119,6 +119,23 @@ class TFrame:
 
         return self.__class__(new_frames), r_matrices
 
+    def get_vectorize_factors(self) -> List[np.ndarray]:
+        """Return the Tucker factors in vectorized (2D) format.
+
+        Each 3D array is flattened to 2D ``(-1, Rank)``:
+        ``(Rank, N1, N2)`` becomes ``(N1 * N2, Rank)``.
+
+        Returns
+        -------
+        list of numpy.ndarray
+        """
+        return [
+            s.data.transpose(1, 2, 0).reshape(d1 * d2, r)
+            for s, (d1, d2), r in zip(
+                self.frames, self.shape, self.representation_ranks
+            )
+        ]
+
     def cat(self, other: "TFrame") -> "TFrame":
         """Concatenates the elements of two TFrames."""
         if self.order != other.order:

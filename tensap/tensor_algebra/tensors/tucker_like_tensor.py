@@ -9,6 +9,7 @@ import numpy as np
 import tensap
 from typing import Union, List, Tuple, Optional
 from .tensor_frame import TFrame, TFrameVector, TFrameOperator
+from .frame import Frame, FrameVector, FrameOperator
 
 
 class TuckerLikeTensor:
@@ -736,7 +737,7 @@ class BaseTuckerTensor:
 
     @property
     def ranks(self) -> tuple:
-        return self.frames.ranks
+        return self.frames.representation_ranks
 
     @property
     def shape(self) -> tuple:
@@ -745,6 +746,81 @@ class BaseTuckerTensor:
     @property
     def is_orth(self) -> bool:
         return self.core.is_orth and self.frames.is_orth
+
+    # --- storage and metrics ---
+
+    def storage(self) -> int:
+        """Return the total storage complexity"""
+        return self.frames.storage() + self.core.storage()
+
+    def sparse_storage(self) -> int:
+        """Return the number of non-zero entries"""
+        return self.frames.sparse_storage() + self.core.sparse_storage()
+
+    def representation_rank(self) -> int:
+        """Return the representation rank (product of subspace dimensions)"""
+        return int(np.prod(self.ranks))
+
+    # --- conversion to dense ---
+
+    def full(self):
+        """
+        Convert the object to a dense tensap.FullTensor.
+        """
+        # 1. Extract matrices of shape (Physical_size, Rank)
+        matrices = self.frames.get_vectorize_factors()
+
+        # 2. Contract the core with these matrices
+        result = self.core.tensor_matrix_product(matrices).full()
+
+        # 3. Reshape the resulting 1D/flat array into the actual physical tensor geometry
+        target_shape = []
+        for frame in self.frames.frames:
+            if frame.dim2 == 1:
+                target_shape.append(frame.dim1)
+            else:
+                target_shape.extend([frame.dim1, frame.dim2])
+
+        return result.reshape(target_shape)
+
+    # --- routing and complex constructors ---
+
+    @classmethod
+    def _factory(cls, core, frames: "TFrame") -> "BaseTuckerTensor":
+        """Internal router to instantiate the correct subclass based on frame type."""
+        if isinstance(frames, TFrameVector):
+            return TuckerTensorVector(core, frames)
+        elif isinstance(frames, TFrameOperator):
+            return TuckerTensorOperator(core, frames)
+        raise TypeError(f"Unknown TFrame type: {type(frames)}")
+
+    @classmethod
+    def from_tree_based_tensor(cls, tree_tensor) -> "BaseTuckerTensor":
+        """
+        Convert a TreeBasedTensor into a Tucker format.
+        """
+        tree = tree_tensor.tree
+        frames_data = []
+
+        for mu in range(tree_tensor.order):
+            nod = tree.dim2ind[mu]
+            idx = nod - 1
+
+            # get the matrix (N, R)
+            if tree_tensor.is_active_node[idx]:
+                mat = tree_tensor.tensors[idx].data
+            else:
+                mat = np.eye(tree_tensor.shape[mu])
+
+            # For FrameVector: (N, R) -> (R, N, 1)
+            N, R = mat.shape
+            data = mat.T.reshape(R, N, 1)
+            frames_data.append(FrameVector(data))
+
+        core = tree_tensor.tensors[0]
+        frames = TFrameVector(frames_data)
+
+        return cls._factory(core, frames)
 
     # ---- Fundamental Algebra ----
 
