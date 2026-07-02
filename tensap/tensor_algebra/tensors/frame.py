@@ -30,7 +30,7 @@ class Frame:
 
     @property
     def shape(self) -> tuple[int, int]:
-        return tuple(self._dim1, self._dim2)
+        return (self._dim1, self._dim2)
 
     @property
     def is_orth(self):
@@ -97,6 +97,16 @@ class Frame:
         # concatenate the on the ranks axis
         new_data = np.concatenate((self.data, other.data), axis=0)
         return self.__class__(new_data, is_orth=False)
+
+    def kron(self, other: 'Frame') -> 'Frame':
+        """Kronecker product with another Frame."""
+        r1, d1a, d1b = self.data.shape
+        r2, d2a, d2b = other.data.shape
+        new_data = np.zeros((r1 * r2, d1a * d2a, d1b * d2b))
+        for i in range(r1):
+            for j in range(r2):
+                new_data[i * r2 + j] = np.kron(self.data[i], other.data[j])
+        return self.__class__(new_data)
 
     def eval_in_space(self, coefs: np.ndarray) -> np.ndarray:
         """
@@ -186,6 +196,15 @@ class FrameVector(Frame):
 
         return self.__class__(new_data, is_orth=False)
 
+    def hadamard(self, other: "FrameVector") -> "FrameVector":
+        """Element-wise (Hadamard) product of two vector frames."""
+        if self.shape != other.shape or self.rank != other.rank:
+            raise ValueError(
+                "Frames must have the exact same shape for Hadamard product."
+            )
+
+        new_data = self.data * other.data
+        return self.__class__(new_data, is_orth=False)
 
 
 class FrameOperator(Frame):

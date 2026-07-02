@@ -217,10 +217,6 @@ class TestTuckerLikeTensor:
         tbt = t.tree_based_tensor()
         assert isinstance(tbt, tensap.TreeBasedTensor)
 
-    def test_abs(self):
-        t = self._make_tucker(2)
-        assert np.allclose(abs(t).core.data, abs(t.core.data))
-
     def test_radd(self):
         t = self._make_tucker(2)
         result = 0 + t

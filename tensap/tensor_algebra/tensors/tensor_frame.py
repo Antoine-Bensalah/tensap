@@ -119,21 +119,29 @@ class TFrame:
 
         return self.__class__(new_frames), r_matrices
 
-    def get_vectorize_factors(self) -> List[np.ndarray]:
-        """Return the Tucker factors in vectorized (2D) format.
+    def get_vectorize_factors(
+        self, dims: Optional[Sequence[int]] = None
+    ) -> List[np.ndarray]:
+        """Return the Tucker factors in vectorized (2D) format for specified dimensions.
 
         Each 3D array is flattened to 2D ``(-1, Rank)``:
         ``(Rank, N1, N2)`` becomes ``(N1 * N2, Rank)``.
+
+        Parameters
+        ----------
+        dims : Sequence[int], optional
+            The dimensions to vectorize. If None, vectorize all dimensions.
 
         Returns
         -------
         list of numpy.ndarray
         """
+        if dims is None:
+            dims = range(self.order)
+
         return [
-            s.data.transpose(1, 2, 0).reshape(d1 * d2, r)
-            for s, (d1, d2), r in zip(
-                self.frames, self.shape, self.representation_ranks
-            )
+            self.frames[d].data.transpose(1, 2, 0).reshape(-1, self.frames[d].rank)
+            for d in dims
         ]
 
     def cat(self, other: "TFrame") -> "TFrame":
@@ -143,6 +151,15 @@ class TFrame:
 
         new_frames = [
             f_self.cat(f_other) for f_self, f_other in zip(self.frames, other.frames)
+        ]
+        return self.__class__(new_frames)
+
+    def kron(self, other: "TFrame") -> "TFrame":
+        """Kronecker product with another TFrame."""
+        if self.order != other.order:
+            raise ValueError("Spaces must have the same order.")
+        new_frames = [
+            f_self.kron(f_other) for f_self, f_other in zip(self.frames, other.frames)
         ]
         return self.__class__(new_frames)
 
@@ -296,6 +313,27 @@ class TFrameVector(TFrame):
         new_frames = [frame.to_diagonal_operator() for frame in self.frames]
         return TFrameOperator(new_frames)
 
+    def hadamard(self, dims: List[int]) -> "FrameVector":
+        """
+        Element-wise product of several dimensions together.
+        Returns a single FrameVector.
+        """
+        if not dims:
+            raise ValueError("Must provide at least one dimension.")
+
+        result = self.frames[dims[0]]
+        for dim in dims[1:]:
+            result = result.hadamard(self.frames[dim])
+
+        return result
+
+    @classmethod
+    def create(
+        cls, generator: Callable, dims: Sequence[int], ranks: Sequence[int]
+    ) -> "TFrameVector":
+        """Create a TFrameVector using a generator function."""
+        return cls._generate(dims, ranks, generator)
+
     @classmethod
     def _generate(
         cls, dims: Sequence[int], ranks: Sequence[int], generator: Callable
@@ -376,6 +414,15 @@ class TFrameOperator(TFrame):
         """Flatten all operators into column vector spaces."""
         new_frames = [frame.vectorize() for frame in self.frames]
         return TFrameVector(new_frames)
+
+    @classmethod
+    def create(
+        cls, generator: Callable, shape, ranks: Sequence[int]
+    ) -> "TFrameOperator":
+        """Create a TFrameOperator using a generator function."""
+        dims1 = [s[0] for s in shape]
+        dims2 = [s[1] for s in shape]
+        return cls._generate(dims1, dims2, ranks, generator)
 
     @classmethod
     def _generate(

@@ -152,9 +152,6 @@ class TuckerLikeTensor:
         """Return the negative of the tensor."""
         return TuckerLikeTensor(-self.core, self.space)
 
-    def __abs__(self):
-        return TuckerLikeTensor(abs(self.core.data), self.space)
-
     # ---- Arithmetic operators ----
 
     def __add__(self, other):
@@ -729,33 +726,33 @@ class BaseTuckerTensor:
 
     def __init__(self, core, frames: 'TFrame'):
         self.core = core
-        self.frames = frames
+        self.tensor_frame = frames
 
     @property
     def order(self) -> int:
-        return self.frames.order
+        return self.tensor_frame.order
 
     @property
     def ranks(self) -> tuple:
-        return self.frames.representation_ranks
+        return self.tensor_frame.representation_ranks
 
     @property
     def shape(self) -> tuple:
-        return self.frames.shape
+        return self.tensor_frame.shape
 
     @property
     def is_orth(self) -> bool:
-        return self.core.is_orth and self.frames.is_orth
+        return self.core.is_orth and self.tensor_frame.is_orth
 
     # --- storage and metrics ---
 
     def storage(self) -> int:
         """Return the total storage complexity"""
-        return self.frames.storage() + self.core.storage()
+        return self.tensor_frame.storage() + self.core.storage()
 
     def sparse_storage(self) -> int:
         """Return the number of non-zero entries"""
-        return self.frames.sparse_storage() + self.core.sparse_storage()
+        return self.tensor_frame.sparse_storage() + self.core.sparse_storage()
 
     def representation_rank(self) -> int:
         """Return the representation rank (product of subspace dimensions)"""
@@ -768,20 +765,24 @@ class BaseTuckerTensor:
         Convert the object to a dense tensap.FullTensor.
         """
         # 1. Extract matrices of shape (Physical_size, Rank)
-        matrices = self.frames.get_vectorize_factors()
+        matrices = self.tensor_frame.get_vectorize_factors()
 
         # 2. Contract the core with these matrices
         result = self.core.tensor_matrix_product(matrices).full()
 
         # 3. Reshape the resulting 1D/flat array into the actual physical tensor geometry
         target_shape = []
-        for frame in self.frames.frames:
+        for frame in self.tensor_frame.frames:
             if frame.dim2 == 1:
                 target_shape.append(frame.dim1)
             else:
                 target_shape.extend([frame.dim1, frame.dim2])
 
         return result.reshape(target_shape)
+
+    def numpy(self) -> np.ndarray:
+        """Convert to a dense numpy.ndarray."""
+        return self.full().numpy()
 
     # --- routing and complex constructors ---
 
@@ -840,9 +841,9 @@ class BaseTuckerTensor:
 
         core_self, core_other = tensap.convert_tensors(self.core, other.core)
 
-        gram_matrices = self.frames.dot(other.frames)
+        gram_matrices = self.tensor_frame.dot(other.tensor_frame)
         projected_other_core = core_other.tensor_matrix_product(gram_matrices)
-        return core_self.dot(projected_other_core)
+        return float(core_self.dot(projected_other_core))
 
     def norm(self) -> float:
         """Compute the Frobenius norm."""
@@ -856,54 +857,151 @@ class BaseTuckerTensor:
         Orthonormalize the tensor spaces and absorb the change into the core.
         Returns a new orthonormalized tensor.
         """
-        new_frames, r_matrices = self.frames.orth()
+        new_frames, r_matrices = self.tensor_frame.orth()
 
         # Absorb the R factors into the core
         new_core = self.core.tensor_matrix_product(r_matrices)
 
-        if type(new_core).__name__ == "FullTensor":
-            raise NotImplementedError(
-                "Global orthogonalization of a Tucker tensor with a FullTensor core "
-                "is not mathematically well-defined. The core must support global "
-                "orthogonalization (e.g., TreeBasedTensor)."
-            )
-
         core_orth = new_core.orth()
+        if isinstance(core_orth, tuple):
+            core_orth = core_orth[0]
         return self.__class__(core_orth, new_frames)
+
+    # --- contractions ---
 
     def tensor_matrix_product(
         self, matrices: List[np.ndarray], dims: Optional[List[int]] = None
     ) -> "BaseTuckerTensor":
         """Contract the tensor with matrices along physical dimensions."""
-        new_frames = self.frames.matrix_times_space(matrices, dims)
+        new_frames = self.tensor_frame.matrix_times_space(matrices, dims)
         return self.__class__(self.core, new_frames)
+
+    def tensor_diag_matrix_product(
+        self, M: Union[np.ndarray, List[np.ndarray]], dims: Optional[List[int]] = None
+    ) -> "BaseTuckerTensor":
+        """Contract the tensor with diagonal matrices."""
+        if isinstance(M, np.ndarray):
+            M = [M]
+        if dims is None:
+            dims = list(range(self.order))
+
+        diag_mats = [np.diag(m.ravel()) for m in M]
+        return self.tensor_matrix_product(diag_mats, dims)
+
+    def squeeze(self, dims: Optional[List[int]] = None):
+        """
+        Remove singleton dimensions.
+        Contract singleton dimensions into the core and remove them from the space.
+        """
+        if dims is None:
+            dims = [i for i, (d1, d2) in enumerate(self.shape) if d1 == 1 and d2 == 1]
+
+        if len(dims) == 0:
+            return self
+
+        squeeze_matrices = self.tensor_frame.get_vectorize_factors(dims)
+        new_core = self.core.tensor_vector_product(squeeze_matrices, dims)
+        new_frames = self.tensor_frame.remove_space(dims)
+
+        if new_frames.order == 0:
+            return new_core.numpy()
+
+        return self.__class__(new_core, new_frames)
+
+    # ---- Tensor Algebra ----
+
+    def cat(self, other: 'BaseTuckerTensor') -> 'BaseTuckerTensor':
+        """Concatenate two Tucker tensors using block-diagonal concatenation."""
+        new_core = self.core.cat(other.core)
+        new_frames = self.tensor_frame.diag_cat(other.tensor_frame)
+        return self.__class__(new_core, new_frames)
+
+    def kron(self, other: 'BaseTuckerTensor') -> 'BaseTuckerTensor':
+        """Kronecker product of two Tucker tensors."""
+        new_core = self.core.kron(other.core)
+        new_frames = self.tensor_frame.kron(other.tensor_frame)
+        return self.__class__(new_core, new_frames)
+
+    def permute(self, dims: List[int]) -> 'BaseTuckerTensor':
+        """Permute the dimensions of the tensor."""
+        new_core = self.core.transpose(dims)
+        new_frames = self.tensor_frame.permute(dims)
+        return self.__class__(new_core, new_frames)
+
+    def singular_values(self):
+        """Return the singular values of the tensor."""
+        if self.order == 2:
+            orth_self = self.orth()
+            return np.linalg.svd(orth_self.core.data, compute_uv=False)
+        else:
+            orth_self = self.orth()
+            if hasattr(orth_self.core, 'singular_values'):
+                return orth_self.core.singular_values()
+            # fallback: unfold and compute SVD for each dimension
+            return [None] * self.order
+
+    def normalize_basis(self):
+        """Normalize the elements of the bases of subspaces in-place."""
+        N = self.tensor_frame.dot(self.tensor_frame)
+        N = [np.sqrt(np.diag(n)) for n in N]
+        diag_mats = [np.diag(n) for n in N]
+        self.core = self.core.tensor_matrix_product(diag_mats)
+        inv_mats = [np.diag(1.0 / n) for n in N]
+        self.tensor_frame = self.tensor_frame.space_times_matrix(inv_mats)
+        return self
 
     # ---- Magic Methods ----
 
     def __add__(self, other: "BaseTuckerTensor") -> "BaseTuckerTensor":
+        """Addition of two Tucker tensors."""
         if type(self) is not type(other):
             return NotImplemented
 
         core_self, core_other = tensap.convert_tensors(self.core, other.core)
 
         new_core = core_self.cat(core_other)
-        new_frames = self.frames.cat(other.frames)
+        new_frames = self.tensor_frame.cat(other.tensor_frame)
 
         return self.__class__(new_core, new_frames)
 
-    def __neg__(self) -> 'BaseTuckerTensor':
-        return self.__class__(-self.core, self.frames)
+    def __radd__(self, other):
+        if other == 0:
+            return self
+        return NotImplemented
 
     def __sub__(self, other: 'BaseTuckerTensor') -> 'BaseTuckerTensor':
+        if type(self) is not type(other):
+            return NotImplemented
         return self + (-other)
+
+    def __neg__(self) -> 'BaseTuckerTensor':
+        return self.__class__(-self.core, self.tensor_frame)
 
     def __mul__(self, scalar: float) -> 'BaseTuckerTensor':
         if not np.isscalar(scalar):
             return NotImplemented
-        return self.__class__(self.core * scalar, self.frames)
+        return self.__class__(self.core * scalar, self.tensor_frame)
 
     def __rmul__(self, scalar: float) -> 'BaseTuckerTensor':
         return self * scalar
+
+    def __truediv__(self, scalar: float) -> "BaseTuckerTensor":
+        if not np.isscalar(scalar):
+            return NotImplemented
+        return self.__class__(self.core / scalar, self.tensor_frame)
+
+    def __repr__(self):
+        class_name = type(self).__name__
+        shape_str = "x".join(
+            f"{d1}x{d2}" if d2 > 1 else str(d1) for d1, d2 in self.shape
+        )
+        return (
+            f"<{shape_str} {class_name}:\n"
+            f"\torder = {self.order},\n"
+            f"\tshape = {self.shape},\n"
+            f"\tranks = {self.ranks},\n"
+            f"\tis_orth = {self.is_orth}>"
+        )
 
     # ---- The Factory (Static Constructors) ----
 
@@ -938,9 +1036,7 @@ class BaseTuckerTensor:
         else:
             raise ValueError("Unrecognized shape format.")
 
-        # For simplicity, assuming a FullTensor core generator exists
-        # core = FullTensor(generator(tuple(ranks)))
-        core = "MOCK_CORE"
+        core = tensap.FullTensor(generator(tuple(ranks)))
 
         return BaseTuckerTensor._factory(core, frames)
 
@@ -948,13 +1044,36 @@ class BaseTuckerTensor:
     def rand(ranks: List[int], shape: List) -> 'BaseTuckerTensor':
         return BaseTuckerTensor.create(lambda x: np.random.rand(*x), ranks, shape)
 
+    @staticmethod
+    def randn(ranks: List[int], shape: List) -> 'BaseTuckerTensor':
+        return BaseTuckerTensor.create(lambda x: np.random.randn(*x), ranks, shape)
+
+    @staticmethod
+    def zeros(ranks: List[int], shape: List) -> 'BaseTuckerTensor':
+        return BaseTuckerTensor.create(np.zeros, ranks, shape)
+
+    @staticmethod
+    def ones(ranks: List[int], shape: List) -> 'BaseTuckerTensor':
+        return BaseTuckerTensor.create(np.ones, ranks, shape)
+
+    @staticmethod
+    def eye(shape: List[int]) -> 'BaseTuckerTensor':
+        """
+        Construct the identity operator in Tucker format.
+        """
+        shape = np.atleast_1d(np.asarray(shape, dtype=int))
+        d = len(shape)
+        core = tensap.DiagonalTensor(np.array([1.0]), order=d)
+        frames = TFrameOperator.eye(shape, [1] * d)
+        return BaseTuckerTensor._factory(core, frames)
+
 
 class TuckerTensorVector(BaseTuckerTensor):
     """
     Tucker tensor representing a state or function in a vector space.
     """
 
-    frames: TFrameVector
+    tensor_frame: TFrameVector
 
     def __init__(self, core, frames: 'TFrameVector'):
         super().__init__(core, frames)
@@ -963,26 +1082,119 @@ class TuckerTensorVector(BaseTuckerTensor):
 
     def sub_tensor(self, indices: List[np.ndarray], dims: Optional[List[int]] = None) -> 'TuckerTensorVector':
         """Extract a sub-tensor by evaluating on a grid of indices."""
-        new_frames = self.frames.eval_at_indices(indices, dims)
-        return TuckerTensorVector(self.core, new_frames)
+        new_frames = self.tensor_frame.eval_at_indices(indices, dims)
+        return self.__class__(self.core, new_frames)
 
-    def tensor_vector_product(self, vectors: List[np.ndarray], dims: Optional[List[int]] = None) -> 'BaseTuckerTensor':
-        """Contract the physical dimension with external vectors."""
-        # Note: the exact math logic depends on how your cores handle vector contraction
-        # Typically, this reduces the order of the tensor if all dims are contracted.
-        new_frames = self.frames.matrix_times_space(vectors, dims) # Reduces dim1 to 1
+    def tensor_vector_product(
+        self,
+        vectors: Union[np.ndarray, List[np.ndarray]],
+        dims: Optional[List[int]] = None,
+    ):
+        """
+        Contract the tensor with external vectors along given dimensions.
+        """
+        if dims is None:
+            dims = list(range(self.order))
+        else:
+            dims = np.atleast_1d(dims).tolist()
 
-        # Usually requires core.tensor_vector_product logic here
-        # ...
-        return TuckerTensorVector(self.core, new_frames)
+        if isinstance(vectors, np.ndarray):
+            vectors = [vectors]
+
+        # 1. transform the vectors in a row-vector (1, N)
+        row_vectors = [np.atleast_2d(v.ravel()) for v in vectors]
+
+        # 2. Contraction
+        # (1, N) @ (Rank, N, 1) -> (Rank, 1, 1)
+        new_frames = self.tensor_frame.matrix_times_space(row_vectors, dims)
+
+        # 3. extract the contracted factors for the core
+        core_factors = [
+            # (Rank, 1, 1) -> (Rank, 1)
+            new_frames.frames[d].data.reshape(-1, 1) for d in dims
+        ]
+
+        # 4. contraction of with the core
+        new_core = self.core.tensor_vector_product(core_factors, dims)
+
+        # 5. Résolution de la géométrie de sortie
+        if len(dims) != self.order:
+            # if the remains some dimensions, one keep them
+            final_frames = new_frames.remove_space(dims)
+            return self.__class__(new_core, final_frames)
+        else:
+            # all dimensions are contracted
+            return new_core
 
     def to_operator(self) -> 'TuckerTensorOperator':
         """
         Isomorphism: Convert the state vector into a diagonal operator.
         Each basis vector v becomes a diagonal matrix diag(v).
         """
-        new_frames = self.frames.to_diagonal_operators()
+        new_frames = self.tensor_frame.to_diagonal_operators()
         return TuckerTensorOperator(self.core, new_frames)
+
+    def dot_with_rank_one_metric(
+        self, tensor_2: "TuckerTensorVector", matrices: List[np.ndarray]
+    ) -> float:
+        """Weighted inner product using matrices: <A, M @ B>."""
+        tmp = tensor_2.tensor_matrix_product(matrices)
+        return self.dot(tmp)
+
+    def unvectorize(self, dims1: List[int], dims2: List[int]) -> 'TuckerTensorOperator':
+        """Reshape the vector Tucker tensor into an operator Tucker tensor."""
+        new_frames = self.tensor_frame.unvectorize(dims1, dims2)
+        return TuckerTensorOperator(self.core, new_frames)
+
+    def tree_based_tensor(self):
+        """Convert into a TreeBasedTensor."""
+        tree = tensap.DimensionTree.trivial(self.order)
+        factors = self.tensor_frame.get_vectorize_factors()
+        tensors = [self.core] + [tensap.FullTensor(m) for m in factors]
+        return tensap.TreeBasedTensor(tensors, tree)
+
+    def eval_diag(self, dims: Optional[List[int]] = None):
+        """
+        Extract the diagonal of the tensor.
+        """
+        if dims is None:
+            dims = list(range(self.order))
+
+        if len(dims) <= 1:
+            return self
+
+        # 1. Case of a Diagonal Core (CP decomposition)
+        # use the name of the class in string form to avoid circular import
+        if type(self.core).__name__ == "DiagonalTensor":
+
+            s_frame = self.tensor_frame.hadamard(dims)
+
+            if len(dims) == self.order:
+                # total evaluation
+                # core.data: (R, )
+                # s_frame.data: (R, N, 1)
+                # res: (N, 1)
+                res = np.tensordot(self.core.data, s_frame.data, axes=(0, 0))
+                return res.squeeze()  # (N, )
+
+            # partial evaluation
+            keep = [k for k in range(self.order) if k not in dims]
+            new_frames_list = [s_frame] + [self.tensor_frame.frames[k] for k in keep]
+            new_frames = self.tensor_frame.__class__(new_frames_list)
+
+            # the new core is still diagonal, but its order decreases
+            n_order = 1 + len(keep)
+            new_core = self.core.__class__(self.core.data, order=n_order)
+
+            return self.__class__(new_core, new_frames)
+
+        # 2. General case: FullTensor or TreeBasedTensor
+        # one gets the factors in the form (N, R)
+        factors = self.tensor_frame.get_vectorize_factors()
+
+        # contraction
+        s = self.core.tensor_matrix_product(factors)
+        return s.eval_diag(dims)
 
 
 class TuckerTensorOperator(BaseTuckerTensor):
@@ -990,7 +1202,7 @@ class TuckerTensorOperator(BaseTuckerTensor):
     Tucker tensor representing a linear operator (matrices mapping N_in to N_out).
     """
 
-    frames: TFrameOperator
+    tensor_frame: TFrameOperator
 
     def __init__(self, core, frames: "TFrameOperator"):
         super().__init__(core, frames)
@@ -1009,7 +1221,7 @@ class TuckerTensorOperator(BaseTuckerTensor):
         new_core = self.core.kron(other.core)
 
         # 2. Composition of the physical frames (which handles the rank multiplication)
-        new_frames = self.frames.mtimes(other.frames)
+        new_frames = self.tensor_frame.mtimes(other.tensor_frame)
 
         # 3. Dynamic return type based on the right operand
         if isinstance(other, TuckerTensorVector):
@@ -1018,7 +1230,7 @@ class TuckerTensorOperator(BaseTuckerTensor):
 
     def transpose(self) -> "TuckerTensorOperator":
         """Transpose the physical dimensions."""
-        return TuckerTensorOperator(self.core, self.frames.transpose(conjugate=False))
+        return TuckerTensorOperator(self.core, self.tensor_frame.transpose(conjugate=False))
 
     @property
     def T(self) -> "TuckerTensorOperator":
@@ -1029,7 +1241,7 @@ class TuckerTensorOperator(BaseTuckerTensor):
         """Conjugate transpose of the operator."""
         # Assuming the core has a conj() method
         new_core = self.core.conj() if hasattr(self.core, "conj") else self.core
-        return TuckerTensorOperator(new_core, self.frames.transpose(conjugate=True))
+        return TuckerTensorOperator(new_core, self.tensor_frame.transpose(conjugate=True))
 
     @property
     def H(self) -> "TuckerTensorOperator":
@@ -1038,5 +1250,5 @@ class TuckerTensorOperator(BaseTuckerTensor):
 
     def vectorize(self) -> TuckerTensorVector:
         """Flatten the operator into a column vector space."""
-        new_frames = self.frames.vectorize()
+        new_frames = self.tensor_frame.vectorize()
         return TuckerTensorVector(self.core, new_frames)
