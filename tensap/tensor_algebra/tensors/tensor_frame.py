@@ -4,7 +4,7 @@ import numpy as np
 from .frame import Frame, FrameVector, FrameOperator
 
 
-class TFrames:
+class TFrame:
     """
     Base class representing a tensor product of frames.
     Orchestrates local operations across multiple tensor dimensions.
@@ -42,7 +42,7 @@ class TFrames:
 
     def matrix_times_space(
         self, matrices: List[np.ndarray], dims: Optional[List[int]] = None
-    ) -> "TFrames":
+    ) -> "TFrame":
         """Apply physical contraction on specified dimensions."""
         if dims is None:
             dims = list(range(self.order))
@@ -62,7 +62,7 @@ class TFrames:
             self,
             matrices: List[np.ndarray],
             dims: Optional[List[int]] = None
-    ) -> 'TFrames':
+    ) -> 'TFrame':
         """Apply rank contraction (change of basis) on specified dimensions."""
         if dims is None:
             dims = list(range(self.order))
@@ -79,7 +79,7 @@ class TFrames:
         return self.__class__(new_frames)
 
     def dot(
-            self, other: 'TFrames', dims: Optional[List[int]] = None
+            self, other: 'TFrame', dims: Optional[List[int]] = None
     ) -> List[np.ndarray]:
         """Compute the local Gram matrices between self and other.
         Returns a list of local Gram matrices (one for each specified dimension).
@@ -95,13 +95,13 @@ class TFrames:
 
     def orth(
             self, dims: Optional[List[int]] = None
-    ) -> Tuple['TFrames', List[Optional[np.ndarray]]]:
+    ) -> Tuple['TFrame', List[Optional[np.ndarray]]]:
         """
         Orthonormalize the specified frames.
 
         Returns
         -------
-        new_tframes : TFrames
+        new_tframes : TFrame
             A new TFrames object with orthonormalized frames.
         r_matrices : List[np.ndarray or None]
             A list of length `order` containing the R factors from the QR
@@ -119,7 +119,7 @@ class TFrames:
 
         return self.__class__(new_frames), r_matrices
 
-    def cat(self, other: "TFrames") -> "TFrames":
+    def cat(self, other: "TFrame") -> "TFrame":
         """Concatenates the elements of two TFrames."""
         if self.order != other.order:
             raise ValueError("Spaces must have the same order.")
@@ -133,7 +133,7 @@ class TFrames:
         """Evaluates a vector/operator from its coefficients on the basis."""
         return self.frames[dim].eval_in_space(coefs)
 
-    def permute(self, dims: Sequence[int]) -> "TFrames":
+    def permute(self, dims: Sequence[int]) -> "TFrame":
         """
         Reorder the tensor dimensions.
 
@@ -144,7 +144,7 @@ class TFrames:
 
         Returns
         -------
-        TFrames
+        TFrame
             A new TFrames instance with reordered frames
         """
 
@@ -163,7 +163,7 @@ class TFrames:
         new_frames = [self.frames[i] for i in dims]
         return self.__class__(new_frames)
 
-    def keep_space(self, dims: Sequence[int]) -> "TFrames":
+    def keep_space(self, dims: Sequence[int]) -> "TFrame":
         """
         Keep only the specified dimensions, reducing the tensor order.
 
@@ -174,7 +174,7 @@ class TFrames:
 
         Returns
         -------
-        TFrames
+        TFrame
             A new TFrames instance containing only the kept dimensions
         """
         if any(i < 0 or i >= self.order for i in dims):
@@ -183,7 +183,7 @@ class TFrames:
         new_frames = [self.frames[i] for i in dims]
         return self.__class__(new_frames)
 
-    def remove_space(self, dims: Sequence[int]) -> "TFrames":
+    def remove_space(self, dims: Sequence[int]) -> "TFrame":
         """
         Remove the specified dimensions, reducing the tensor order.
 
@@ -194,14 +194,14 @@ class TFrames:
 
         Returns
         -------
-        TFrames
+        TFrame
             A new TFrames instance without the specified dimensions.
         """
         keep = [i for i in range(self.order) if i not in dims]
         return self.keep_space(keep)
 
 
-class TFrameVectors(TFrames):
+class TFrameVector(TFrame):
     """Orchestrates tensor product of vector spaces (states, functions)."""
 
     frames: List[FrameVector]
@@ -211,7 +211,7 @@ class TFrameVectors(TFrames):
 
     def eval_at_indices(
         self, indices: List[np.ndarray], dims: Optional[List[int]] = None
-    ) -> "TFrameVectors":
+    ) -> "TFrameVector":
         """Extract a sub-tensor space (evaluate at specific indices)."""
         if dims is None:
             dims = list(range(self.order))
@@ -226,12 +226,12 @@ class TFrameVectors(TFrames):
         for idx, dim in zip(indices, dims):
             new_frames[dim] = self.frames[dim].eval_at_indices(idx)
 
-        return TFrameVectors(new_frames)
+        return TFrameVector(new_frames)
 
     def dot_with_metrics(
         self,
-        other: "TFrameVectors",
-        metrics: "TFrameOperators",
+        other: "TFrameVector",
+        metrics: "TFrameOperator",
         dims: Optional[List[int]] = None,
     ) -> List[np.ndarray]:
         """
@@ -249,7 +249,7 @@ class TFrameVectors(TFrames):
 
         return gram_matrices
 
-    def diag_cat(self, other: "TFrameVectors") -> "TFrameVectors":
+    def diag_cat(self, other: "TFrameVector") -> "TFrameVector":
         """Concatenates the elements of two TFrames in a block-diagonal way."""
         if self.order != other.order:
             raise ValueError("Spaces must have the same order.")
@@ -262,7 +262,7 @@ class TFrameVectors(TFrames):
 
     def unvectorize(
         self, dims1: List[int], dims2: List[int]
-    ) -> "TFrameOperators":
+    ) -> "TFrameOperator":
         """Reshape the vector spaces into operator spaces."""
         if len(dims1) != self.order or len(dims2) != self.order:
             raise ValueError(
@@ -272,17 +272,17 @@ class TFrameVectors(TFrames):
         new_frames = []
         for i, frame in enumerate(self.frames):
             new_frames.append(frame.unvectorize(dims1[i], dims2[i]))
-        return TFrameOperators(new_frames)
+        return TFrameOperator(new_frames)
 
-    def to_diagonal_operators(self) -> "TFrameOperators":
+    def to_diagonal_operators(self) -> "TFrameOperator":
         """Convert all vector frames into diagonal operator frames."""
         new_frames = [frame.to_diagonal_operator() for frame in self.frames]
-        return TFrameOperators(new_frames)
+        return TFrameOperator(new_frames)
 
     @classmethod
     def _generate(
         cls, dims: Sequence[int], ranks: Sequence[int], generator: Callable
-    ) -> "TFrameVectors":
+    ) -> "TFrameVector":
         """Utility method to generate TFrameVectors."""
         if len(dims) != len(ranks):
             raise ValueError("Length of 'dims' and 'ranks' must match.")
@@ -295,23 +295,23 @@ class TFrameVectors(TFrames):
         return cls(frames)
 
     @classmethod
-    def zeros(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+    def zeros(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVector":
         return cls._generate(dims, ranks, np.zeros)
 
     @classmethod
-    def ones(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+    def ones(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVector":
         return cls._generate(dims, ranks, np.ones)
 
     @classmethod
-    def rand(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+    def rand(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVector":
         return cls._generate(dims, ranks, lambda shape: np.random.uniform(size=shape))
 
     @classmethod
-    def randn(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+    def randn(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVector":
         return cls._generate(dims, ranks, lambda shape: np.random.normal(size=shape))
 
     @classmethod
-    def eye(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVectors":
+    def eye(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameVector":
         """Canonical basis for each Frame"""
         if len(dims) != len(ranks):
             raise ValueError("Length of 'dims' and 'ranks' must match.")
@@ -323,7 +323,7 @@ class TFrameVectors(TFrames):
         return cls(frames)
 
 
-class TFrameOperators(TFrames):
+class TFrameOperator(TFrame):
     """Orchestrates tensor product of operator spaces."""
 
     frames: List[FrameOperator]
@@ -331,7 +331,7 @@ class TFrameOperators(TFrames):
     def __init__(self, frames: List[FrameOperator]):
         super().__init__(frames)
 
-    def mtimes(self, other: TFrames) -> TFrames:
+    def mtimes(self, other: TFrame) -> TFrame:
         """Compose this tensor operator space with another space (Operator or Vector)."""
         if self.order != other.order:
             raise ValueError("Spaces must have the same order for composition.")
@@ -342,23 +342,23 @@ class TFrameOperators(TFrames):
 
         return other.__class__(new_frames)
 
-    def transpose(self, conjugate: bool = False) -> "TFrameOperators":
+    def transpose(self, conjugate: bool = False) -> "TFrameOperator":
         """Transpose (or conjugate transpose) all physical dimensions."""
         new_frames = [frame.transpose(conjugate) for frame in self.frames]
-        return TFrameOperators(new_frames)
+        return TFrameOperator(new_frames)
 
     @property
-    def T(self) -> "TFrameOperators":
+    def T(self) -> "TFrameOperator":
         return self.transpose(conjugate=False)
 
     @property
-    def H(self) -> "TFrameOperators":
+    def H(self) -> "TFrameOperator":
         return self.transpose(conjugate=True)
 
-    def vectorize(self) -> TFrameVectors:
+    def vectorize(self) -> TFrameVector:
         """Flatten all operators into column vector spaces."""
         new_frames = [frame.vectorize() for frame in self.frames]
-        return TFrameVectors(new_frames)
+        return TFrameVector(new_frames)
 
     @classmethod
     def _generate(
@@ -367,7 +367,7 @@ class TFrameOperators(TFrames):
         dims2: Sequence[int],
         ranks: Sequence[int],
         generator: Callable,
-    ) -> "TFrameOperators":
+    ) -> "TFrameOperator":
         if not (len(dims1) == len(dims2) == len(ranks)):
             raise ValueError("Lengths of dims1, dims2 and ranks must match.")
 
@@ -381,19 +381,19 @@ class TFrameOperators(TFrames):
     @classmethod
     def zeros(
         cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
-    ) -> "TFrameOperators":
+    ) -> "TFrameOperator":
         return cls._generate(dims1, dims2, ranks, np.zeros)
 
     @classmethod
     def ones(
         cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
-    ) -> "TFrameOperators":
+    ) -> "TFrameOperator":
         return cls._generate(dims1, dims2, ranks, np.ones)
 
     @classmethod
     def rand(
         cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
-    ) -> "TFrameOperators":
+    ) -> "TFrameOperator":
         return cls._generate(
             dims1, dims2, ranks, lambda shape: np.random.uniform(size=shape)
         )
@@ -401,13 +401,13 @@ class TFrameOperators(TFrames):
     @classmethod
     def randn(
         cls, dims1: Sequence[int], dims2: Sequence[int], ranks: Sequence[int]
-    ) -> "TFrameOperators":
+    ) -> "TFrameOperator":
         return cls._generate(
             dims1, dims2, ranks, lambda shape: np.random.normal(size=shape)
         )
 
     @classmethod
-    def eye(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameOperators":
+    def eye(cls, dims: Sequence[int], ranks: Sequence[int]) -> "TFrameOperator":
         """
         Create an identity operator on the tensor space.
         The frames are generated by only one operator for each dimension: the identity.

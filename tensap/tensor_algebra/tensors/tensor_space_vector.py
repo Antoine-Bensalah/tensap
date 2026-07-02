@@ -147,7 +147,7 @@ class TSpaceVectors(TSpace):
         -------
         TSpaceOperators
         """
-        from .tensor_space_operators import TSpaceOperators
+        from .tensor_space_operator import TSpaceOperators
 
         sz = np.asarray(sz)
         new_spaces = [None] * self.order

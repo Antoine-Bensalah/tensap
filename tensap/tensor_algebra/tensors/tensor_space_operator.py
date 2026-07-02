@@ -1,7 +1,7 @@
 import numpy as np
 
 from .tensor_space import TSpace
-from .tensor_space_vectors import TSpaceVectors
+from .tensor_space_vector import TSpaceVectors
 
 
 class TSpaceOperators(TSpace):

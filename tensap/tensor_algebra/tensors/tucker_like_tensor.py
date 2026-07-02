@@ -8,7 +8,7 @@ Module tucker_like_tensor.
 import numpy as np
 import tensap
 from typing import Union, List, Tuple, Optional
-from .tensor_frame import TFrames, TFrameVectors, TFrameOperators
+from .tensor_frame import TFrame, TFrameVector, TFrameOperator
 
 
 class TuckerLikeTensor:
@@ -726,7 +726,7 @@ class BaseTuckerTensor:
     (vector or operator) of the tensor.
     """
 
-    def __init__(self, core, frames: 'TFrames'):
+    def __init__(self, core, frames: 'TFrame'):
         self.core = core
         self.frames = frames
 
@@ -832,12 +832,12 @@ class BaseTuckerTensor:
     # ---- The Factory (Static Constructors) ----
 
     @classmethod
-    def _factory(cls, core, frames: 'TFrames') -> 'BaseTuckerTensor':
+    def _factory(cls, core, frames: 'TFrame') -> 'BaseTuckerTensor':
         """Internal router to instantiate the correct subclass based on frame type."""
         # Note: TFrameVectors and TFrameOperators must be imported
-        if isinstance(frames, TFrameVectors):
+        if isinstance(frames, TFrameVector):
             return TuckerTensorVector(core, frames)
-        elif isinstance(frames, TFrameOperators):
+        elif isinstance(frames, TFrameOperator):
             return TuckerTensorOperator(core, frames)
         raise TypeError("Unknown TFrames type.")
 
@@ -855,10 +855,10 @@ class BaseTuckerTensor:
         # (Operator)
         if isinstance(shape[0], (int, np.integer)):
             # It's a State/Vector
-            frames = TFrameVectors.create(generator, shape, ranks)
+            frames = TFrameVector.create(generator, shape, ranks)
         elif isinstance(shape[0], (tuple, list)):
             # It's an Operator
-            frames = TFrameOperators.create(generator, shape, ranks)
+            frames = TFrameOperator.create(generator, shape, ranks)
         else:
             raise ValueError("Unrecognized shape format.")
 
@@ -878,11 +878,11 @@ class TuckerTensorVector(BaseTuckerTensor):
     Tucker tensor representing a state or function in a vector space.
     """
 
-    frames: TFrameVectors
+    frames: TFrameVector
 
-    def __init__(self, core, frames: 'TFrameVectors'):
+    def __init__(self, core, frames: 'TFrameVector'):
         super().__init__(core, frames)
-        if not isinstance(frames, TFrameVectors):
+        if not isinstance(frames, TFrameVector):
             raise TypeError("TuckerTensorVector requires a TFrameVectors object.")
 
     def sub_tensor(self, indices: List[np.ndarray], dims: Optional[List[int]] = None) -> 'TuckerTensorVector':
@@ -914,11 +914,11 @@ class TuckerTensorOperator(BaseTuckerTensor):
     Tucker tensor representing a linear operator (matrices mapping N_in to N_out).
     """
 
-    frames: TFrameOperators
+    frames: TFrameOperator
 
-    def __init__(self, core, frames: "TFrameOperators"):
+    def __init__(self, core, frames: "TFrameOperator"):
         super().__init__(core, frames)
-        if not isinstance(frames, TFrameOperators):
+        if not isinstance(frames, TFrameOperator):
             raise TypeError("TuckerTensorOperator requires a TFrameOperators object.")
 
     def __matmul__(self, other: BaseTuckerTensor) -> BaseTuckerTensor:
