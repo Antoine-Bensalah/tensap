@@ -107,10 +107,10 @@ class BaseTuckerTensor:
         # 3. Reshape the resulting 1D/flat array into the actual physical tensor geometry
         target_shape = []
         for frame in self.tensor_frame.frames:
-            if frame.dim2 == 1:
-                target_shape.append(frame.dim1)
+            if frame.shape[1] == 1:
+                target_shape.append(frame.shape[0])
             else:
-                target_shape.extend([frame.dim1, frame.dim2])
+                target_shape.extend([frame.shape[0], frame.shape[1]])
 
         return result.reshape(target_shape)
 
@@ -460,7 +460,7 @@ class BaseTuckerTensor:
             f"<{shape_str} {class_name}:\n"
             f"\torder = {self.order},\n"
             f"\tshape = {self.shape},\n"
-            f"\tranks = {self.ranks},\n"
+            f"\tranks = {self.representation_rank()},\n"
             f"\tis_orth = {self.is_orth}>"
         )
 

@@ -33,7 +33,7 @@ class TFrame:
         -------
         tuple of int
         """
-        return tuple(frame.rank for frame in self.frames)
+        return tuple(frame.dim for frame in self.frames)
 
     @property
     def shape(self) -> Tuple[Tuple[int, int], ...]:
@@ -211,7 +211,7 @@ class TFrame:
             dims = range(self.order)
 
         return [
-            self.frames[d].data.transpose(1, 2, 0).reshape(-1, self.frames[d].rank)
+            self.frames[d].data.transpose(1, 2, 0).reshape(-1, self.frames[d].dim)
             for d in dims
         ]
 
@@ -437,7 +437,7 @@ class TFrameVector(TFrame):
             Output dimensions for each space.
         dims2 : list of int
             Input dimensions for each space.
-            Must satisfy dims1[i] * dims2[i] == self.frames[i].dim1.
+            Must satisfy dims1[i] * dims2[i] == self.frames[i].shape[0].
 
         Returns
         -------

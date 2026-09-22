@@ -38,7 +38,7 @@ class TestConstruction:
         t = TuckerTensorVector(core, frames)
         assert t.order == 2
         assert t.shape == _vector_shape(shape)
-        assert t.ranks == tuple(ranks)
+        assert t.representation_rank() == tuple(ranks)
 
     @staticmethod
     def test_construction_from_frames_operator():
@@ -54,7 +54,7 @@ class TestConstruction:
         t = TuckerTensorOperator(core, frames)
         assert t.order == 2
         assert t.shape == _operator_shape(dims1, dims2)
-        assert t.ranks == tuple(ranks)
+        assert t.representation_rank() == tuple(ranks)
 
     @staticmethod
     def test_from_tree_based_tensor():
@@ -377,7 +377,7 @@ class TestStorage:
 
     def test_representation_rank(self):
         t = self._make_vector()
-        assert t.representation_rank() == np.prod(t.ranks)
+        assert t.representation_rank() == tuple(t.tensor_frame.representation_ranks)
 
 
 class TestSubTensorEvalDiag:
@@ -641,7 +641,7 @@ class TestSingularValuesNormalize:
         for mu in range(t.order):
             col_norms = np.linalg.norm(
                 t.tensor_frame.frames[mu].data[:, :, 0], axis=1)
-            assert np.allclose(col_norms, np.ones(t.ranks[mu]), atol=1e-10)
+            assert np.allclose(col_norms, np.ones(t.representation_rank()[mu]), atol=1e-10)
         assert np.isclose(t.norm(), expected_norm)
 
 

@@ -26,25 +26,6 @@ class Frame:
 
     # --- geometric properties ---
     @property
-    def shape(self) -> tuple[int, ...] | int:
-        """Return the physical shape of the frame.
-
-        Returns
-        -------
-        Return the physical shape of the frame element.
-        """
-
-    @property
-    def dim(self) -> int:
-        """Return the number of frame elements.
-
-        Returns
-        -------
-        int
-        """
-        return self._dim
-
-    @property
     def shape(self) -> tuple[int, int]:
         """Return the physical shape (dim1, dim2).
 
@@ -53,6 +34,16 @@ class Frame:
         tuple of int
         """
         return (self._dim1, self._dim2)
+
+    @property
+    def dim(self) -> int:
+        """Return the number of frame elements (representation rank).
+
+        Returns
+        -------
+        int
+        """
+        return self._rank
 
     @property
     def is_orth(self):
@@ -93,16 +84,16 @@ class Frame:
         Parameters
         ----------
         mat : ndarray
-            Matrix of shape (M, N1) where N1 must equal self.dim1.
+            Matrix of shape (M, N1) where N1 must equal self.shape[0].
 
         Returns
         -------
         Frame
             New frame with shape (R, M, N2).
         """
-        if mat.shape[1] != self.dim1:
+        if mat.shape[1] != self.shape[0]:
             raise ValueError(f"Matrix shape {mat.shape} incompatible with "
-                             f"dim1 of the Frame: {self.dim1}")
+                             f"dim1 of the Frame: {self.shape[0]}")
         # mat: (M, N1)
         # data: (R, N1, N2)
         # new_data: (R, M, N2)
@@ -119,17 +110,17 @@ class Frame:
         Parameters
         ----------
         mat : ndarray
-            Matrix of shape (K, R) where R must equal self.rank.
+            Matrix of shape (K, R) where R must equal self.dim.
 
         Returns
         -------
         Frame
             New frame with shape (K, N1, N2).
         """
-        if mat.shape[0] != self.rank:
+        if mat.shape[0] != self.dim:
             raise ValueError(f"Matrix shape {mat.shape[0]} is incompatible "
                              f"with the representation rank of the "
-                             f"Frame: {self.rank}")
+                             f"Frame: {self.dim}")
         # mat: (R, K)
         # data: (R, N1, N2)
         # new_data: (K, N1, N2)
@@ -147,9 +138,9 @@ class Frame:
         Returns
         -------
         ndarray
-            Gram matrix of shape (self.rank, other.rank).
+            Gram matrix of shape (self.dim, other.dim).
         """
-        if self.dim1 != other.dim1 or self.dim2 != other.dim2:
+        if self.shape != other.shape:
             raise ValueError("Frames must have the same physical dimensions "
                              "to compute Gram matrix.")
         # self.data: (R, N1, N2)
@@ -172,9 +163,9 @@ class Frame:
         ndarray
             The R factor from the QR decomposition.
         """
-        Q, R_fact = np.linalg.qr(self.data.reshape(self.rank, -1).T,
+        Q, R_fact = np.linalg.qr(self.data.reshape(self.dim, -1).T,
                                  mode="reduced")
-        new_data = Q.T.reshape(self.rank, self.dim1, self.dim2)
+        new_data = Q.T.reshape(self.dim, self.shape[0], self.shape[1])
         return self.__class__(new_data, is_orth=True), R_fact
 
     def cat(self, other: "Frame") -> "Frame":
@@ -191,9 +182,9 @@ class Frame:
         Returns
         -------
         Frame
-            New frame with rank = self.rank + other.rank.
+            New frame with rank = self.dim + other.dim.
         """
-        if self.dim1 != other.dim1 or self.dim2 != other.dim2:
+        if self.shape != other.shape:
             raise ValueError(
                 "Physical dimensions must match for standard concatenation."
             )
@@ -213,7 +204,7 @@ class Frame:
         Returns
         -------
         Frame
-            New frame with rank = self.rank * other.rank and physical
+            New frame with rank = self.dim * other.dim and physical
             dimensions multiplied component-wise.
         """
         r1, d1a, d1b = self.data.shape
@@ -232,15 +223,15 @@ class Frame:
         Parameters
         ----------
         coefs : ndarray
-            1D array of coefficients of length self.rank.
+            1D array of coefficients of length self.dim.
 
         Returns
         -------
         ndarray
             Array of shape (N1, N2).
         """
-        if coefs.ndim != 1 or len(coefs) != self.rank:
-            raise ValueError(f"Coefficients must be 1D array of size {self.rank}.")
+        if coefs.ndim != 1 or len(coefs) != self.dim:
+            raise ValueError(f"Coefficients must be 1D array of size {self.dim}.")
 
         return np.tensordot(coefs, self.data, axes=(0, 0))
 
@@ -254,10 +245,10 @@ class FrameVector(Frame):
 
     def __init__(self, data: np.ndarray, is_orth: bool=False):
         super().__init__(data, is_orth)
-        if self.dim2 != 1:
+        if self.shape[1] != 1:
             raise ValueError(
                 f"A FrameVector must have an input dimension (dim2) of 1, "
-                f"but got {self.dim2}.")
+                f"but got {self.shape[1]}.")
 
     def eval_at_indices(self, dim1_idx) -> 'FrameVector':
         """Extract a sub-frame by selecting specific rows.
@@ -286,18 +277,18 @@ class FrameVector(Frame):
             First dimension of the resulting operator.
         dim2 : int
             Second dimension of the resulting operator.
-            Must satisfy dim1 * dim2 == self.dim1.
+            Must satisfy dim1 * dim2 == self.shape[0].
 
         Returns
         -------
         FrameOperator
         """
-        if dim1 * dim2 != self.dim1:
-            raise ValueError(f"Cannot unvectorize dim1={self.dim1} into "
+        if dim1 * dim2 != self.shape[0]:
+            raise ValueError(f"Cannot unvectorize dim1={self.shape[0]} into "
                              f"{dim1}x{dim2}.")
 
         # (R, N1, 1) --> (R, dim1, dim2)
-        new_data = self.data.reshape(self.rank, dim1, dim2)
+        new_data = self.data.reshape(self.dim, dim1, dim2)
 
         return FrameOperator(new_data)
 
@@ -311,8 +302,8 @@ class FrameVector(Frame):
         FrameOperator
         """
         # (R, N1, 1) -> (R, N1, N1)
-        new_data = np.zeros((self.rank, self.dim1, self.dim1), dtype=self.data.dtype)
-        idx = np.arange(self.dim1)
+        new_data = np.zeros((self.dim, self.shape[0], self.shape[0]), dtype=self.data.dtype)
+        idx = np.arange(self.shape[0])
         new_data[:, idx, idx] = self.data[:, :, 0]
         return FrameOperator(new_data)
 
@@ -327,15 +318,15 @@ class FrameVector(Frame):
         ----------
         other : FrameVector
         metric : FrameOperator
-            Metric frame of shape (R3, N2, M2) where N2 must equal self.dim1
-            and M2 must equal other.dim1.
+            Metric frame of shape (R3, N2, M2) where N2 must equal self.shape[0]
+            and M2 must equal other.shape[0].
 
         Returns
         -------
         ndarray
-            Array of shape (R3, self.rank, other.rank).
+            Array of shape (R3, self.dim, other.dim).
         """
-        if metric.dim1 != self.dim1 or metric.dim2 != other.dim1:
+        if metric.shape[0] != self.shape[0] or metric.shape[1] != other.shape[0]:
             raise ValueError("Incompatible physical dimensions for metric contraction.")
 
         # apply metrics to other
@@ -358,8 +349,8 @@ class FrameVector(Frame):
     def diag_cat(self, other: "FrameVector") -> "FrameVector":
         """Concatenate two frames in a block-diagonal fashion.
 
-        The resulting frame has rank = self.rank + other.rank and
-        dim1 = self.dim1 + other.dim1.
+        The resulting frame has rank = self.dim + other.dim and
+        dim1 = self.shape[0] + other.shape[0].
 
         Parameters
         ----------
@@ -369,13 +360,13 @@ class FrameVector(Frame):
         -------
         FrameVector
         """
-        new_rank = self.rank + other.rank
-        new_dim1 = self.dim1 + other.dim1
+        new_rank = self.dim + other.dim
+        new_dim1 = self.shape[0] + other.shape[0]
         new_dim2 = 1
 
         new_data = np.zeros((new_rank, new_dim1, new_dim2), dtype=self.data.dtype)
-        new_data[0 : self.rank, 0 : self.dim1, 0] = self.data[:, :, 0]
-        new_data[self.rank :, self.dim1 :, 0] = other.data[:, :, 0]
+        new_data[0 : self.dim, 0 : self.shape[0], 0] = self.data[:, :, 0]
+        new_data[self.dim :, self.shape[0] :, 0] = other.data[:, :, 0]
 
         return self.__class__(new_data, is_orth=False)
 
@@ -391,7 +382,7 @@ class FrameVector(Frame):
         -------
         FrameVector
         """
-        if self.shape != other.shape or self.rank != other.rank:
+        if self.shape != other.shape or self.dim != other.dim:
             raise ValueError(
                 "Frames must have the exact same shape for Hadamard product."
             )
@@ -417,16 +408,16 @@ class FrameOperator(Frame):
         Parameters
         ----------
         other : Frame or FrameVector or FrameOperator
-            Must satisfy self.dim2 == other.dim1.
+            Must satisfy self.shape[1] == other.shape[0].
 
         Returns
         -------
         Frame
             Result of the composition.
         """
-        if self.dim2 != other.dim1:
+        if self.shape[1] != other.shape[0]:
             raise ValueError(f"Incompatible dimensions for composition: "
-                             f"self.dim2={self.dim2} != other.dim1={other.dim1}")
+                             f"self.dim2={self.shape[1]} != other.dim1={other.shape[0]}")
 
         # self.data  : (R_a, N1, N2)
         # other.data : (R_b, M1, M2) with M1 = N2
@@ -434,9 +425,9 @@ class FrameOperator(Frame):
         new_data = np.tensordot(self.data, other.data,
                                 axes=(2, 1)).swapaxes(1, 2)
 
-        new_rank = self.rank * other.rank
+        new_rank = self.dim * other.dim
         # lexicographic ordering on (R_a, R_b) -> new_data (R_a.R_b, N1, M2)
-        new_data = new_data.reshape(new_rank, self.dim1, other.dim2)
+        new_data = new_data.reshape(new_rank, self.shape[0], other.shape[1])
         return other.__class__(new_data)
 
     def transpose(self, conjugate: bool=False) -> 'FrameOperator':
@@ -481,7 +472,7 @@ class FrameOperator(Frame):
         -------
         FrameVector
         """
-        new_dim = self.dim1 * self.dim2
-        new_data = self.data.reshape(self.rank, new_dim, 1)
+        new_dim = self.shape[0] * self.shape[1]
+        new_data = self.data.reshape(self.dim, new_dim, 1)
 
         return FrameVector(new_data, is_orth=self.is_orth)
