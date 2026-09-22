@@ -26,34 +26,23 @@ class Frame:
 
     # --- geometric properties ---
     @property
-    def dim1(self) -> int:
-        """Return the first physical dimension (output / row size).
+    def shape(self) -> tuple[int, ...] | int:
+        """Return the physical shape of the frame.
 
         Returns
         -------
-        int
+        Return the physical shape of the frame element.
         """
-        return self._dim1
 
     @property
-    def dim2(self) -> int:
-        """Return the second physical dimension (input / column size).
+    def dim(self) -> int:
+        """Return the number of frame elements.
 
         Returns
         -------
         int
         """
-        return self._dim2
-
-    @property
-    def rank(self) -> int:
-        """Return the representation rank (number of basis elements).
-
-        Returns
-        -------
-        int
-        """
-        return self._rank
+        return self._dim
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -390,7 +379,7 @@ class FrameVector(Frame):
 
         return self.__class__(new_data, is_orth=False)
 
-    def hadamard(self, other: "FrameVector") -> "FrameVector":
+    def elementwise_hadamard(self, other: "FrameVector") -> "FrameVector":
         """Compute the element-wise (Hadamard) product of two vector frames.
 
         Parameters

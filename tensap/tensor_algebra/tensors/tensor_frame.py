@@ -196,6 +196,7 @@ class TFrame:
         """Return the Tucker factors in vectorized (2D) format for specified dims.
 
         Each 3D array (Rank, N1, N2) is flattened to 2D (N1 * N2, Rank).
+        # todo : C-order -> le documenter ! sens pour les opérateurs ? 
 
         Parameters
         ----------
@@ -462,7 +463,7 @@ class TFrameVector(TFrame):
         new_frames = [frame.to_diagonal_operator() for frame in self.frames]
         return TFrameOperator(new_frames)
 
-    def hadamard(self, dims: List[int]) -> "FrameVector":
+    def elementwise_hadamard(self, dims: List[int]) -> "FrameVector":
         """Compute the element-wise product of several dimensions.
 
         Parameters
@@ -480,7 +481,7 @@ class TFrameVector(TFrame):
 
         result = self.frames[dims[0]]
         for dim in dims[1:]:
-            result = result.hadamard(self.frames[dim])
+            result = result.elementwise_hadamard(self.frames[dim])
 
         return result
 

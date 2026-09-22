@@ -36,16 +36,6 @@ class BaseTuckerTensor:
         return self.tensor_frame.order
 
     @property
-    def ranks(self) -> tuple:
-        """Return the representation ranks for each dimension.
-
-        Returns
-        -------
-        tuple of int
-        """
-        return self.tensor_frame.representation_ranks
-
-    @property
     def shape(self) -> tuple:
         """Return the physical shape for each dimension.
 
@@ -88,14 +78,14 @@ class BaseTuckerTensor:
         """
         return self.tensor_frame.sparse_storage() + self.core.sparse_storage()
 
-    def representation_rank(self) -> int:
-        """Return the representation rank (product of subspace dimensions).
+    def representation_rank(self) -> Tuple[int, ...]:
+        """Return the representation ranks.
 
         Returns
         -------
-        int
+        tuple(int)
         """
-        return int(np.prod(self.ranks))
+        return self.tensor_frame.representation_ranks
 
     # --- conversion to dense ---
 
@@ -106,6 +96,8 @@ class BaseTuckerTensor:
         -------
         FullTensor
         """
+        # TODO : faire un full() spécifique aux TuckerTensorOperator TuckerTensorVector
+        #        ne pas tester les dims = 1
         # 1. Extract matrices of shape (Physical_size, Rank)
         matrices = self.tensor_frame.get_vectorize_factors()
 
@@ -760,7 +752,7 @@ class TuckerTensorVector(BaseTuckerTensor):
         # use the name of the class in string form to avoid circular import
         if type(self.core).__name__ == "DiagonalTensor":
 
-            s_frame = self.tensor_frame.hadamard(dims)
+            s_frame = self.tensor_frame.elementwise_hadamard(dims)
 
             if len(dims) == self.order:
                 # total evaluation
