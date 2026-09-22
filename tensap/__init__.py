@@ -40,6 +40,9 @@ from .tensor_algebra.tensors.frame import Frame, FrameVector, FrameOperator
 from .tensor_algebra.tensors.tensor_frame import TFrame, TFrameVector, TFrameOperator
 from .tensor_algebra.tools.truncator import Truncator
 from .tensor_algebra.tools.convert_tensors import convert_tensors
+from .tensor_algebra.tools.laplacian_like_operator_factory import (
+    LaplacianLikeOperatorFactory,
+)
 
 from .tools.utils import *
 from .tools.multi_indices import MultiIndices

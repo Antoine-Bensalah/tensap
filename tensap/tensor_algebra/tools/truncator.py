@@ -117,6 +117,9 @@ class Truncator:
 
         """
 
+        if isinstance(tensor, tensap.BaseTuckerTensor):
+            return self._truncate_tucker(tensor)
+
         if not hasattr(tensor, "order"):
             tensor = tensap.FullTensor(tensor)
 
@@ -132,6 +135,66 @@ class Truncator:
         else:
             raise ValueError("Wrong tensor order.")
         return out
+
+    def _truncate_tucker(self, tensor):
+        """
+        Truncate a BaseTuckerTensor (TuckerTensorVector or TuckerTensorOperator)
+        using a Tucker-format HOSVD: orthonormalize the frames, run HOSVD on
+        the (small) core, and push the resulting factor matrices back into
+        the frames. Equivalent to Truncator.truncate for a TuckerLikeTensor
+        with a FullTensor core in the MATLAB ApproximationToolbox.
+
+        Parameters
+        ----------
+        tensor : tensap.BaseTuckerTensor
+            The Tucker tensor to truncate. Its core must be a tensap.FullTensor.
+
+        Raises
+        ------
+        NotImplementedError
+            If the core of tensor is not a tensap.FullTensor.
+
+        Returns
+        -------
+        tensap.BaseTuckerTensor
+            The truncated tensor, of the same subclass as tensor.
+
+        """
+        if not isinstance(tensor.core, tensap.FullTensor):
+            raise NotImplementedError(
+                "Truncation of a BaseTuckerTensor is only implemented for a "
+                "FullTensor core."
+            )
+
+        x = tensor.orth()
+        core = x.core
+        order = core.order
+
+        max_rank = np.atleast_1d(self.max_rank)
+        if max_rank.size == 1:
+            max_rank = np.repeat(max_rank, order)
+        local_tol = self.tolerance / np.sqrt(order)
+
+        saved_max_rank = self.max_rank
+        factors = []
+        for dim in range(order):
+            self.max_rank = max_rank[dim]
+            factors.append(
+                self.trunc_svd(core.matricize(dim).numpy(), local_tol).space[0]
+            )
+        self.max_rank = saved_max_rank
+
+        new_core = core.tensor_matrix_product(factors[0].T, 0)
+        for dim in range(1, order):
+            new_core = new_core.tensor_matrix_product(factors[dim].T, dim)
+
+        new_frames = [
+            frame.space_times_matrix(factor)
+            for frame, factor in zip(x.tensor_frame.frames, factors)
+        ]
+        new_tensor_frame = x.tensor_frame.__class__(new_frames)
+
+        return type(x)(new_core, new_tensor_frame)
 
     def trunc_svd(self, matrix, tolerance=None, power=2):
         """
