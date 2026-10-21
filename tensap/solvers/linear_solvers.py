@@ -7,13 +7,16 @@ Module linear_solvers.
 Iterative linear solvers Ax=b for operators and right-hand sides in tensor
 format. Port of ApproximationToolbox/Approximation/TensorApproximation/
 EquationsSolvers/LinearSolver.m, TruncatedRichardsonIterations.m,
-RankOneALSLinearSolver.m and GreedyLinearSolver.m.
+RankOneALSLinearSolver.m, GreedyLinearSolver.m and
+TuckerLikeTensorALSLinearSolver.m.
 """
 
 import abc
 import time
 
 import numpy as np
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 import tensap
 
 
@@ -404,3 +407,239 @@ class GreedyLinearSolver(LinearSolver):
             "time": time.perf_counter() - clock0,
         }
         return x, output
+
+
+def _times_diag_core(core, diag, mu):
+    """Multiply a core tensor by diag(diag) along dimension mu."""
+    if isinstance(core, tensap.DiagonalTensor):
+        return tensap.DiagonalTensor(core.data * diag, core.order)
+    return core.tensor_matrix_product([np.diag(diag)], [mu])
+
+
+class TuckerTensorALSLinearSolver(LinearSolver):
+    """
+    Galerkin updates of a Tucker tensor x for A @ x = b by alternating least
+    squares: update of the core with fixed frames (update_core), update of
+    the frames with a fixed core (update_frames_by_als), or both alternately
+    (solve). Port of TuckerLikeTensorALSLinearSolver.m.
+
+    The methods update_core and update_frames_by_als can be used as the
+    update of a GreedyLinearSolver.
+
+    Attributes
+    ----------
+    max_iterations_core : int
+        Maximum number of iterations of the core update (iterative core
+        formats only).
+    max_iterations_frames : int
+        Maximum number of sweeps over the dimensions in update_frames_by_als.
+    stagnation_core : float
+        Stagnation criterion of the core update (iterative core formats only).
+    stagnation_frames : float
+        Stagnation criterion of update_frames_by_als.
+    """
+
+    def __init__(
+        self,
+        A,
+        b,
+        max_iterations_core=10,
+        max_iterations_frames=10,
+        stagnation_core=1e-6,
+        stagnation_frames=1e-6,
+        **kwargs,
+    ):
+        super().__init__(A, b, **kwargs)
+        if type(A.core) is not type(b.core):
+            raise TypeError("A and b must have the same type of core.")
+        self.max_iterations_core = max_iterations_core
+        self.max_iterations_frames = max_iterations_frames
+        self.stagnation_core = stagnation_core
+        self.stagnation_frames = stagnation_frames
+
+    def solve(self, x=None):
+        """Alternate core and frames updates, starting from x (or x0).
+
+        Returns
+        -------
+        x : TuckerTensorVector
+        output : dict
+            Dictionary with keys 'flag', 'iter', 'error', 'errvec',
+            'stagnation', 'times'.
+        """
+        if x is None:
+            if self.x0 is None:
+                raise ValueError("An initial guess must be provided.")
+            x = self.x0
+
+        clock0 = time.perf_counter()
+        if self.error_criterion is None:
+            b_norm = self.b.norm()
+
+            def error_criterion(x):
+                return (self.b - self.A @ x).norm() / b_norm
+
+        else:
+            error_criterion = self.error_criterion
+
+        flag = 1
+        errvec, stagnations, times = [], [], []
+        k = 0
+        for k in range(1, self.max_iterations + 1):
+            x_old = x
+            x = self.update_core(x)
+            x = self.update_frames_by_als(x)
+
+            times.append(time.perf_counter() - clock0)
+            errvec.append(error_criterion(x))
+            stagnations.append((x - x_old).norm() / x.norm())
+
+            if self.display:
+                print(
+                    f"ALS: Iteration {k:3d} - Stagnation {stagnations[-1]:.2e} "
+                    f"- Error {errvec[-1]:.2e}"
+                )
+
+            if stagnations[-1] < self.stagnation:
+                flag = 2
+                break
+            if errvec[-1] < self.tolerance:
+                flag = 0
+                break
+
+        output = {
+            "flag": flag,
+            "iter": k,
+            "error": errvec[-1],
+            "errvec": errvec,
+            "stagnation": stagnations,
+            "times": times,
+        }
+        return x, output
+
+    # ---- update of the core ----
+
+    def update_core(self, x):
+        """Galerkin update of the core of x, the frames being fixed."""
+        if isinstance(self.A.core, tensap.DiagonalTensor):
+            return self._update_diagonal_core(x)
+        if isinstance(self.A.core, tensap.FullTensor):
+            return self._update_full_core(x)
+        raise NotImplementedError(
+            f"update_core is not implemented for a {type(self.A.core).__name__} "
+            "core."
+        )
+
+    def _update_diagonal_core(self, x):
+        """Canonical format: solve G sigma = g, G(j, i) = <A x_i, x_j>."""
+        if not isinstance(x.core, tensap.DiagonalTensor):
+            raise TypeError("x must have a DiagonalTensor core.")
+        x_frames = x.tensor_frame
+
+        # products over the dimensions of w_j^T A_k w_i: (R_A, m, m)
+        xAx = x_frames.dot_with_metrics(x_frames, self.A.tensor_frame)
+        G = np.tensordot(self.A.core.data, np.prod(np.stack(xAx), axis=0), axes=1)
+
+        # products over the dimensions of b_l^T w_j: (R_b, m)
+        xb = self.b.tensor_frame.dot(x_frames)
+        g = self.b.core.data @ np.prod(np.stack(xb), axis=0)
+
+        sigma = np.linalg.solve(G, g)
+        return tensap.TuckerTensorVector(
+            tensap.DiagonalTensor(sigma, x.order), x_frames
+        )
+
+    def _update_full_core(self, x):
+        """Tucker format: Galerkin system on the whole core, of size prod(R)."""
+        x = x.orth()
+        x_frames = x.tensor_frame
+        order = x.order
+        ranks = x.representation_rank()
+
+        # operator on the core space: sum_k C_A(k) M^(1)_k x ... x M^(d)_k
+        xAx = x_frames.dot_with_metrics(x_frames, self.A.tensor_frame)
+        matrices = [m.reshape(m.shape[0], -1).T for m in xAx]
+        core_A = tensap.FullTensor(self.A.core.full())
+        MA = core_A.tensor_matrix_product(matrices).numpy()
+        MA = MA.reshape([r for r in ranks for _ in range(2)])
+        MA = MA.transpose(list(range(0, 2 * order, 2)) + list(range(1, 2 * order, 2)))
+        size = int(np.prod(ranks))
+        MA = MA.reshape(size, size)
+
+        xb = self.b.tensor_frame.dot(x_frames)
+        core_b = tensap.FullTensor(self.b.core.full())
+        MB = core_b.tensor_matrix_product([m.T for m in xb]).numpy().reshape(size)
+
+        core = np.linalg.solve(MA, MB).reshape(ranks)
+        return tensap.TuckerTensorVector(tensap.FullTensor(core), x_frames)
+
+    # ---- update of the frames ----
+
+    def update_frames_by_als(self, x):
+        """Galerkin update of the frames of x, one dimension at a time."""
+        A_frames = self.A.tensor_frame
+        b_frames = self.b.tensor_frame
+        xAx = [
+            m.reshape(m.shape[0], -1)
+            for m in x.tensor_frame.dot_with_metrics(x.tensor_frame, A_frames)
+        ]
+        xb = b_frames.dot(x.tensor_frame)
+
+        for k in range(1, self.max_iterations_frames + 1):
+            x_old = x
+            for mu in range(self.A.order):
+                x = self.update_frame(x, mu, xAx, xb)
+                frame = x.tensor_frame.frames[mu]
+                m = frame.dot_with_metric(frame, A_frames.frames[mu])
+                xAx[mu] = m.reshape(m.shape[0], -1)
+                xb[mu] = b_frames.frames[mu].dot(frame)
+
+            stagnation = (x - x_old).norm() / x_old.norm()
+            if self.display:
+                print(f"update_frames: iteration {k:2d} - stagnation {stagnation:.2e}")
+            if k > 1 and stagnation < self.stagnation_frames:
+                break
+        return x
+
+    def update_frame(self, x, mu, xAx=None, xb=None):
+        """Galerkin update of all the elements of the frame of dimension mu.
+
+        The unknown W = [w_1, ..., w_m] solves the system of size n*m
+        (sum_k C_k x A^(mu)_k) vec(W) = vec(F), then its columns are
+        normalized and their norms moved into the core.
+        """
+        A_frames = self.A.tensor_frame
+        b_frames = self.b.tensor_frame
+        if xAx is None:
+            xAx = [
+                m.reshape(m.shape[0], -1)
+                for m in x.tensor_frame.dot_with_metrics(x.tensor_frame, A_frames)
+            ]
+        if xb is None:
+            xb = b_frames.dot(x.tensor_frame)
+
+        n, rank = x.tensor_frame.frames[mu].shape[0], x.tensor_frame.frames[mu].dim
+
+        # C_k(p, q): contraction of the cores with all the dimensions but mu
+        core_A, core_x = tensap.convert_tensors(self.A.core, x.core)
+        coef = core_A.tensordot_matrix_product_except_dim(
+            core_x.kron(core_x), xAx, mu
+        ).reshape(-1, rank, rank)
+        K = sp.csr_matrix((n * rank, n * rank))
+        for C_k, A_k in zip(coef, A_frames.frames[mu].data):
+            K = K + sp.kron(C_k, sp.csr_matrix(A_k), format="csr")
+
+        # right-hand side: F = sum_l b^(mu)_l c_l^T, block p = column p of F
+        core_b, core_x = tensap.convert_tensors(self.b.core, x.core)
+        coef = core_b.tensordot_matrix_product_except_dim(core_x, xb, mu)
+        F = b_frames.frames[mu].data[:, :, 0].T @ coef
+        rhs = F.T.ravel()
+
+        W = spla.spsolve(K.tocsc(), rhs).reshape(rank, n)
+        norms = np.linalg.norm(W, axis=1)
+
+        frames = list(x.tensor_frame.frames)
+        frames[mu] = tensap.FrameVector((W / norms[:, None]).reshape(rank, n, 1))
+        return tensap.TuckerTensorVector(
+            _times_diag_core(x.core, norms, mu), tensap.TFrameVector(frames)
+        )

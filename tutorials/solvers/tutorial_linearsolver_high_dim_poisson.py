@@ -50,6 +50,14 @@ residual b - A @ x_{m-1} (tensap.GreedyLinearSolver with the default
 tensap.RankOneALSLinearSolver). The operator is taken in canonical format
 (diagonal core), so that A, x and the residual stay in canonical format and
 no truncation is needed.
+
+Part 3 - Greedy solver with updates by alternating least squares
+----------------------------------------------------------------
+The pure greedy algorithm never revisits a correction. After each correction,
+x_m can be improved by a Galerkin update (tensap.TuckerTensorALSLinearSolver):
+of its coefficients (update_core), or of all its rank-one factors, one
+dimension at a time (update_frames_by_als). The same solver can also
+alternate both updates on its own, starting from the greedy solution.
 """
 
 # %% Imports
@@ -199,6 +207,57 @@ plt.semilogy(
 plt.xlabel("Greedy iteration (rank of x)")
 plt.ylabel("Relative residual error ||b - A@x|| / ||b||")
 plt.title("Greedy rank-one corrections for the high-dimensional Poisson equation")
+plt.grid(True, which="both")
+plt.show()
+
+
+# %% Part 3 - Greedy solver with update of the core
+# After each correction, the coefficients sigma of
+# x_m = sum_i sigma_i w_i^(1) x ... x w_i^(d) are recomputed by the Galerkin
+# system G sigma = g, with G(j, i) = <A x_i, x_j> and g(j) = <b, x_j>.
+updater = tensap.TuckerTensorALSLinearSolver(A_can, b, display=False)
+
+np.random.seed(0)
+solver = tensap.GreedyLinearSolver(
+    A_can, b, max_iterations=30, update=updater.update_core, display=False
+)
+x_core, output_core = solver.solve()
+print(f"\nGreedy + core update: relative error {output_core['error']:.3e}")
+
+# %% Greedy solver with update of the frames
+# After each correction, all the factors w_i^(mu) of a dimension mu are
+# recomputed at once (Galerkin system of size n * rank), for mu = 1, ..., d,
+# in at most 3 sweeps.
+updater.max_iterations_frames = 3
+
+np.random.seed(0)
+solver = tensap.GreedyLinearSolver(
+    A_can, b, max_iterations=30, update=updater.update_frames_by_als, display=False
+)
+x_frames, output_frames = solver.solve()
+print(f"Greedy + frames update: relative error {output_frames['error']:.3e}")
+
+# %% Alternating least squares from the pure greedy solution
+# Starting from the rank-30 solution of Part 2, alternate core and frames
+# updates; the rank stays 30.
+solver = tensap.TuckerTensorALSLinearSolver(
+    A_can, b, x0=x_can, max_iterations=5, max_iterations_frames=2, display=True
+)
+x_als, output_als = solver.solve()
+print(f"ALS from the greedy solution: relative error {output_als['error']:.3e}")
+
+# %% Comparison of the greedy variants
+plt.figure()
+for output, label in (
+    (output_can, "pure greedy"),
+    (output_core, "greedy + core update"),
+    (output_frames, "greedy + frames update"),
+):
+    plt.semilogy(range(1, len(output["errvec"]) + 1), output["errvec"], label=label)
+plt.xlabel("Greedy iteration (rank of x)")
+plt.ylabel("Relative residual error ||b - A@x|| / ||b||")
+plt.title("Greedy rank-one corrections, with and without updates")
+plt.legend()
 plt.grid(True, which="both")
 plt.show()
 

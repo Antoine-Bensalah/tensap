@@ -29,6 +29,7 @@ from .solvers.linear_solvers import (
     TruncatedRichardsonIterations,
     RankOneALSLinearSolver,
     GreedyLinearSolver,
+    TuckerTensorALSLinearSolver,
 )
 
 from .tensor_algebra.tensors.dimension_tree import DimensionTree
