@@ -24,7 +24,12 @@ Initialization file for tensap (tensor approximation package).
 __version__ = "1.8"
 
 from .linear_algebra.magic_indices import magic_indices
-from .solvers.linear_solvers import LinearSolver, TruncatedRichardsonIterations
+from .solvers.linear_solvers import (
+    LinearSolver,
+    TruncatedRichardsonIterations,
+    RankOneALSLinearSolver,
+    GreedyLinearSolver,
+)
 
 from .tensor_algebra.tensors.dimension_tree import DimensionTree
 from .tensor_algebra.tensors.full_tensor import FullTensor

@@ -2,8 +2,9 @@
 # This file is part of tensap (tensor approximation package).
 
 """
-Tutorial: solving a high-dimensional Poisson equation with a truncated
-Richardson iteration, using a Laplacian-like operator in Tucker format.
+Tutorial: solving a high-dimensional Poisson equation with low-rank tensor
+solvers. Python counterpart of the MATLAB tutorial
+tutorial_LinearSolvers_highDimPoissonEq.m.
 
 Problem
 -------
@@ -27,6 +28,8 @@ Instead, we represent A, b and every iterate x in Tucker format
 small core contracted with d "frames" (one small factor per dimension), so
 the storage grows only linearly with d.
 
+Part 1 - Truncated Richardson iterations (small problem)
+--------------------------------------------------------
 The linear system is solved with a Richardson iteration
 
     x_{k+1} = x_k + rho * (b - A @ x_k)
@@ -35,6 +38,18 @@ Because tensor operations (+, @, ...) tend to increase the Tucker
 representation rank at every step, the iterate is truncated (compressed
 back to a low rank, up to a prescribed tolerance) after each update: this is
 what tensap.Truncator and tensap.TruncatedRichardsonIterations do.
+
+Part 2 - Greedy solver with rank-one corrections (large problem)
+----------------------------------------------------------------
+The solution is built by successive rank-one corrections
+
+    x_m = x_{m-1} + lambda_m w_m^(1) x ... x w_m^(d),
+
+each correction being computed by alternating least squares on the current
+residual b - A @ x_{m-1} (tensap.GreedyLinearSolver with the default
+tensap.RankOneALSLinearSolver). The operator is taken in canonical format
+(diagonal core), so that A, x and the residual stay in canonical format and
+no truncation is needed.
 """
 
 # %% Imports
@@ -43,7 +58,7 @@ import matplotlib.pyplot as plt
 import scipy.sparse as sp
 import tensap
 
-# %% 1D discretization
+# %% Part 1 - 1D discretization
 # We discretize the 1D Laplacian operator -d^2/dx^2 on (0, L) with a
 # standard 3-point finite-difference scheme.
 L = 1.0
@@ -135,4 +150,55 @@ print(
     "densely; this would be impossible for large d)"
 )
 
-# %%
+
+# %% Part 2 - 1D discretization of a larger problem
+# The greedy solver never forms a full core: we can take the sizes of the
+# MATLAB tutorial, n^d = 10^12 unknowns.
+n = 100
+d = 6
+h = L / (n + 1)
+
+K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n))
+I = sp.identity(n)
+
+print(f"\nPart 2: n = {n} interior points, d = {d}, n^d = {float(n)**d:.0e} unknowns")
+
+# %% Operator in canonical format, right-hand side of rank one
+# Canonical format: A = sum_k A^(1)_k x ... x A^(d)_k with A^(mu)_k = K if
+# k == mu, I otherwise, i.e. a Tucker tensor with a diagonal core of ones
+# and rank d in every dimension.
+factory = tensap.LaplacianLikeOperatorFactory(K, I, d)
+A_can = factory.make_canonical_tensor()
+
+ones_frames = tensap.TFrameVector(
+    [tensap.FrameVector(np.ones((1, n, 1))) for _ in range(d)]
+)
+b = tensap.TuckerTensorVector(tensap.DiagonalTensor(np.array([1.0]), d), ones_frames)
+
+print(f"Operator A: {A_can!r}")
+print(f"Right-hand side b: {b!r}")
+
+# %% Greedy solver
+# At iteration m, a rank-one correction c_m is computed by alternating least
+# squares: all the factors but one are fixed, and the Galerkin condition gives
+# a linear system of size n for the remaining factor. Then x_m = x_{m-1} + c_m.
+np.random.seed(0)
+solver = tensap.GreedyLinearSolver(A_can, b, max_iterations=30, display=True)
+x_can, output_can = solver.solve()
+
+print(f"\nStopped after {output_can['iter']} iterations (flag = {output_can['flag']}).")
+print(f"Final relative error ||b - A@x|| / ||b|| = {output_can['error']:.3e}")
+print(f"Canonical rank of x: {x_can.representation_rank()[0]}")
+print(f"Storage of x: {x_can.storage()} numbers instead of n^d = {float(n)**d:.0e}")
+
+# %% Convergence of the greedy solver
+plt.figure()
+plt.semilogy(
+    range(1, len(output_can["errvec"]) + 1), output_can["errvec"], marker="o"
+)
+plt.xlabel("Greedy iteration (rank of x)")
+plt.ylabel("Relative residual error ||b - A@x|| / ||b||")
+plt.title("Greedy rank-one corrections for the high-dimensional Poisson equation")
+plt.grid(True, which="both")
+plt.show()
+

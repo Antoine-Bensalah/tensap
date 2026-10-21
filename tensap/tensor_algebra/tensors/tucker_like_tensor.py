@@ -214,7 +214,18 @@ class BaseTuckerTensor:
         core_self, core_other = tensap.convert_tensors(self.core, other.core)
 
         gram_matrices = self.tensor_frame.dot(other.tensor_frame)
+
+        # Canonical format: <x, y> = sigma^T (G^(1) o ... o G^(d)) tau, without
+        # forming any full core
+        if isinstance(core_self, tensap.DiagonalTensor):
+            gram = np.prod(np.stack(gram_matrices), axis=0)
+            return float(core_self.data @ gram @ core_other.data)
+
         projected_other_core = core_other.tensor_matrix_product(gram_matrices)
+        # the projection may change the type of the core (e.g. to a FullTensor)
+        core_self, projected_other_core = tensap.convert_tensors(
+            core_self, projected_other_core
+        )
         return float(core_self.dot(projected_other_core))
 
     def norm(self) -> float:
@@ -438,10 +449,20 @@ class BaseTuckerTensor:
     def __neg__(self) -> 'BaseTuckerTensor':
         return self.__class__(-self.core, self.tensor_frame)
 
+    def _scaled_core(self, scalar: float):
+        """Return the core multiplied by a scalar.
+
+        DiagonalTensor.__mul__ is the Hadamard product with another tensor, so
+        a diagonal core is scaled through its data.
+        """
+        if isinstance(self.core, tensap.DiagonalTensor):
+            return tensap.DiagonalTensor(self.core.data * scalar, self.core.order)
+        return self.core * scalar
+
     def __mul__(self, scalar: float) -> 'BaseTuckerTensor':
         if not np.isscalar(scalar):
             return NotImplemented
-        return self.__class__(self.core * scalar, self.tensor_frame)
+        return self.__class__(self._scaled_core(scalar), self.tensor_frame)
 
     def __rmul__(self, scalar: float) -> 'BaseTuckerTensor':
         return self * scalar
@@ -449,7 +470,7 @@ class BaseTuckerTensor:
     def __truediv__(self, scalar: float) -> "BaseTuckerTensor":
         if not np.isscalar(scalar):
             return NotImplemented
-        return self.__class__(self.core / scalar, self.tensor_frame)
+        return self.__class__(self._scaled_core(1.0 / scalar), self.tensor_frame)
 
     def __repr__(self):
         class_name = type(self).__name__

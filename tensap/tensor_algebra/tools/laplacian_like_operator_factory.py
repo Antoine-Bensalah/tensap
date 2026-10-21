@@ -5,7 +5,7 @@
 Module laplacian_like_operator_factory.
 
 Port of ApproximationToolbox/TensorAlgebra/Tools/LaplacianLikeOperatorFactory.m
-(currently limited to the Tucker-format construction).
+(currently limited to the canonical and Tucker constructions).
 """
 
 import numpy as np
@@ -38,6 +38,29 @@ class LaplacianLikeOperatorFactory:
         self.K = K
         self.I = I
         self.order = d
+
+    def make_canonical_tensor(self) -> "tensap.TuckerTensorOperator":
+        """Build the operator in canonical format (representation rank d per dimension).
+
+        Dimension mu has a rank-d FrameOperator whose k-th element is K if
+        k == mu and I otherwise. The core is a DiagonalTensor of ones, so that
+        the operator is sum_{k} A^{(1)}_k x ... x A^{(d)}_k.
+
+        Returns
+        -------
+        TuckerTensorOperator
+        """
+        d = self.order
+        K = _to_dense(self.K)
+        I = _to_dense(self.I)
+        frames = [
+            tensap.FrameOperator(np.stack([K if k == mu else I for k in range(d)]))
+            for mu in range(d)
+        ]
+        tensor_frame = tensap.TFrameOperator(frames)
+        core = tensap.DiagonalTensor(np.ones(d), d)
+
+        return tensap.TuckerTensorOperator(core, tensor_frame)
 
     def make_tucker_tensor(self) -> "tensap.TuckerTensorOperator":
         """Build the operator in Tucker format (representation rank 2 per dimension).
