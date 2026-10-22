@@ -2268,11 +2268,9 @@ class TreeBasedTensor:
                     tensap.FullTensor(matrices[ind]), 0, 0
                 )
             else:
+                # identity matrix: evaluation of the diagonal of the tensor
                 out = out.outer_product_eval_diag(
-                    tensap.FullTensor(np.eye(diag_below[alpha - 1].shape[0])),
-                    [],
-                    [],
-                    True,
+                    tensap.FullTensor(np.eye(tensors[alpha - 1].shape[0])), 0, 0
                 )
             # out = out.squeeze()
 
@@ -2293,12 +2291,12 @@ class TreeBasedTensor:
                             tensap.FullTensor(matrices[ind]), 0, 0
                         )
                     else:
+                        # identity matrix: evaluation of the diagonal
                         ind = tree.child_number(child) - 1
                         tmp = tmp.outer_product_eval_diag(
                             tensap.FullTensor(np.eye(tensors[alpha - 1].shape[ind])),
-                            [],
-                            [],
-                            True,
+                            0,
+                            0,
                         )
                 # tmp = tmp.squeeze()
                 if active_ch.size != 0:
