@@ -7,7 +7,7 @@ Module linear_solvers.
 Iterative linear solvers Ax=b for operators and right-hand sides in tensor
 format. Port of ApproximationToolbox/Approximation/TensorApproximation/
 EquationsSolvers/LinearSolver.m, TruncatedRichardsonIterations.m,
-RankOneALSLinearSolver.m, GreedyLinearSolver.m and
+TruncatedPCG.m, RankOneALSLinearSolver.m, GreedyLinearSolver.m and
 TuckerLikeTensorALSLinearSolver.m.
 """
 
@@ -145,6 +145,93 @@ class TruncatedRichardsonIterations(LinearSolver):
         return x, output
 
 
+class TruncatedPCG(LinearSolver):
+    """
+    Solve A @ x = b by the (preconditioned) conjugate gradient method, the
+    iterate, the residual and the search direction being truncated at each
+    step to keep the tensor representation rank under control. Port of
+    TruncatedPCG.m.
+
+    The residual is recomputed at each step as truncate(b - A @ x), and the
+    new direction is A-orthogonalized against the previous one only.
+
+    Attributes
+    ----------
+    truncator : tensap.Truncator
+        Used to truncate the iterate, the residual and the direction.
+    """
+
+    def __init__(self, A, b, truncator, **kwargs):
+        super().__init__(A, b, **kwargs)
+        self.truncator = truncator
+
+    def solve(self):
+        truncate = self.truncator.truncate
+        A, b, P = self.A, self.b, self.P
+        x = b * 0.0 if self.x0 is None else self.x0
+
+        if self.error_criterion is None:
+            b_norm = b.norm()
+
+            def error_criterion(x):
+                return (b - A @ x).norm() / b_norm
+
+        else:
+            error_criterion = self.error_criterion
+
+        r = b - A @ x
+        z = P @ r if P is not None else r
+        p = z
+        Ap = A @ p
+        pAp = p.dot(Ap)
+
+        flag = 1
+        errvec = []
+        k = 0
+        for k in range(1, self.max_iterations + 1):
+            x_old = x
+            omega = r.dot(p) / pAp
+            x = truncate(x + omega * p)
+            stagnation = (x - x_old).norm() / x.norm()
+            r = truncate(b - A @ x)
+            errvec.append(error_criterion(x))
+
+            if self.display:
+                print(
+                    f"Iteration {k:3d} - Stagnation {stagnation:.2e} "
+                    f"- Error {errvec[-1]:.2e}"
+                )
+
+            if stagnation < self.stagnation:
+                flag = 2
+                break
+            if errvec[-1] < self.tolerance:
+                flag = 0
+                break
+
+            z = P @ r if P is not None else r
+            beta = -z.dot(Ap) / pAp
+            p = truncate(z + beta * p)
+            Ap = A @ p
+            pAp = p.dot(Ap)
+
+        output = {
+            "flag": flag,
+            "iter": k,
+            "error": errvec[-1],
+            "errvec": errvec,
+        }
+        return x, output
+
+def _contract_except_dim(core, other, matrices, mu):
+    """core.tensordot_matrix_product_except_dim as a numpy array.
+
+    FullTensor returns a FullTensor and DiagonalTensor a numpy array.
+    """
+    result = core.tensordot_matrix_product_except_dim(other, matrices, mu)
+    return result.numpy() if hasattr(result, "numpy") else np.asarray(result)
+
+
 def _direct_local_solver(M, rhs, mu):
     """Default local solver of RankOneALSLinearSolver: dense direct solve."""
     return np.linalg.solve(M, rhs)
@@ -220,12 +307,12 @@ class RankOneALSLinearSolver(LinearSolver):
             for mu in range(order):
                 # reduced operator M_mu = sum_k alpha_k A^(mu)_k
                 core_a, core_x = tensap.convert_tensors(A_core, x_core)
-                coef = core_a.tensordot_matrix_product_except_dim(core_x, xtAx, mu)
+                coef = _contract_except_dim(core_a, core_x, xtAx, mu)
                 M = A_frames.eval_in_space(mu, np.ravel(coef))
 
                 # reduced right-hand side f_mu = sum_l beta_l b^(mu)_l
                 core_b, core_x = tensap.convert_tensors(b_core, x_core)
-                coef = core_b.tensordot_matrix_product_except_dim(core_x, xtb, mu)
+                coef = _contract_except_dim(core_b, core_x, xtb, mu)
                 rhs = b_frames.eval_in_space(mu, np.ravel(coef))
 
                 # local solve, normalization of the factor into the core
@@ -622,8 +709,8 @@ class TuckerTensorALSLinearSolver(LinearSolver):
 
         # C_k(p, q): contraction of the cores with all the dimensions but mu
         core_A, core_x = tensap.convert_tensors(self.A.core, x.core)
-        coef = core_A.tensordot_matrix_product_except_dim(
-            core_x.kron(core_x), xAx, mu
+        coef = _contract_except_dim(
+            core_A, core_x.kron(core_x), xAx, mu
         ).reshape(-1, rank, rank)
         K = sp.csr_matrix((n * rank, n * rank))
         for C_k, A_k in zip(coef, A_frames.frames[mu].data):
@@ -631,7 +718,7 @@ class TuckerTensorALSLinearSolver(LinearSolver):
 
         # right-hand side: F = sum_l b^(mu)_l c_l^T, block p = column p of F
         core_b, core_x = tensap.convert_tensors(self.b.core, x.core)
-        coef = core_b.tensordot_matrix_product_except_dim(core_x, xb, mu)
+        coef = _contract_except_dim(core_b, core_x, xb, mu)
         F = b_frames.frames[mu].data[:, :, 0].T @ coef
         rhs = F.T.ravel()
 

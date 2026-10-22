@@ -112,7 +112,9 @@ class BaseTuckerTensor:
             else:
                 target_shape.extend([frame.shape[0], frame.shape[1]])
 
-        return result.reshape(target_shape)
+        # C order, as in get_vectorize_factors (FullTensor.reshape uses the
+        # Fortran order, which would transpose every operator factor)
+        return tensap.FullTensor(result.numpy().reshape(target_shape))
 
     def numpy(self) -> np.ndarray:
         """Convert to a dense numpy.ndarray.
@@ -365,7 +367,8 @@ class BaseTuckerTensor:
         -------
         BaseTuckerTensor
         """
-        new_core = self.core.kron(other.core)
+        core_self, core_other = tensap.convert_tensors(self.core, other.core)
+        new_core = core_self.kron(core_other)
         new_frames = self.tensor_frame.kron(other.tensor_frame)
         return self.__class__(new_core, new_frames)
 
@@ -823,8 +826,10 @@ class TuckerTensorOperator(BaseTuckerTensor):
         if not isinstance(other, BaseTuckerTensor):
             return NotImplemented
 
-        # 1. Kronecker product of the cores
-        new_core = self.core.kron(other.core)
+        # 1. Kronecker product of the cores, aligned to a common type first
+        # (DiagonalTensor.kron assumes a diagonal argument)
+        core_self, core_other = tensap.convert_tensors(self.core, other.core)
+        new_core = core_self.kron(core_other)
 
         # 2. Composition of the physical frames (which handles the rank multiplication)
         new_frames = self.tensor_frame.mtimes(other.tensor_frame)

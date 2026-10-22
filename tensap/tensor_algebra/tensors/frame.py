@@ -165,7 +165,9 @@ class Frame:
         """
         Q, R_fact = np.linalg.qr(self.data.reshape(self.dim, -1).T,
                                  mode="reduced")
-        new_data = Q.T.reshape(self.dim, self.shape[0], self.shape[1])
+        # if dim > N1 * N2, the reduced QR has only N1 * N2 columns: the
+        # orthonormal frame has min(dim, N1 * N2) elements
+        new_data = Q.T.reshape(Q.shape[1], self.shape[0], self.shape[1])
         return self.__class__(new_data, is_orth=True), R_fact
 
     def cat(self, other: "Frame") -> "Frame":
