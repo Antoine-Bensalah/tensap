@@ -226,7 +226,8 @@ class TreeBasedTensor:
         """
         result = np.isin(self.tree.dim2ind[dim], self.active_nodes)
         if result.size == 1:
-            result = result[0]
+            # a scalar dim gives a 0-d array
+            result = bool(np.ravel(result)[0])
         return result
 
     def __repr__(self):
