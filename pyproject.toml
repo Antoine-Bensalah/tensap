@@ -49,6 +49,19 @@ packages = ["tensap",
 
 [project.optional-dependencies]
 doc = ["numpydoc", "sphinx-gallery", "sphinx"]
+test = ["pytest", "pytest-xdist", "pytest-timeout", "matplotlib", "scikit-learn"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+markers = [
+  "slow: long test (more than about 10 s), excluded by default; run with -m slow",
+  "tutorial: runs a tutorial script end to end",
+]
+# Fast run by default: `pytest` skips the slow tests. Run everything with
+# `pytest -m ""`, in parallel with `pytest -n auto` (pytest-xdist).
+addopts = "-m 'not slow' --durations=10"
+# Fail a test stuck for more than 20 min (pytest-timeout).
+timeout = 1200
 
 [project.urls]
 Homepage = "https://github.com/anthony-nouy/tensap"

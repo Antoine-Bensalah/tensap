@@ -1,5 +1,10 @@
 name: Build
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"  # nightly run of the whole test suite
+  workflow_dispatch:
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -22,10 +27,11 @@ jobs:
       - name: Build
         shell: bash -l {0}
         run: |
-          conda install -y scikit-learn pytest networkx matplotlib-base pip sphinx numpydoc pytest-cov codecov tensorflow
+          conda install -y scikit-learn pytest pytest-xdist pytest-timeout networkx matplotlib-base pip sphinx numpydoc pytest-cov codecov tensorflow
           pip install .
           make html -C doc
-          mv tensap tensap_code && pytest --cov-report=xml --cov=tensap --capture=no test && codecov && mv tensap_code tensap
+          # fast tests only (slow ones excluded by default, see pyproject.toml)
+          mv tensap tensap_code && pytest -n auto --cov-report=xml --cov=tensap test && codecov && mv tensap_code tensap
       - name: Upload
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
@@ -52,7 +58,24 @@ jobs:
           conda-remove-defaults: true
       - name: Build
         run: |
-          conda install -y scikit-learn pytest networkx matplotlib-base pip python=3.13
+          conda install -y scikit-learn pytest pytest-xdist pytest-timeout networkx matplotlib-base pip python=3.13
           pip install tensorflow
           pip install .
-          pytest -s
+          pytest -n auto
+
+  # Whole test suite, slow tests included: pull requests, nightly, on demand.
+  conda-linux-full:
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: true
+      - name: Test
+        shell: bash -l {0}
+        run: |
+          conda install -y scikit-learn pytest pytest-xdist pytest-timeout networkx matplotlib-base pip tensorflow
+          pip install .
+          mv tensap tensap_code && pytest -n auto -m "" test && mv tensap_code tensap
