@@ -501,7 +501,8 @@ class DiagonalTensor:
 
         """
         if isinstance(matrix, list):
-            matrix = np.hstack([np.reshape(x, [-1, 1]) for x in matrix])
+            # each matrix as a column, in Fortran order as for the reshape below
+            matrix = np.hstack([np.reshape(x, [-1, 1], order="F") for x in matrix])
         matrix = np.reshape(
             np.expand_dims(matrix, 1),
             (self.shape[0], y.shape[0], self.order),

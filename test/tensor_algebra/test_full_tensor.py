@@ -355,3 +355,80 @@ def test_conversions_preserve_the_tensor(rng):
     x, a = _tensor(rng, (2, 3, 4))
     npt.assert_allclose(x.tree_based_tensor().full().numpy(), a)
     npt.assert_allclose(x.sparse().full().numpy(), a)
+
+
+# --- remaining call variants ---------------------------------------------------
+
+
+def test_constructor_from_a_list():
+    x = tensap.FullTensor([[1.0, 2.0], [3.0, 4.0]])
+    npt.assert_array_equal(x.numpy(), [[1.0, 2.0], [3.0, 4.0]])
+
+
+def test_division_by_a_tensor(rng):
+    x, a = _tensor(rng, (2, 3))
+    y = tensap.FullTensor(rng.uniform(1, 2, (2, 3)))
+    npt.assert_allclose((x / y).numpy(), a / y.numpy())
+
+
+def test_eval_at_indices_accepts_transposed_indices(rng):
+    x, a = _tensor(rng, (3, 4, 5))
+    indices = np.array([[0, 2, 1], [1, 4, 3]])  # one column per evaluation
+    s = x.eval_at_indices(indices, [0, 2])
+    expected = np.stack([a[0, :, 1], a[2, :, 4], a[1, :, 3]], axis=0)
+    npt.assert_allclose(s.numpy(), expected)
+
+
+def test_eval_diag_on_one_dimension_returns_the_tensor(rng):
+    x, a = _tensor(rng, (3, 4))
+    npt.assert_array_equal(x.eval_diag([1]).numpy(), a)
+
+
+def test_sub_tensor_on_a_tensor_with_a_singleton_dimension(rng):
+    x, a = _tensor(rng, (1, 4, 3))
+    s = x.sub_tensor([0], [1, 3], ":")
+    npt.assert_array_equal(s.numpy(), a[np.ix_([0], [1, 3], range(3))])
+
+
+def test_orth_on_the_last_dimension(rng):
+    x, a = _tensor(rng, (3, 4, 5))
+    q, r = x.orth(-1)
+    assert q.orth_dim == 2
+    npt.assert_allclose(q.tensor_matrix_product(r.T, 2).numpy(), a, atol=1e-12)
+
+
+def test_matricize_last_dimension_and_explicit_columns(rng):
+    x, a = _tensor(rng, (2, 3, 4))
+    npt.assert_array_equal(
+        x.matricize(-1).numpy(),
+        np.reshape(np.transpose(a, (2, 0, 1)), (4, 6), order="F"),
+    )
+    npt.assert_array_equal(
+        x.matricize([1], [2, 0]).numpy(),
+        np.reshape(np.transpose(a, (1, 2, 0)), (3, 8), order="F"),
+    )
+
+
+def test_tensordot_eval_diag_with_several_diagonals(rng):
+    # z(k, l, i5, j1) = sum_{l1, l2} x(k, l1, l, l2, i5) y(j1, k, l1, l2, l)
+    x, a = _tensor(rng, (3, 2, 4, 2, 5))
+    y, b = _tensor(rng, (6, 3, 2, 2, 4))
+    z = x.tensordot_eval_diag(y, [1, 3], [2, 3], [0, 2], [1, 4], diag=True)
+    npt.assert_allclose(z.numpy(), np.einsum("kalbi,jkabl->klij", a, b))
+
+
+def test_tensor_matrix_product_eval_diag_on_some_dimensions(rng):
+    x, a = _tensor(rng, (2, 3, 4))
+    H = [rng.standard_normal((5, n)) for n in (2, 4)]
+    out = x.tensor_matrix_product_eval_diag(H, [0, 2])
+    npt.assert_allclose(out.numpy(), np.einsum("ijk,ai,ak->aj", a, *H))
+    out = x.tensor_matrix_product_eval_diag(H[1], 2)
+    npt.assert_allclose(out.numpy(), np.einsum("ijk,ak->aij", a, H[1]))
+
+
+def test_tensor_diagonal_matrix_product_on_all_dimensions(rng):
+    x, a = _tensor(rng, (2, 3))
+    d = [rng.standard_normal(2), rng.standard_normal(3)]
+    npt.assert_allclose(
+        x.tensor_diagonal_matrix_product(d).numpy(), a * np.outer(d[0], d[1])
+    )
