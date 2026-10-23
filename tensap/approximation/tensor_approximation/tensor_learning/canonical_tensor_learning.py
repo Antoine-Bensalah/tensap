@@ -57,6 +57,7 @@ class CanonicalTensorLearning(tensap.TensorLearning):
         self.order = order
         self.initialization_type = "mean"
         self.truncate_initialization = True
+        self.alternating_minimization_parameters.setdefault("inner_loops", 1)
 
     # %% Standard solver methods
     def initialize(self):
@@ -352,8 +353,11 @@ class CanonicalTensorLearning(tensap.TensorLearning):
         ), "Method not implemented for this loss function."
 
         bases_eval = self.bases_eval
+        if self._number_of_parameters is None:  # not set by initialize
+            self._number_of_parameters = self.order + 1
         output = {}
         output["sequence"] = np.empty(self.rank, dtype=object)
+        output["test_error_iterations"] = []
 
         # Replication of the LinearModelLearning objects
         if self.linear_model_learning_parameters[
@@ -390,14 +394,14 @@ class CanonicalTensorLearning(tensap.TensorLearning):
 
         f = tensap.CanonicalTensor.zeros(0, [x.shape[1] for x in bases_eval])
         f_0 = deepcopy(f)
-        stagnation = np.zeros((1, self.rank))
+        stagnation = np.zeros(self.rank)
 
         ls_local = deepcopy(
             s_local.linear_model_learning[self._number_of_parameters - 1]
         )
 
         is_error = False
-        error = np.ones((1, self.rank))
+        error = np.ones(self.rank)
         pure_greedy = False
         if not pure_greedy:
             for linear_solver in self.linear_model_learning:
@@ -435,18 +439,14 @@ class CanonicalTensorLearning(tensap.TensorLearning):
                 if self.alternating_minimization_parameters["display"]:
                     print(
                         "Alternating minimization (greedy): rank = %i, "
-                        + "error = %2.5e, stagnation = %2.5e",
-                        current_rank,
-                        error[k - 1],
-                        stagnation[k - 1],
+                        "error = %2.5e, stagnation = %2.5e"
+                        % (current_rank, error[k - 1], stagnation[k - 1])
                     )
             else:
                 if self.alternating_minimization_parameters["display"]:
                     print(
                         "Alternating minimization (greedy): rank = %i, "
-                        + "stagnation = %2.5e",
-                        current_rank,
-                        stagnation[k - 1],
+                        "stagnation = %2.5e" % (current_rank, stagnation[k - 1])
                     )
 
             if (
@@ -469,14 +469,13 @@ class CanonicalTensorLearning(tensap.TensorLearning):
                 output["test_error_iterations"].append(output["test_error"])
                 if self.display:
                     print(
-                        "Greedy: iteration %i, test error = %2.5e",
-                        k,
-                        output["test_error"],
+                        "Greedy: iteration %i, test error = %2.5e"
+                        % (k, output["test_error"])
                     )
 
-        output["stagnation"] = stagnation[: k - 1]
+        output["stagnation"] = stagnation[:k]
         if is_error:
-            output["errors"] = error[: k - 1]
+            output["errors"] = error[:k]
             K = np.argmin(output["errors"])
             f = output["sequence"][K]
             output["selected_iterate"] = K
