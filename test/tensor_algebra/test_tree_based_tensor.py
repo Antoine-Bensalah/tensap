@@ -327,3 +327,126 @@ def test_squeeze(tree, rng):
 def test_remove_unique_children_preserves_the_tensor(x):
     a = x.full().numpy()
     npt.assert_allclose(x.remove_unique_children().full().numpy(), a, atol=1e-12)
+
+
+# === Part 2: operations on the tree ===================================================
+
+
+def _diag_tensor(tree, inactive_first_leaf=False):
+    x = tensap.TreeBasedTensor.randn(tree, _ranks(tree), [3, 3, 3, 3])
+    if inactive_first_leaf:
+        x = x.inactivate_nodes([tree.dim2ind[0]])
+    return x
+
+
+@pytest.mark.parametrize("inactive", [False, True])
+def test_eval_diag_below_and_above_factorize_the_diagonal(tree, inactive):
+    # for every node beta: f(i) = sum_k v^beta(i, k) w^beta(i, k)
+    x = _diag_tensor(tree, inactive)
+    d = np.ravel(x.eval_diag())
+    below = x.eval_diag_below()
+    above = x.eval_diag_above(below)
+    for nod in x.active_nodes:
+        if nod == tree.root:
+            continue
+        v = np.asarray(below[nod - 1].numpy())
+        w = np.asarray(above[nod - 1].numpy())
+        npt.assert_allclose(np.sum(v * w, axis=1), d)
+
+
+def _core_in_gradient_order(x, nod):
+    """Core of nod with its dimensions ordered as in the gradient: active
+    children, then inactive children, then the parent."""
+    core = x.tensors[nod - 1].numpy()
+    children = list(x.tree.children(nod))
+    active = [i for i, c in enumerate(children) if x.is_active_node[c - 1]]
+    inactive = [i for i, c in enumerate(children) if not x.is_active_node[c - 1]]
+    rest = list(range(len(children), core.ndim))
+    return np.transpose(core, active + inactive + rest)
+
+
+@pytest.mark.parametrize("inactive", [False, True])
+def test_parameter_gradient_eval_diag_euler_identity(tree, inactive):
+    # the diagonal is linear in each node tensor: f(i) = <grad(i), tensor>
+    x = _diag_tensor(tree, inactive)
+    d = np.ravel(x.eval_diag())
+    for nod in x.active_nodes:
+        g = x.parameter_gradient_eval_diag(nod).numpy()
+        core = _core_in_gradient_order(x, nod)
+        assert g.shape[1:] == core.shape
+        npt.assert_allclose(np.tensordot(g, core, axes=core.ndim), d)
+
+
+def test_parameter_gradient_eval_diag_with_identity_matrices(tree):
+    x = _diag_tensor(tree)
+    identity = [np.eye(3)] * 4
+    for nod in x.active_nodes:
+        npt.assert_allclose(
+            x.parameter_gradient_eval_diag(nod).numpy(),
+            x.parameter_gradient_eval_diag(nod, identity).numpy(),
+        )
+
+
+def test_parameter_gradient_eval_diag_dmrg_euler_identity(tree):
+    # the diagonal is linear in the contraction of a node with its parent
+    x = _diag_tensor(tree)
+    d = np.ravel(x.eval_diag())
+    identity = [np.eye(3)] * 4
+    for nod in range(1, tree.nb_nodes + 1):
+        if nod == tree.root:
+            continue
+        parent = tree.parent(nod)
+        A = x.tensors[nod - 1].numpy()
+        P = x.tensors[parent - 1].numpy()
+        position = list(tree.children(parent)).index(nod)
+        merged = np.tensordot(A, P, axes=([A.ndim - 1], [position]))
+        g, g_alpha, g_gamma = x.parameter_gradient_eval_diag_dmrg(nod)
+        g = g.numpy()
+        npt.assert_allclose(np.tensordot(g, merged, axes=merged.ndim), d)
+        npt.assert_allclose(
+            g, x.parameter_gradient_eval_diag_dmrg(nod, identity)[0].numpy()
+        )
+
+
+def test_permute_leaves_preserves_the_tensor(tree):
+    x = _diag_tensor(tree)
+    a = x.full().numpy()
+    y = x.permute_leaves([1, 0, 3, 2])
+    npt.assert_allclose(y.full().numpy(), a, atol=1e-10)
+
+
+def test_permute_nodes(tree):
+    x = _diag_tensor(tree)
+    a = x.full().numpy()
+    leaves = x.tree.dim2ind
+    y = x.permute_nodes([leaves[0], leaves[2]])
+    npt.assert_allclose(y.full().numpy(), a, atol=1e-10)
+
+
+def test_permute_nodes_rejects_an_ascendant():
+    tree = TREES["balanced"]
+    x = _diag_tensor(tree)
+    leaf = tree.dim2ind[0]
+    with pytest.raises(ValueError):
+        x.permute_nodes([tree.parent(leaf), leaf])
+
+
+def test_nodes_permutation_cost(tree):
+    x = _diag_tensor(tree)
+    cost = x.nodes_permutation_cost(tree.dim2ind[0])
+    assert np.size(cost) == tree.nb_nodes
+    assert np.all(np.asarray(cost) >= 0)
+
+
+@pytest.mark.parametrize("method", ["optimize_dimension_tree", "optimize_leaves_permutations"])
+def test_optimizations_preserve_the_tensor_and_do_not_increase_storage(tree, method):
+    x = _diag_tensor(tree)
+    a = x.full().numpy()
+    y = getattr(x, method)(1e-12, 5)
+    npt.assert_allclose(y.full().numpy(), a, atol=1e-9)
+    assert y.storage() <= x.storage()
+
+
+def test_plot_requires_igraph(tree):
+    pytest.importorskip("igraph")
+    _diag_tensor(tree).plot()

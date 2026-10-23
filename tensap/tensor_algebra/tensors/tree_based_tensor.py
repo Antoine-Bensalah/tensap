@@ -707,7 +707,8 @@ class TreeBasedTensor:
 
         """
         tree = self.tree
-        ranks = self.ranks
+        # copy: the ranks of the inactive nodes are set below
+        ranks = np.array(self.ranks)
         ranks[self.non_active_nodes - 1] = self.shape[
             np.logical_not(self.is_active_node[tree.dim2ind - 1])
         ]
@@ -758,6 +759,10 @@ class TreeBasedTensor:
         tensor_star = self
 
         nodes = tensap.fast_setdiff(np.arange(1, nb_nodes + 1), self.tree.root)
+        # no pair of nodes can be permuted (e.g. trivial tree): nothing to
+        # gain, and the random search below would never end
+        if all(np.all(self.nodes_permutation_cost(a) == 0) for a in nodes):
+            return self
 
         proba_m = 1 / np.arange(1, self.order + 1) ** 2
 
@@ -2361,9 +2366,8 @@ class TreeBasedTensor:
                     ind = tree.child_number(child) - 1
                     tmp = tmp.outer_product_eval_diag(
                         tensap.FullTensor(np.eye(self.tensors[gamma - 1].shape[ind])),
-                        [],
-                        [],
-                        True,
+                        0,
+                        0,
                     )
             # tmp = tmp.squeeze()
             if active_ch.size != 0:
@@ -2387,8 +2391,9 @@ class TreeBasedTensor:
                     tensap.FullTensor(matrices[ind]), 0, 0
                 )
             else:
+                # identity matrix: evaluation of the diagonal of the tensor
                 g_alpha = g_alpha.outer_product_eval_diag(
-                    tensap.FullTensor(np.eye(u_alpha[alpha - 1].shape[0])), [], [], True
+                    tensap.FullTensor(np.eye(self.tensors[alpha - 1].shape[0])), 0, 0
                 )
             # g_alpha = g_alpha.squeeze()
         else:
@@ -2412,9 +2417,8 @@ class TreeBasedTensor:
                             tensap.FullTensor(
                                 np.eye(self.tensors[alpha - 1].shape[ind])
                             ),
-                            [],
-                            [],
-                            True,
+                            0,
+                            0,
                         )
                 # tmp = tmp.squeeze()
                 if active_ch.size != 0:
