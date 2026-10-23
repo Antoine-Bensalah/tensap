@@ -75,7 +75,8 @@ class RandomVariable(tensap.ProbabilityMeasure):
             param_1 = self.get_parameters()
             param_2 = rv_2.get_parameters()
             for ind in zip(param_1, param_2):
-                is_equal = is_equal and (ind[0] == ind[1])
+                # parameters may be arrays (discrete and empirical variables)
+                is_equal = is_equal and np.array_equal(ind[0], ind[1])
         return is_equal
 
     def __ne__(self, rv_2):
@@ -91,7 +92,7 @@ class RandomVariable(tensap.ProbabilityMeasure):
             The number of parameters that admits the random variable.
 
         """
-        return np.size(self.get_parameters())
+        return int(sum(np.size(p) for p in self.get_parameters()))
 
     def pdf(self, x):
         """

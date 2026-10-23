@@ -257,3 +257,13 @@ def test_composite_tensor_product_rule():
         [np.linspace(0, 1, 3), np.linspace(0, 2, 3)], 2
     )
     npt.assert_allclose(G.integrate(lambda x: x[:, 0] ** 3 * x[:, 1]), 1 / 4 * 2)
+
+
+def test_shifted_hermite_moments_with_another_normal_measure():
+    # NormalRandomVariable.shift must be the affine map bias + scaling * X
+    p = tensap.NormalRandomVariable(1, 2).orthonormal_polynomials()
+    x, w = _gauss_hermite(30)
+    P = p.polyval([0, 1, 2], 2 + 3 * x)
+    expected = [np.sum(w * P[:, 1] * P[:, 2]), np.sum(w * P[:, 1] ** 2)]
+    m = tensap.NormalRandomVariable(2, 3)
+    npt.assert_allclose(p.moment([[1, 2], [1, 1]], m), expected, atol=1e-12)
