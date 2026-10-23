@@ -306,7 +306,7 @@ class FunctionalTensor(tensap.Function):
 
         """
         dims = np.atleast_1d(dims)
-        if np.all([isinstance(x, bool) for x in dims]):
+        if np.asarray(dims).dtype == bool:
             dims = np.nonzero(dims)[0]
 
         d = self.tensor.order
@@ -358,7 +358,7 @@ class FunctionalTensor(tensap.Function):
         v = np.zeros(alpha.shape[0])
         for i in range(alpha.shape[0]):
             u = alpha[i, :]
-            if np.all([isinstance(x, bool) for x in u]):
+            if np.asarray(u).dtype == bool:
                 u = np.nonzero(u)[0]
             if u.size == 0:
                 v[i] = 0

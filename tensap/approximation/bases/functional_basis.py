@@ -81,6 +81,10 @@ class FunctionalBasis:
         """
         if measure is None:
             measure = self.measure
+            if not isinstance(measure, tensap.ProbabilityMeasure) and hasattr(
+                self, "get_random_vector"
+            ):
+                measure = self.get_random_vector()
         if not isinstance(measure, tensap.ProbabilityMeasure):
             raise ValueError("Must provide a ProbabilityMeasure.")
 
@@ -235,6 +239,8 @@ class FunctionalBasis:
             the integration rule G.
 
         """
+        if isinstance(G, tensap.FullTensorProductIntegrationRule):
+            G = G.integration_rule()
 
         A = self.eval(G.points)
         W = diags(G.weights)
@@ -287,6 +293,8 @@ class FunctionalBasis:
             the integration rule G.
 
         """
+        if isinstance(G, tensap.FullTensorProductIntegrationRule):
+            G = G.integration_rule()
 
         y = fun(G.points) if callable(fun) else fun
 
@@ -320,6 +328,8 @@ class FunctionalBasis:
             the integration rule G.
 
         """
+        if isinstance(G, tensap.FullTensorProductIntegrationRule):
+            G = G.integration_rule()
 
         A = self.eval(G.points)
         W = diags(G.weights)

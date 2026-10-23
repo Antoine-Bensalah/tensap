@@ -411,7 +411,10 @@ class FunctionalBases:
             if nargout == 1:
                 return bases_eval
             return bases_eval, x
-        return self.random_dims(dims, n, self.measure, nargout)
+        measure = self.get_random_vector()
+        if measure is None:
+            raise ValueError("Must provide a ProbabilityMeasure.")
+        return self.random_dims(dims, n, measure, nargout)
 
     def get_random_vector(self):
         """
@@ -425,8 +428,11 @@ class FunctionalBases:
         """
         if isinstance(self.measure, tensap.RandomVector):
             measure = self.measure
-        elif isinstance(self.measure, tensap.ProbabilityMeasure):
-            measure = self.measure.random_vector()
+        elif isinstance(self.measure, (tensap.ProbabilityMeasure, tensap.ProductMeasure)):
+            try:
+                measure = self.measure.random_vector()
+            except AssertionError:  # a product of measures that are not random
+                measure = None
         else:
             measure = None
         return measure
