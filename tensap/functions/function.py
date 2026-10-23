@@ -66,7 +66,7 @@ class Function:
             x = np.expand_dims(x, 1)
 
         if self.store:
-            y = self.store_eval(x)
+            y = self.store_eval(x)[0]
             if np.ndim(y) == 2 and np.shape(y)[1] == 1:
                 y = np.squeeze(y, axis=1)
             return y
@@ -272,7 +272,8 @@ class Function:
         f_alpha = tensap.UserDefinedFunction(fun, alpha.size)
         f_alpha.store = self.store
         f_alpha.evaluation_at_multiple_points = self.evaluation_at_multiple_points
-        f_alpha.measure = self.measure.marginal(alpha)
+        if self.measure is not None:
+            f_alpha.measure = self.measure.marginal(alpha)
 
         return f_alpha
 
@@ -307,7 +308,7 @@ class Function:
                 measure = self.measure
             else:
                 raise ValueError("Must provide a ProbabilityMeasure.")
-        elif not isinstance(self.measure, tensap.ProbabilityMeasure):
+        elif not isinstance(measure, tensap.ProbabilityMeasure):
             raise ValueError("Must provide a ProbabilityMeasure.")
 
         x = measure.random(n)
@@ -335,6 +336,8 @@ class Function:
             The evaluation of the Function on the grid.
 
         """
+        if not isinstance(x, tensap.TensorGrid):
+            raise ValueError("A TensorGrid object must be provided.")
         x_a = x.array()
         fx = self.eval(x_a)
 

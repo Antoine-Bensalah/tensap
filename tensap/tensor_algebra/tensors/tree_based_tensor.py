@@ -1888,7 +1888,7 @@ class TreeBasedTensor:
                 tmp = tensors2[nod - 1].tensor_matrix_product(out[nod - 1], 0)
                 out[nod - 1] = tensors1[nod - 1].tensordot(tmp, 0, 0)
                 out[nod - 1] = out[nod - 1].reshape(
-                    [tensors1[nod - 1].shape[-1], tensors2[nod - 1].shape[-1]]
+                    [self.ranks[nod - 1], tensor2.ranks[nod - 1]]
                 )
                 out[nod - 1] = out[nod - 1].numpy()
 
@@ -1911,7 +1911,10 @@ class TreeBasedTensor:
                         [tensors1[nod - 1].shape[-1], tensors2[nod - 1].shape[-1]]
                     )
                 out[nod - 1] = out[nod - 1].numpy()
-        out = out[nod_level - 1]
+        if tree.is_leaf[tree.root - 1]:  # a tree with a single node
+            out = out[tree.root - 1]
+            return out.item() if out.size == 1 else out
+        out = out[[tree.root - 1]]
         if out.size == 1:
             out = out[0]
         return out
@@ -2463,7 +2466,10 @@ class TreeBasedTensor:
                 self.shape[dim] = self.tensors[parent_nod - 1].shape[ind - 1]
             else:
                 self.shape[dim] = self.tensors[nod - 1].shape[0]
-                self.ranks[nod - 1] = self.tensors[nod - 1].shape[-1]
+                if nod == self.tree.root and self.tensors[nod - 1].order == 1:
+                    self.ranks[nod - 1] = 1  # a root leaf of rank 1 is a vector
+                else:
+                    self.ranks[nod - 1] = self.tensors[nod - 1].shape[-1]
         return self
 
     @staticmethod

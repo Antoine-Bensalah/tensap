@@ -174,7 +174,8 @@ class FunctionalBases:
 
         """
         out = deepcopy(self)
-        out.bases = [x.kron(y) for x, y in zip(self.bases, g.bases)]
+        out.bases = np.empty(len(self.bases), dtype=object)
+        out.bases[:] = [x.kron(y) for x, y in zip(self.bases, g.bases)]
         return out
 
     def remove_bases(self, ind):
@@ -458,7 +459,7 @@ class FunctionalBases:
             dims = range(len(self))
         return [x.one() for x in self.bases[dims]]
 
-    def gram_matrices(self, dims=None):
+    def gram_matrices(self, dims=None, measure=None):
         """
         Return the gram matrices of each basis of self, or of a selection of
         them if dims is provided.
@@ -468,6 +469,9 @@ class FunctionalBases:
         dims : list or numpy.ndarray, optional
             The dimensions of the bases for which the gram matrix is computed.
             The default is None, indicating all the bases.
+        measure : tensap.RandomVector or tensap.Measure, optional
+            The measure of the dot products. The default is None, indicating
+            the measures of the bases.
 
         Returns
         -------
@@ -477,7 +481,12 @@ class FunctionalBases:
         """
         if dims is None:
             dims = range(len(self))
-        return [x.gram_matrix() for x in self.bases[dims]]
+        bases = self.bases[np.asarray(dims)]
+        if measure is None:
+            return [x.gram_matrix() for x in bases]
+        if isinstance(measure, tensap.RandomVector):
+            return [x.gram_matrix(y) for x, y in zip(bases, measure.random_variables)]
+        return [x.gram_matrix(measure) for x in bases]
 
     def storage(self):
         """

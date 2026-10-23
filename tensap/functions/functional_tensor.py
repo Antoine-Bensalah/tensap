@@ -242,7 +242,7 @@ class FunctionalTensor(tensap.Function):
                     + "order, must specify fdims."
                 )
         if self.bases == f_2.bases:
-            gram_matrix = self.bases.gram_matrix(fdims, *measure)
+            gram_matrix = self.bases.gram_matrices(fdims, *measure)
         else:
             raise NotImplementedError("Method not implemented.")
         tensor = self.tensor.tensor_matrix_product(gram_matrix, fdims)
@@ -269,7 +269,7 @@ class FunctionalTensor(tensap.Function):
 
         """
         if not self.evaluated_bases:
-            gram_matrix = self.bases.gram_matrix(range(self.tensor.order), *measure)
+            gram_matrix = self.bases.gram_matrices(range(self.tensor.order), *measure)
         else:
             gram_matrix = [np.eye(x.shape[1]) for x in self.bases]
         tensor = self.tensor.tensor_matrix_product(
@@ -750,12 +750,12 @@ class FunctionalTensor(tensap.Function):
         """
         g = []
         for ind in range(self.bases.length()):
-            n = self.length() * [0]
+            n = self.bases.length() * [0]
             n[ind] = 1
             dHx = self.bases.eval_derivative(n, x)
             y = self.eval_with_bases_evals(dHx)
             g.append(y)
-        out = np.concatenate(g, axis=1)
+        out = np.stack(g, axis=1)
         return out
 
     def derivative(self, n):
