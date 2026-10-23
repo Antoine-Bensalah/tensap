@@ -170,7 +170,7 @@ def test_surrogate_minimization_recovers_the_feature(loss, case):
     assert losses.size == 1 and losses[0] < 1e-7  # stops when the loss vanishes
 
 
-@pytest.mark.parametrize("precond", ["sigma", "hessian", "cg_sigma"])
+@pytest.mark.parametrize("precond", ["sigma", "cg_sigma"])
 def test_quasi_newton_recovers_the_feature(loss, case, precond):
     G, value = loss.minimize_qn(m=1, init_method="surrogate", precond_method=precond,
                                 precond_kwargs={"rtol": 1e-12} if precond == "cg_sigma" else {})
@@ -188,10 +188,14 @@ def test_initializations(loss, case, init):
     assert np.all(np.isfinite(values))
 
 
-def test_quasi_newton_without_preconditioner(loss):
-    # fixed point iterations G <- orth(G + H_G G): no guarantee, only finite
-    G, value = loss.minimize_qn(m=1, precond_method=None, maxiter=5)
-    assert np.isfinite(value)
+@pytest.mark.parametrize("precond", [None, "hessian"])
+def test_quasi_newton_with_other_preconditioners(loss, precond):
+    # G <- orth(G + P^-1 H_G G) is the quasi-Newton iteration for P = S_G only:
+    # without preconditioner, or with the Hessian (singular at a minimum, so
+    # that the step depends on the cutoff of numpy.linalg.lstsq), there is no
+    # guarantee: only the iterations are checked
+    G, value = loss.minimize_qn(m=1, precond_method=precond, maxiter=5)
+    assert np.isfinite(value) and G.shape == (loss.jac_basis.shape[1], 1)
 
 
 def test_wrong_options(loss):
