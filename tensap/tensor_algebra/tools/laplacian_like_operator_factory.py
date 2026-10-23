@@ -5,7 +5,7 @@
 Module laplacian_like_operator_factory.
 
 Port of ApproximationToolbox/TensorAlgebra/Tools/LaplacianLikeOperatorFactory.m
-(currently limited to the canonical and Tucker constructions).
+(canonical, Tucker and tree-based constructions; the TT ones are left).
 """
 
 import numpy as np
@@ -75,9 +75,7 @@ class LaplacianLikeOperatorFactory:
         TuckerTensorOperator
         """
         d = self.order
-        stacked = np.stack([_to_dense(self.K), _to_dense(self.I)], axis=0)
-        frames = [tensap.FrameOperator(stacked.copy()) for _ in range(d)]
-        tensor_frame = tensap.TFrameOperator(frames)
+        tensor_frame = self.make_tensor_frame()
 
         core_data = np.zeros((2,) * d)
         for mu in range(d):
@@ -87,3 +85,54 @@ class LaplacianLikeOperatorFactory:
         core = tensap.FullTensor(core_data)
 
         return tensap.TuckerTensorOperator(core, tensor_frame)
+
+    def make_tree_based_tensor(self, tree=None) -> "tensap.TuckerTensorOperator":
+        """Build the operator in Tucker format with a tree-based core.
+
+        The frames are [K, I] in every dimension (make_tensor_frame) and the
+        core is a TreeBasedTensor with inactive leaves. The index of a node
+        tells whether K appears in its subtree (index 0, exactly once) or not
+        (index 1): an internal node has the entries (0, 1, 0), (1, 0, 0) and
+        (1, 1, 1) (children, then parent), the root the entries (0, 1) and
+        (1, 0). All ranks are 2.
+
+        Parameters
+        ----------
+        tree : DimensionTree, optional
+            Binary dimension tree. The default is the balanced tree, as in
+            MATLAB.
+
+        Returns
+        -------
+        TuckerTensorOperator
+        """
+        if tree is None:
+            tree = tensap.DimensionTree.balanced(self.order)
+        tensors = []
+        for nod in range(1, tree.nb_nodes + 1):
+            if tree.is_leaf[nod - 1]:
+                tensors.append(tensap.FullTensor([]))
+                continue
+            if np.count_nonzero(tree.children(nod)) != 2:
+                raise ValueError("make_tree_based_tensor requires a binary tree.")
+            if nod == tree.root:
+                data = np.zeros((2, 2))
+                data[0, 1] = data[1, 0] = 1.0
+            else:
+                data = np.zeros((2, 2, 2))
+                data[0, 1, 0] = data[1, 0, 0] = data[1, 1, 1] = 1.0
+            tensors.append(tensap.FullTensor(data))
+        core = tensap.TreeBasedTensor(tensors, tree)
+        return tensap.TuckerTensorOperator(core, self.make_tensor_frame())
+
+    def make_tensor_frame(self) -> "tensap.TFrameOperator":
+        """Frames [K, I] in every dimension (MATLAB makeTSpaceForTuckerLikeTensor).
+
+        Returns
+        -------
+        TFrameOperator
+        """
+        stacked = np.stack([_to_dense(self.K), _to_dense(self.I)], axis=0)
+        return tensap.TFrameOperator(
+            [tensap.FrameOperator(stacked.copy()) for _ in range(self.order)]
+        )

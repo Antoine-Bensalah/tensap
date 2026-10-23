@@ -237,7 +237,7 @@ class DiagonalTensor:
         """
         self.shape = np.full(self.order, self.data.size)
 
-    def tensor_vector_product(self, vectors):
+    def tensor_vector_product(self, vectors, dims=None):
         """
         Compute the contraction of the tensor with vectors.
 
@@ -249,6 +249,11 @@ class DiagonalTensor:
         ----------
         vectors : numpy.ndarray or list of numpy.ndarray
             The vectors to use in the product.
+        dims : list or numpy.ndarray, optional
+            Dimensions of the contractions, accepted for compatibility with
+            the other tensor formats. A diagonal tensor is invariant under
+            permutations of its dimensions, so the result only depends on the
+            number of vectors.
 
         Returns
         -------

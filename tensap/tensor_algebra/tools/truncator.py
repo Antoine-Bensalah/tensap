@@ -138,21 +138,27 @@ class Truncator:
 
     def _truncate_tucker(self, tensor):
         """
-        Truncate a BaseTuckerTensor (TuckerTensorVector or TuckerTensorOperator)
-        using a Tucker-format HOSVD: orthonormalize the frames, run HOSVD on
-        the (small) core, and push the resulting factor matrices back into
-        the frames. Equivalent to Truncator.truncate for a TuckerLikeTensor
-        with a FullTensor core in the MATLAB ApproximationToolbox.
+        Truncate a BaseTuckerTensor (TuckerTensorVector or TuckerTensorOperator).
+
+        As Truncator.truncate for a TuckerLikeTensor in the MATLAB
+        ApproximationToolbox: an operator is vectorized, then
+        - order 2: truncated SVD of the core of the orthonormalized tensor,
+          the result has a diagonal core (the singular values);
+        - FullTensor core: HOSVD of the core of the orthonormalized tensor;
+        - DiagonalTensor core: recompression by a greedy algorithm with
+          rank-one corrections and updates of the factors;
+        - TreeBasedTensor core: the frames are absorbed into the leaves and
+          the tree-based tensor is truncated by hsvd.
 
         Parameters
         ----------
         tensor : tensap.BaseTuckerTensor
-            The Tucker tensor to truncate. Its core must be a tensap.FullTensor.
+            The Tucker tensor to truncate.
 
         Raises
         ------
         NotImplementedError
-            If the core of tensor is not a tensap.FullTensor.
+            For another type of core.
 
         Returns
         -------
@@ -160,12 +166,82 @@ class Truncator:
             The truncated tensor, of the same subclass as tensor.
 
         """
-        if not isinstance(tensor.core, tensap.FullTensor):
-            raise NotImplementedError(
-                "Truncation of a BaseTuckerTensor is only implemented for a "
-                "FullTensor core."
-            )
+        if isinstance(tensor, tensap.TuckerTensorOperator):
+            shape = tensor.shape
+            vector = self._truncate_tucker(tensor.vectorize())
+            return vector.unvectorize([s[0] for s in shape], [s[1] for s in shape])
 
+        if tensor.order == 2:
+            return self._truncate_tucker_svd(tensor)
+        if isinstance(tensor.core, tensap.FullTensor):
+            return self._truncate_tucker_hosvd(tensor)
+        if isinstance(tensor.core, tensap.DiagonalTensor):
+            return self._truncate_tucker_greedy(tensor)
+        if isinstance(tensor.core, tensap.TreeBasedTensor):
+            return tensap.TuckerTensorVector.from_tree_based_tensor(
+                self.hsvd(tensor.tree_based_tensor())
+            )
+        raise NotImplementedError(
+            "Truncation of a BaseTuckerTensor is not implemented for a "
+            f"{type(tensor.core).__name__} core."
+        )
+
+    def _truncate_tucker_svd(self, tensor):
+        """Truncated SVD of an order-2 Tucker tensor, with a diagonal core."""
+        x = tensor.orth()
+        saved_max_rank = self.max_rank
+        self.max_rank = np.min(self.max_rank)
+        try:
+            svd = self.trunc_svd(x.core.full().numpy())
+        finally:
+            self.max_rank = saved_max_rank
+        new_frames = x.tensor_frame.space_times_matrix(svd.space)
+        return type(x)(tensap.DiagonalTensor(svd.core.data, 2), new_frames)
+
+    def _truncate_tucker_greedy(self, tensor):
+        """
+        Recompression of a Tucker tensor with a diagonal core (canonical
+        format) by the greedy algorithm applied to I y = x: rank-one
+        corrections computed by ALS, each followed by an update of all the
+        rank-one factors by ALS.
+
+        Differences with MATLAB: the factors are updated after each correction
+        (MATLAB uses the pure greedy algorithm, which converges much more
+        slowly), and the number of corrections is bounded by the rank of x
+        (instead of the size of the first dimension), since x itself is an
+        exact representation of that rank.
+        """
+        x_norm = tensor.norm()
+        if x_norm == 0:
+            return tensor
+        identity = tensap.BaseTuckerTensor.eye([s[0] for s in tensor.shape])
+        local_solver = tensap.RankOneALSLinearSolver(
+            identity, tensor, max_iterations=30, stagnation=1e-5, display=False
+        )
+        updater = tensap.TuckerTensorALSLinearSolver(
+            identity, tensor, max_iterations_frames=2, display=False
+        )
+        max_iterations = int(np.min([tensor.core.data.size, np.min(self.max_rank)]))
+        solver = tensap.GreedyLinearSolver(
+            identity,
+            tensor,
+            local_solver=local_solver,
+            update=updater.update_frames_by_als,
+            max_iterations=max_iterations,
+            tolerance=self.tolerance,
+            display=False,
+        )
+        out = solver.solve()[0]
+        if (out - tensor).norm() / x_norm > self.tolerance:
+            warnings.warn("Truncator: the approximation is not accurate enough.")
+        return out
+
+    def _truncate_tucker_hosvd(self, tensor):
+        """
+        HOSVD of a Tucker tensor with a FullTensor core: orthonormalize the
+        frames, run HOSVD on the (small) core, and push the resulting factor
+        matrices back into the frames.
+        """
         x = tensor.orth()
         core = x.core
         order = core.order

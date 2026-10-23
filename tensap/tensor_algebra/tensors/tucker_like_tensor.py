@@ -144,24 +144,29 @@ class BaseTuckerTensor:
     def from_tree_based_tensor(cls, tree_tensor) -> "BaseTuckerTensor":
         """Convert a TreeBasedTensor into a Tucker format.
 
+        The leaf of each dimension becomes its frame (the identity if the leaf
+        is inactive). With a trivial tree the core is the root tensor
+        (FullTensor); otherwise it is the TreeBasedTensor with inactive leaves.
+
         Parameters
         ----------
         tree_tensor : TreeBasedTensor
 
         Returns
         -------
-        BaseTuckerTensor
+        TuckerTensorVector
         """
         tree = tree_tensor.tree
+        tensors = np.array(tree_tensor.tensors)
         frames_data = []
 
         for mu in range(tree_tensor.order):
-            nod = tree.dim2ind[mu]
-            idx = nod - 1
+            idx = tree.dim2ind[mu] - 1
 
             # get the matrix (N, R)
             if tree_tensor.is_active_node[idx]:
-                mat = tree_tensor.tensors[idx].data
+                mat = tensors[idx].data
+                tensors[idx] = tensap.FullTensor([])
             else:
                 mat = np.eye(tree_tensor.shape[mu])
 
@@ -170,7 +175,10 @@ class BaseTuckerTensor:
             data = mat.T.reshape(R, N, 1)
             frames_data.append(FrameVector(data))
 
-        core = tree_tensor.tensors[0]
+        if all(tree.parent(nod) == tree.root for nod in tree.dim2ind):
+            core = tensors[tree.root - 1]
+        else:
+            core = tensap.TreeBasedTensor(tensors, tree)
         frames = TFrameVector(frames_data)
 
         return cls._factory(core, frames)
@@ -379,23 +387,35 @@ class BaseTuckerTensor:
     def singular_values(self):
         """Return the singular values of the tensor.
 
-        Uses orthonormalization before SVD for numerical stability.
+        The frames are orthonormalized first, so that the singular values of
+        the tensor are those of its core. An operator is treated as its
+        vectorization.
 
         Returns
         -------
-        ndarray or list of ndarray or list of None
-            If order == 2, returns the singular values of the core after orth.
-            If order > 2, delegates to core.singular_values() if available.
+        ndarray or list of ndarray
+            Order 2: the singular values of the matrix. FullTensor core: the
+            singular values of the matricizations along each dimension.
+            TreeBasedTensor core: the tree-based singular values, one array
+            per node of the tree (None for the root), the leaves giving the
+            singular values along each dimension.
+
+        Raises
+        ------
+        NotImplementedError
+            For another type of core (as in MATLAB).
         """
         if self.order == 2:
             orth_self = self.orth()
-            return np.linalg.svd(orth_self.core.data, compute_uv=False)
-        else:
-            orth_self = self.orth()
-            if hasattr(orth_self.core, 'singular_values'):
-                return orth_self.core.singular_values()
-            # fallback: unfold and compute SVD for each dimension
-            return [None] * self.order
+            return np.linalg.svd(orth_self.core.full().numpy(), compute_uv=False)
+        if isinstance(self.core, tensap.TreeBasedTensor):
+            vector = self.vectorize() if isinstance(self, TuckerTensorOperator) else self
+            return vector.tree_based_tensor().singular_values()
+        if isinstance(self.core, tensap.FullTensor):
+            return self.orth().core.singular_values()
+        raise NotImplementedError(
+            f"singular_values is not implemented for a {type(self.core).__name__} core."
+        )
 
     def normalize_basis(self) -> 'BaseTuckerTensor':
         """Normalize the elements of the bases of subspaces.
@@ -806,12 +826,26 @@ class TuckerTensorVector(BaseTuckerTensor):
     def tree_based_tensor(self):
         """Convert into a TreeBasedTensor.
 
+        With a TreeBasedTensor core, the frames are absorbed into the leaves
+        of its tree (an inactive leaf receives the frame itself); otherwise
+        the tree is trivial, with the core at the root and the frames as
+        leaves.
+
         Returns
         -------
         TreeBasedTensor
         """
-        tree = tensap.DimensionTree.trivial(self.order)
         factors = self.tensor_frame.get_vectorize_factors()
+        if isinstance(self.core, tensap.TreeBasedTensor):
+            tree = self.core.tree
+            tensors = np.array(self.core.tensors)
+            for mu, factor in enumerate(factors):
+                idx = tree.dim2ind[mu] - 1
+                if self.core.is_active_node[idx]:
+                    factor = factor @ tensors[idx].data
+                tensors[idx] = tensap.FullTensor(factor)
+            return tensap.TreeBasedTensor(tensors, tree)
+        tree = tensap.DimensionTree.trivial(self.order)
         tensors = [self.core] + [tensap.FullTensor(m) for m in factors]
         return tensap.TreeBasedTensor(tensors, tree)
 

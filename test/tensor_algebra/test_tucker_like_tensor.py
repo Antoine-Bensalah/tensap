@@ -107,6 +107,18 @@ def test_full_of_vectorized_operator(rng):
     npt.assert_allclose(A.vectorize().numpy(), A.numpy().reshape(6, 8))
 
 
+# --- contraction with vectors -------------------------------------------------
+
+
+@pytest.mark.parametrize("kind", CORE_TYPES)
+def test_tensor_vector_product_on_some_dimensions(rng, kind):
+    # with a diagonal core, the contraction used to fail (no dims argument)
+    x = _vector(rng, kind, [3, 4, 5], [2, 2, 2])
+    v = rng.standard_normal(4)
+    y = x.tensor_vector_product(v, [1])
+    npt.assert_allclose(y.numpy(), np.einsum("ijk,j->ik", x.numpy(), v))
+
+
 # --- normalize_basis ----------------------------------------------------------
 
 
@@ -246,3 +258,56 @@ def test_convert_tensors_aligns_cores_of_same_class(rng):
     assert isinstance(Ac.core, tensap.FullTensor)
     assert isinstance(Bc.core, tensap.FullTensor)
     npt.assert_allclose(Bc.numpy(), B.numpy())
+
+
+# --- tree-based cores ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("d", [2, 3, 5])
+def test_laplacian_tree_based_tensor(rng, d):
+    K = rng.standard_normal((3, 3))
+    M = rng.standard_normal((3, 3))
+    factory = tensap.LaplacianLikeOperatorFactory(K, M, d)
+    A = factory.make_tree_based_tensor()
+    assert isinstance(A.core, tensap.TreeBasedTensor)
+    npt.assert_allclose(A.numpy(), factory.make_tucker_tensor().numpy())
+    x = _vector(rng, "full", [3] * d, [2] * d)
+    npt.assert_allclose((A @ x).numpy(), (factory.make_canonical_tensor() @ x).numpy())
+
+
+def test_laplacian_tree_based_tensor_requires_a_binary_tree():
+    factory = tensap.LaplacianLikeOperatorFactory(np.eye(2), np.eye(2), 3)
+    with pytest.raises(ValueError):
+        factory.make_tree_based_tensor(tensap.DimensionTree.trivial(3))
+
+
+def _matricization_singular_values(a, mu):
+    return np.linalg.svd(np.moveaxis(a, mu, 0).reshape(a.shape[mu], -1), compute_uv=False)
+
+
+def test_singular_values_tree_core(rng):
+    np.random.seed(3)
+    t = tensap.TreeBasedTensor.randn(tensap.DimensionTree.balanced(4), None, [4, 3, 5, 2])
+    x = TuckerTensorVector.from_tree_based_tensor(t)
+    x = x.tensor_matrix_product([rng.standard_normal((n, n)) for n in [4, 3, 5, 2]])
+    sv = x.singular_values()
+    a = x.numpy()
+    tree = t.tree
+    for mu in range(4):
+        s = sv[tree.dim2ind[mu] - 1]
+        # computed from the Gram matrices: accuracy of order sqrt(eps) * s[0]
+        npt.assert_allclose(s, _matricization_singular_values(a, mu)[:s.size],
+                            atol=1e-6 * s[0])
+
+
+def test_singular_values_full_and_order_two(rng):
+    x = _vector(rng, "full", [4, 3, 5], [2, 3, 2])
+    for mu, s in enumerate(x.singular_values()):
+        npt.assert_allclose(s, _matricization_singular_values(x.numpy(), mu)[:s.size])
+    y = _vector(rng, "diagonal", [4, 3], [2])
+    npt.assert_allclose(y.singular_values(), np.linalg.svd(y.numpy(), compute_uv=False)[:2])
+
+
+def test_singular_values_diagonal_core_not_implemented(rng):
+    with pytest.raises(NotImplementedError):
+        _vector(rng, "diagonal", [3, 3, 3], [2]).singular_values()
