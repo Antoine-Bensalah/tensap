@@ -348,7 +348,7 @@ class TreeBasedTensor:
             tensor.tensors[root] = tensor.tensors[root].tensor_matrix_product(
                 arg, tensor.tensors[root].order - 1
             )
-            tensor.ranks[root] = arg.shape[1]
+            tensor.ranks[root] = arg.shape[0]
         else:
             raise ValueError("Wrong shapes.")
         return tensor
