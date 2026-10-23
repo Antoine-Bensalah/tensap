@@ -1,0 +1,377 @@
+# Copyright (c) 2024
+# This file is part of tensap (tensor approximation package).
+
+"""
+Module qtt: quantized tensor-train (QTT) representations.
+
+An array of size b^L along each of its dim axes is reshaped into a tensor of
+order L * dim with dimensions of size b, then stored as a TTTensor; a matrix
+acting on such arrays becomes a TTOperator with cores of size b x b.
+
+The layout (base b, number L of digits per axis, number dim of axes, order of
+the digits) is the one of tensap.Tensorizer, which describes the same
+quantization for functions: the index i = sum_k i_k b^(L-k) of a grid point
+along an axis is written with its most significant digit first (C order),
+and the digits of the axes are ordered by blocks (ordering_type = 1: all the
+digits of the first axis, then those of the second one...) or interleaved
+(ordering_type = 2: the first digit of every axis, then the second one...).
+The Tensorizer is optional for the algebra (the layout is then deduced from
+the shape); it is required to interpret a QTT vector as a function, since it
+carries the geometry of the grid.
+
+The module also provides the QTT primitives of 1D operators on b^L points:
+identity, shift, elementary matrices, the matrix of ones, banded Toeplitz
+matrices and corner blocks. They contain no discretization choice (stencils
+and boundary conditions are built on top of them).
+"""
+
+from typing import Optional
+
+import numpy as np
+import tensap
+
+
+# --- layout -----------------------------------------------------------------------
+
+
+def _layout(shape, tensorizer: Optional["tensap.Tensorizer"], base: int = 2):
+    """(b, L, dim, ordering_type) for an array of the given shape."""
+    shape = tuple(int(n) for n in shape)
+    if tensorizer is None:
+        L = _number_of_digits(shape[0], base)
+        if any(n != shape[0] for n in shape):
+            raise ValueError(
+                "All the axes must have the same size b^L (one number of digits "
+                "for all the axes, as in Tensorizer)."
+            )
+        return base, L, len(shape), 1
+    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
+    if shape != (b**L,) * dim:
+        raise ValueError(f"Expected an array of shape {(b**L,) * dim}, got {shape}.")
+    return b, L, dim, tensorizer.ordering_type
+
+
+def _number_of_digits(n: int, b: int) -> int:
+    L = int(round(np.log(n) / np.log(b)))
+    if L < 1 or b**L != n:
+        raise ValueError(f"The size {n} is not a power b^L of the base b = {b}.")
+    return L
+
+
+def _digit_permutation(L: int, dim: int, ordering_type: int) -> np.ndarray:
+    """Axes of the block-ordered digit tensor, in the order of the layout."""
+    if ordering_type == 1:
+        return np.arange(L * dim)
+    if ordering_type == 2:
+        return np.arange(L * dim).reshape(dim, L).T.ravel()
+    raise ValueError("ordering_type must be 1 (blocks) or 2 (interleaved).")
+
+
+def default_tensorizer(shape, base: int = 2) -> "tensap.Tensorizer":
+    """Tensorizer of the default layout of an array: base b, blocks, [0, 1]^dim."""
+    b, L, dim, _ = _layout(shape, None, base)
+    return tensap.Tensorizer(b, L, dim)
+
+
+# --- vectors and arrays -----------------------------------------------------------
+
+
+def quantize(array, tensorizer=None, tolerance: float = 1e-12, base: int = 2):
+    """QTT representation of an array of shape (b^L, ..., b^L).
+
+    Parameters
+    ----------
+    array : numpy.ndarray or tensap.FullTensor
+        Vector of size b^L, or array with dim axes of size b^L.
+    tensorizer : tensap.Tensorizer, optional
+        Layout (b, L, dim, ordering_type). The default is deduced from the
+        shape: base `base`, blocks.
+    tolerance : float, optional
+        Relative precision of the TT-SVD. The default 1e-12 only removes the
+        round-off.
+    base : int, optional
+        Base used without tensorizer. The default is 2.
+
+    Returns
+    -------
+    tensap.TTTensor
+        Tensor of order L * dim with dimensions of size b.
+    """
+    a = np.asarray(getattr(array, "data", array), dtype=float)
+    b, L, dim, ordering = _layout(a.shape, tensorizer, base)
+    digits = a.reshape([b] * (L * dim)).transpose(_digit_permutation(L, dim, ordering))
+    return tensap.TTTensor.from_full(digits, tolerance)
+
+
+def dequantize(tensor, tensorizer=None, dim: int = 1) -> np.ndarray:
+    """Inverse of quantize: the array of shape (b^L,) * dim.
+
+    Parameters
+    ----------
+    tensor : tensap.TTTensor
+        QTT tensor of order L * dim.
+    tensorizer : tensap.Tensorizer, optional
+        Layout. The default is blocks, with the base given by the cores and
+        `dim` axes.
+    dim : int, optional
+        Number of axes when no tensorizer is given. The default is 1.
+    """
+    if tensorizer is None:
+        b = int(tensor.shape[0])
+        if tensor.order % dim:
+            raise ValueError("The order must be a multiple of dim.")
+        L, ordering = tensor.order // dim, 1
+    else:
+        b, L, dim, ordering = tensorizer.b, tensorizer.d, tensorizer.dim, tensorizer.ordering_type
+        if tensor.order != L * dim:
+            raise ValueError(f"Expected a tensor of order {L * dim}, got {tensor.order}.")
+    digits = tensor.numpy().transpose(np.argsort(_digit_permutation(L, dim, ordering)))
+    return digits.reshape([b**L] * dim)
+
+
+def quantize_function(fun, tensorizer, y0: float = 0.0, tolerance: float = 1e-12):
+    """QTT representation of the values of fun on the grid of tensorizer.
+
+    The grid points are x = F_X^{-1}((i + F_Y(y0)) b^(-L)) along each axis,
+    for the b^L indices i (the inverse map of the Tensorizer at y = y0): nodes
+    for y0 = 0, cell centres for y0 = 1/2 (uniform X and Y). The function is
+    sampled on the whole grid (b^(L dim) points): moderate sizes only.
+
+    Parameters
+    ----------
+    fun : callable
+        Function of points of shape (n, dim), returning n values.
+    tensorizer : tensap.Tensorizer
+    y0 : float, optional
+        Position in the cells. The default is 0.
+    tolerance : float, optional
+        Relative precision of the TT-SVD.
+
+    Returns
+    -------
+    tensap.TTTensor
+    """
+    points = grid_points(tensorizer, y0)
+    values = np.asarray(fun(points.reshape(-1, tensorizer.dim)), dtype=float)
+    return quantize(values.reshape([tensorizer.b**tensorizer.d] * tensorizer.dim),
+                    tensorizer, tolerance)
+
+
+def grid_points(tensorizer, y0: float = 0.0) -> np.ndarray:
+    """Points of the grid of tensorizer, array of shape (b^L, ..., b^L, dim)."""
+    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
+    axes = []
+    for k in range(dim):
+        u = (np.arange(b**L) + tensorizer.Y.random_variables[k].cdf(np.array([y0]))) / b**L
+        axes.append(tensorizer.X.random_variables[k].icdf(u))
+    return np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
+
+
+def to_functional_tensor(tensor, tensorizer):
+    """The QTT vector as a function: piecewise constant on the grid cells.
+
+    Returns the tensap.TensorizedFunction whose value at x is the entry of the
+    QTT vector at the digits of the cell of x (delta basis on the digits,
+    constant basis in y). The geometry comes from the tensorizer, which is
+    therefore required.
+    """
+    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
+    if tensor.order != L * dim or np.any(tensor.shape != b):
+        raise ValueError("The tensor does not have the layout of the tensorizer.")
+    # one core of size 1 per axis for the variable y (constant basis)
+    cores = list(tensor.cores) + [np.ones((1, 1, 1))] * dim
+    full = tensap.TTTensor(cores)
+    digits = tensap.DeltaFunctionalBasis(np.arange(b))
+    constant = tensap.FunctionalBases(
+        [tensap.PolynomialFunctionalBasis(y.orthonormal_polynomials(), [0])
+         for y in tensorizer.Y.random_variables]
+    )
+    bases = tensap.FunctionalBases([digits] * (L * dim) + list(constant.bases))
+    return tensap.TensorizedFunction(tensap.FunctionalTensor(full, bases), tensorizer)
+
+
+# --- matrices ---------------------------------------------------------------------
+
+
+def quantize_operator(matrix, tensorizer=None, tolerance: float = 1e-12, base: int = 2):
+    """QTT representation of a square matrix acting on quantized arrays.
+
+    Rows and columns are quantized with the same layout and paired digit by
+    digit: core k of the TTOperator has shape (r, b, b, r'), indexed by the
+    k-th digit of the row and of the column. The matrix is dense: moderate
+    sizes only (mostly a test oracle).
+
+    Parameters
+    ----------
+    matrix : numpy.ndarray or scipy.sparse matrix
+        Matrix of shape (N, N), N = b^(L dim).
+    tensorizer : tensap.Tensorizer, optional
+        Layout of the arrays. The default is one axis (dim = 1) of base `base`.
+    """
+    m = matrix.toarray() if hasattr(matrix, "toarray") else np.asarray(matrix, dtype=float)
+    N = m.shape[0]
+    if m.shape != (N, N):
+        raise ValueError("The matrix must be square.")
+    if tensorizer is None:
+        tensorizer = default_tensorizer([N], base)
+    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
+    if N != b ** (L * dim):
+        raise ValueError(f"Expected a matrix of size {b ** (L * dim)}, got {N}.")
+    D = L * dim
+    perm = _digit_permutation(L, dim, tensorizer.ordering_type)
+    digits = m.reshape([b] * (2 * D)).transpose(np.concatenate((perm, perm + D)))
+    # pair the digits (i_k, j_k), then TT-SVD on the paired indices of size b^2
+    paired = digits.transpose(np.ravel(np.column_stack((np.arange(D), np.arange(D) + D))))
+    tt = tensap.TTTensor.from_full(paired.reshape([b * b] * D), tolerance)
+    return tensap.TTOperator.unvectorize(tt, [(b, b)] * D)
+
+
+def dequantize_operator(operator, tensorizer=None) -> np.ndarray:
+    """Inverse of quantize_operator: the matrix of shape (N, N)."""
+    D = operator.order
+    b = operator.shape[0][0]
+    if tensorizer is None:
+        L, dim, ordering = D, 1, 1
+    else:
+        L, dim, ordering = tensorizer.d, tensorizer.dim, tensorizer.ordering_type
+        if D != L * dim:
+            raise ValueError(f"Expected an operator of order {L * dim}, got {D}.")
+    # full: (i_1, j_1, ..., i_D, j_D) -> (i_1, ..., i_D, j_1, ..., j_D)
+    a = operator.numpy().transpose(list(range(0, 2 * D, 2)) + list(range(1, 2 * D, 2)))
+    inverse = np.argsort(_digit_permutation(L, dim, ordering))
+    a = a.transpose(np.concatenate((inverse, inverse + D)))
+    return a.reshape(b**D, b**D)
+
+
+# --- QTT primitives of 1D operators on N = b^L points ------------------------------
+
+
+def _shift_blocks(b: int):
+    """A: digit a <- a + 1 (no carry), B: digit b - 1 <- 0 (carry)."""
+    A = np.eye(b, k=1)
+    B = np.zeros((b, b))
+    B[b - 1, 0] = 1.0
+    return A, B
+
+
+def qtt_identity(L: int, b: int = 2) -> "tensap.TTOperator":
+    """Identity of R^(b^L), of rank 1."""
+    return tensap.TTOperator.eye([b] * L)
+
+
+def qtt_shift(L: int, b: int = 2, periodic: bool = False) -> "tensap.TTOperator":
+    """Shift S of R^(b^L), (S x)_j = x_{j+1} (ones on the superdiagonal).
+
+    Adding 1 to an index written in base b changes its last digits by a
+    carry: S = sum_k I x ... x I x A x B x ... x B (A at digit k), with A the
+    shift of one digit and B = e_{b-1} e_0^T the carry. TT rank 2. With
+    periodic=True, the corner e_{N-1} e_0^T (= B x ... x B) is added, with the
+    same rank: (S x)_{N-1} = x_0.
+    """
+    A, B = _shift_blocks(b)
+    if L == 1:
+        return tensap.TTOperator([(A + periodic * B)[None, :, :, None]])
+    first = np.zeros((1, b, b, 2))
+    first[0, :, :, 0] = np.eye(b)
+    first[0, :, :, 1] = A + periodic * B
+    middle = np.zeros((2, b, b, 2))
+    middle[0, :, :, 0] = np.eye(b)
+    middle[0, :, :, 1] = A
+    middle[1, :, :, 1] = B
+    last = np.zeros((2, b, b, 1))
+    last[0, :, :, 0] = A
+    last[1, :, :, 0] = B
+    return tensap.TTOperator([first] + [middle] * (L - 2) + [last])
+
+
+def qtt_elementary_matrix(L: int, i: int, j: int, b: int = 2) -> "tensap.TTOperator":
+    """Elementary matrix e_i e_j^T of size b^L, of rank 1."""
+    di = tensap.integer2baseb(np.array([i]), b, L)[0]
+    dj = tensap.integer2baseb(np.array([j]), b, L)[0]
+    cores = []
+    for p, q in zip(di, dj):
+        core = np.zeros((1, b, b, 1))
+        core[0, p, q, 0] = 1.0
+        cores.append(core)
+    return tensap.TTOperator(cores)
+
+
+def qtt_ones_matrix(L: int, b: int = 2) -> "tensap.TTOperator":
+    """The matrix of ones 1 1^T of size b^L, of rank 1."""
+    return tensap.TTOperator([np.ones((1, b, b, 1))] * L)
+
+
+def qtt_banded(diagonals: dict, L: int, b: int = 2, periodic: bool = False,
+               tolerance: float = 1e-14) -> "tensap.TTOperator":
+    """Banded Toeplitz matrix sum_k c_k S^k of size b^L.
+
+    Parameters
+    ----------
+    diagonals : dict
+        {offset k: value c_k}: c_k on the k-th diagonal (k > 0 above the main
+        diagonal, k < 0 below). |k| < b^L.
+    L, b : int
+        Size b^L.
+    periodic : bool, optional
+        Circulant matrix (the diagonals wrap around). The default is False.
+    tolerance : float, optional
+        Precision of the rounding of the sum (exact up to round-off).
+
+    Returns
+    -------
+    tensap.TTOperator
+        Of small rank: the sum of the powers of the shift, rounded.
+    """
+    shift = qtt_shift(L, b, periodic)
+    result = None
+    for k, c in diagonals.items():
+        if c == 0:
+            continue
+        if abs(k) >= b**L:
+            raise ValueError(f"Offset {k} out of range for a matrix of size {b**L}.")
+        term = qtt_identity(L, b)
+        power = shift if k > 0 else shift.T
+        for _ in range(abs(k)):
+            term = _round(power @ term, tolerance)
+        term = c * term
+        result = term if result is None else _round(result + term, tolerance)
+    return result if result is not None else 0.0 * qtt_identity(L, b)
+
+
+def qtt_corner(block, L: int, corner: str = "top-left", b: int = 2,
+               tolerance: float = 1e-14) -> "tensap.TTOperator":
+    """Matrix of size b^L, zero except a small dense block in a corner.
+
+    Parameters
+    ----------
+    block : numpy.ndarray
+        Block of shape (p, q), placed at rows 0..p-1 ("top") or N-p..N-1
+        ("bottom") and columns 0..q-1 ("left") or N-q..N-1 ("right").
+    corner : str
+        "top-left", "top-right", "bottom-left" or "bottom-right".
+
+    Returns
+    -------
+    tensap.TTOperator
+        Sum of elementary matrices, rounded: rank at most min(p, q) per bond
+        in practice (a corner block is a low-rank correction).
+    """
+    block = np.atleast_2d(np.asarray(block, dtype=float))
+    N = b**L
+    vertical, horizontal = corner.split("-")
+    if vertical not in ("top", "bottom") or horizontal not in ("left", "right"):
+        raise ValueError("corner must be top-left, top-right, bottom-left or bottom-right.")
+    p, q = block.shape
+    rows = np.arange(p) if vertical == "top" else N - p + np.arange(p)
+    cols = np.arange(q) if horizontal == "left" else N - q + np.arange(q)
+    result = 0.0 * qtt_identity(L, b)
+    for a, i in enumerate(rows):
+        for c, j in enumerate(cols):
+            if block[a, c] != 0:
+                term = block[a, c] * qtt_elementary_matrix(L, int(i), int(j), b)
+                result = _round(result + term, tolerance)
+    return result
+
+
+def _round(tensor, tolerance):
+    return tensap.Truncator(tolerance=tolerance).truncate(tensor)

@@ -221,6 +221,14 @@ class BaseTTTensor:
             cores.append(np.einsum("anb,cnd->acnbd", x, y).reshape(a * c, n, b * e))
         return self._from_vec_cores(cores)
 
+    def tensor_product(self, other: "BaseTTTensor") -> "BaseTTTensor":
+        """Tensor product x (x) y on V (x) W: the chains of cores are
+        concatenated (order d + d', ranks (r, 1, r')). For QTT tensors with the
+        block ordering, the tensor product of the axes."""
+        if type(self) is not type(other):
+            raise TypeError("tensor_product requires two tensors of the same type.")
+        return self.__class__(list(self.cores) + list(other.cores))
+
     # --- helpers ---
 
     def _check_compatible(self, other):
@@ -303,6 +311,26 @@ class TTTensor(BaseTTTensor):
         if pending is not None:
             cores[-1] = np.tensordot(cores[-1], pending, axes=(-1, 0))
         return TTTensor(cores)
+
+    def tensor_matrix_product_eval_diag(self, matrices, dims=None):
+        """Evaluations sum_i x(i) prod_k M_k[p, i_k] for every point p.
+
+        Used by FunctionalTensor.eval, with M_k the evaluations of the basis
+        of dimension k at the points (shape (P, n_k)). Only the evaluation in
+        all the dimensions is implemented.
+
+        Returns
+        -------
+        tensap.FullTensor
+            Of order 1, the P evaluations.
+        """
+        if dims is not None and len(np.atleast_1d(dims)) != self.order:
+            raise NotImplementedError("Partial evaluations are not implemented.")
+        matrices = [np.asarray(getattr(m, "data", m)) for m in matrices]
+        z = np.ones((matrices[0].shape[0], 1))
+        for core, m in zip(self.cores, matrices):
+            z = np.einsum("pa,anb,pn->pb", z, core, m)
+        return tensap.FullTensor(z[:, 0])
 
     def kron(self, other: "TTTensor") -> "TTTensor":
         """Kronecker product, z(i n' + j) = x(i) y(j) in every dimension."""

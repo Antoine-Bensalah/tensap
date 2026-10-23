@@ -58,6 +58,21 @@ from .tensor_algebra.tools.convert_tensors import convert_tensors
 from .tensor_algebra.tools.laplacian_like_operator_factory import (
     LaplacianLikeOperatorFactory,
 )
+from .tensor_algebra.tools.qtt import (
+    quantize,
+    dequantize,
+    quantize_function,
+    quantize_operator,
+    dequantize_operator,
+    grid_points,
+    to_functional_tensor,
+    qtt_identity,
+    qtt_shift,
+    qtt_elementary_matrix,
+    qtt_ones_matrix,
+    qtt_banded,
+    qtt_corner,
+)
 
 from .tools.utils import *
 from .tools.multi_indices import MultiIndices
