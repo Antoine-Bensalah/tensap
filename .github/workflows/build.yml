@@ -48,6 +48,52 @@ jobs:
           git commit -a -m "GitHub Actions build ${GITHUB_REPOSITORY} ${GITHUB_RUN_ID}"
           git push --quiet origin master > /dev/null 2>&1
 
+  # Fast suite on Linux and macOS, with an old and a recent numpy: numerical
+  # results may depend on the numpy version (see test_suite.tex).
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python: ["3.10", "3.13"]
+        include:
+          - python: "3.10"
+            numpy: "1.26"
+          - python: "3.13"
+            numpy: "2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: true
+          python-version: ${{ matrix.python }}
+      - name: Test
+        shell: bash -l {0}
+        run: |
+          conda install -y "numpy=${{ matrix.numpy }}" scipy networkx scikit-learn matplotlib-base pytest pytest-xdist pytest-timeout pip
+          pip install .
+          mv tensap tensap_code && pytest -n auto test && mv tensap_code tensap
+
+  # Optional dependencies (PyTorch, pymanopt) in the pinned test environment,
+  # with the coverage of the branches (threshold in pyproject.toml).
+  optional-dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: conda-incubator/setup-miniconda@v4
+        with:
+          miniforge-version: latest
+          conda-remove-defaults: true
+          environment-file: environment-test.yml
+          activate-environment: tensap-test
+      - name: Test
+        shell: bash -l {0}
+        run: |
+          pip install .
+          mv tensap tensap_code && pytest -n auto --cov=tensap test && mv tensap_code tensap
+
   conda-windows:
     runs-on: windows-latest
     steps:

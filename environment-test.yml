@@ -1,0 +1,28 @@
+# Conda environment to run the whole test suite, optional dependencies
+# included (PyTorch, pymanopt), with the versions it was validated with
+# (October 2026, macOS x86_64). TensorFlow is left aside.
+#
+#   conda env create -f environment-test.yml
+#   conda run -n tensap-test python -m pytest -n auto -m ""
+#
+# tensap itself is not installed: run the tests from the root of the
+# repository (python -m pytest puts it on the path), or `pip install -e .`.
+name: tensap-test
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy=2.4
+  - scipy=1.17
+  - networkx=3.7
+  - scikit-learn=1.8
+  - matplotlib-base=3.10
+  - pytorch=2.7
+  - pytest=9.1
+  - pytest-xdist=3.8
+  - pytest-timeout=2.4
+  - pytest-cov=7.1
+  - flake8=7.4
+  - pip
+  - pip:
+      - pymanopt==2.2.1

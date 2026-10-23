@@ -172,6 +172,8 @@ def test_leave_one_out_error_with_too_few_samples(basis, x):
     assert model.solve()[1]["error"] == np.inf
 
 
+# the orthogonal matching pursuit stops once the exact sparse solution is found
+@pytest.mark.filterwarnings("ignore:Orthogonal matching pursuit ended prematurely")
 @pytest.mark.parametrize("regularization", ["l0", "l1", "l2"])
 def test_regularized_least_squares(basis, x, regularization):
     y = basis.eval(x) @ C

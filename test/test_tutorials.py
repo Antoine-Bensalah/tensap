@@ -57,6 +57,11 @@ def _tutorial_params():
 
 
 @pytest.mark.tutorial
+# the tutorials may show the warnings of tensap to the user (as the truncation
+# tutorial does): they are displayed, not errors
+@pytest.mark.filterwarnings("default::UserWarning:tensap")
+# some tutorials open many figures, closed at the end of the test
+@pytest.mark.filterwarnings("ignore:More than 20 figures have been opened:RuntimeWarning")
 @pytest.mark.parametrize("f", _tutorial_params())
 def test_tutorial(f):
     print(f"-- running {f}", flush=True)
