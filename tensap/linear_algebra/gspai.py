@@ -70,7 +70,7 @@ def gspai(A, B, pattern, *args):
         bw = args[0]
         mask = np.zeros((n, n), dtype=bool)
         for i in range(n):
-            mask[i, max(0, i - (bw - 1)) : min(n, i + bw)] = True
+            mask[i, max(0, i - (bw - 1)):min(n, i + bw)] = True
         return gspai(A, B, "imposed", mask)
 
     if pattern == "diag":

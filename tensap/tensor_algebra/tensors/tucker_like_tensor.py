@@ -9,7 +9,8 @@ import numpy as np
 import tensap
 from typing import Union, List, Tuple, Optional
 from .tensor_frame import TFrame, TFrameVector, TFrameOperator
-from .frame import Frame, FrameVector, FrameOperator
+from .frame import FrameVector
+
 
 class BaseTuckerTensor:
     """
@@ -620,7 +621,9 @@ class TuckerTensorVector(BaseTuckerTensor):
         if not isinstance(frames, TFrameVector):
             raise TypeError("TuckerTensorVector requires a TFrameVectors object.")
 
-    def sub_tensor(self, indices: List[np.ndarray], dims: Optional[List[int]] = None) -> 'TuckerTensorVector':
+    def sub_tensor(
+        self, indices: List[np.ndarray], dims: Optional[List[int]] = None
+    ) -> 'TuckerTensorVector':
         """Extract a sub-tensor by evaluating on a grid of indices.
 
         Parameters

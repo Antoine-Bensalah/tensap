@@ -34,9 +34,9 @@ class LaplacianLikeOperatorFactory:
         Number of dimensions d of the operator.
     """
 
-    def __init__(self, K, I, d: int):
+    def __init__(self, K, I, d: int):  # noqa: E741 (notation of the operator)
         self.K = K
-        self.I = I
+        self.I = I  # noqa: E741
         self.order = d
 
     def make_canonical_tensor(self) -> "tensap.TuckerTensorOperator":
@@ -52,9 +52,9 @@ class LaplacianLikeOperatorFactory:
         """
         d = self.order
         K = _to_dense(self.K)
-        I = _to_dense(self.I)
+        Id = _to_dense(self.I)
         frames = [
-            tensap.FrameOperator(np.stack([K if k == mu else I for k in range(d)]))
+            tensap.FrameOperator(np.stack([K if k == mu else Id for k in range(d)]))
             for mu in range(d)
         ]
         tensor_frame = tensap.TFrameOperator(frames)

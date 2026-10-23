@@ -36,7 +36,7 @@ L = 1.0
 n = 50
 h = L / (n + 1)
 K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
-I = sp.identity(n)
+Id = sp.identity(n)
 f = np.ones(n)
 d = 3
 
@@ -44,7 +44,7 @@ d = 3
 # Frames {K, I} in every dimension; the core selects K in exactly one
 # dimension: C(1, 2, 2) = C(2, 1, 2) = C(2, 2, 1) = 1 (MATLAB indices).
 frames = tensap.TFrameOperator(
-    [tensap.FrameOperator(np.stack([K.toarray(), I.toarray()])) for _ in range(d)]
+    [tensap.FrameOperator(np.stack([K.toarray(), Id.toarray()])) for _ in range(d)]
 )
 core = np.zeros((2, 2, 2))
 core[0, 1, 1] = 1
@@ -58,7 +58,7 @@ b_frames = tensap.TFrameVector(
 b = tensap.TuckerTensorVector(tensap.DiagonalTensor(np.array([1.0]), d), b_frames)
 
 # %% The same operator and right-hand side, with the factory
-factory = tensap.LaplacianLikeOperatorFactory(K, I, d)
+factory = tensap.LaplacianLikeOperatorFactory(K, Id, d)
 A = factory.make_tucker_tensor()
 b = tensap.TuckerTensorVector.ones([1] * d, [n] * d)
 

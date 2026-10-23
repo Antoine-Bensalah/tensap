@@ -13,7 +13,7 @@ class Frame:
     - N2 is the second physical dimension (input / column dimension)
     """
 
-    def __init__(self, data: np.ndarray, is_orth: bool=False):
+    def __init__(self, data: np.ndarray, is_orth: bool = False):
         if data.ndim != 3:
             raise ValueError(f"Get data with wrong number of dimensions, "
                              f"should be 3, got {data.ndim}")
@@ -21,7 +21,7 @@ class Frame:
         self._dim1 = data.shape[1]
         self._dim2 = data.shape[2]
         self.data = data
-        self.data.flags.writeable = False # immutable object
+        self.data.flags.writeable = False  # immutable object
         self._is_orth = is_orth
 
     # --- geometric properties ---
@@ -245,7 +245,7 @@ class FrameVector(Frame):
     Data shape: (R, N1, 1).
     """
 
-    def __init__(self, data: np.ndarray, is_orth: bool=False):
+    def __init__(self, data: np.ndarray, is_orth: bool = False):
         super().__init__(data, is_orth)
         if self.shape[1] != 1:
             raise ValueError(
@@ -367,8 +367,8 @@ class FrameVector(Frame):
         new_dim2 = 1
 
         new_data = np.zeros((new_rank, new_dim1, new_dim2), dtype=self.data.dtype)
-        new_data[0 : self.dim, 0 : self.shape[0], 0] = self.data[:, :, 0]
-        new_data[self.dim :, self.shape[0] :, 0] = other.data[:, :, 0]
+        new_data[0:self.dim, 0:self.shape[0], 0] = self.data[:, :, 0]
+        new_data[self.dim:, self.shape[0]:, 0] = other.data[:, :, 0]
 
         return self.__class__(new_data, is_orth=False)
 
@@ -432,7 +432,7 @@ class FrameOperator(Frame):
         new_data = new_data.reshape(new_rank, self.shape[0], other.shape[1])
         return other.__class__(new_data)
 
-    def transpose(self, conjugate: bool=False) -> 'FrameOperator':
+    def transpose(self, conjugate: bool = False) -> 'FrameOperator':
         """Transpose (or conjugate transpose) the physical dimensions.
 
         Swaps dim1 and dim2 while keeping the rank axis intact.

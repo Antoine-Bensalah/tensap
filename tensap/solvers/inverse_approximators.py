@@ -208,7 +208,7 @@ class GreedyInverseApproximator:
         check_residual=1,
     ):
         self.A = A
-        self.I = (
+        self.I = (  # noqa: E741 (the target I of ||I - P A||)
             tensap.BaseTuckerTensor.eye([shape[0] for shape in A.shape])
             if I is None
             else I
@@ -240,17 +240,17 @@ class GreedyInverseApproximator:
             residuals, nan where not computed), 'time'.
         """
         clock0 = time.perf_counter()
-        I = self.I
+        Id = self.I
         if not self.minimize_residual:
-            A, B = self.A, I
+            A, B = self.A, Id
         else:
             A = self.A @ self.A.T
-            B = I @ self.A.T
+            B = Id @ self.A.T
 
-        norm_I = I.norm()
+        norm_I = Id.norm()
 
         def relative_residual(P):
-            return (I - P @ self.A).norm() / norm_I
+            return (Id - P @ self.A).norm() / norm_I
 
         P = self.P0
         R = B if P is None else B - P @ A

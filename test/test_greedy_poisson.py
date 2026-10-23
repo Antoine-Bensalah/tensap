@@ -18,8 +18,8 @@ import tensap
 def _poisson_1d(n, L=1.0):
     h = L / (n + 1)
     K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
-    I = sp.identity(n)
-    return K, I
+    Id = sp.identity(n)
+    return K, Id
 
 
 def _rank_one_ones(n, d):
@@ -43,8 +43,8 @@ def _dense_laplacian(K, d):
 
 
 def test_canonical_laplacian_equals_tucker_laplacian():
-    K, I = _poisson_1d(5)
-    factory = tensap.LaplacianLikeOperatorFactory(K, I, 3)
+    K, Id = _poisson_1d(5)
+    factory = tensap.LaplacianLikeOperatorFactory(K, Id, 3)
 
     A_can = factory.make_canonical_tensor()
     A_tucker = factory.make_tucker_tensor()
@@ -56,8 +56,8 @@ def test_canonical_laplacian_equals_tucker_laplacian():
 
 def test_diagonal_core_arithmetic():
     n, d = 5, 3
-    K, I = _poisson_1d(n)
-    A = tensap.LaplacianLikeOperatorFactory(K, I, d).make_canonical_tensor()
+    K, Id = _poisson_1d(n)
+    A = tensap.LaplacianLikeOperatorFactory(K, Id, d).make_canonical_tensor()
     b = _rank_one_ones(n, d)
 
     r = b - A @ b
@@ -99,8 +99,8 @@ def test_rank_one_als_exact_rank_one_solution():
 def test_greedy_poisson_3d():
     np.random.seed(0)
     n, d = 10, 3
-    K, I = _poisson_1d(n)
-    A = tensap.LaplacianLikeOperatorFactory(K, I, d).make_canonical_tensor()
+    K, Id = _poisson_1d(n)
+    A = tensap.LaplacianLikeOperatorFactory(K, Id, d).make_canonical_tensor()
     b = _rank_one_ones(n, d)
 
     solver = tensap.GreedyLinearSolver(
@@ -122,8 +122,8 @@ def test_greedy_poisson_3d():
 def test_greedy_with_initial_guess_and_update():
     np.random.seed(0)
     n, d = 6, 3
-    K, I = _poisson_1d(n)
-    A = tensap.LaplacianLikeOperatorFactory(K, I, d).make_canonical_tensor()
+    K, Id = _poisson_1d(n)
+    A = tensap.LaplacianLikeOperatorFactory(K, Id, d).make_canonical_tensor()
     b = _rank_one_ones(n, d)
 
     calls = []
@@ -147,8 +147,8 @@ def test_greedy_with_initial_guess_and_update():
 
 def test_greedy_minimize_residual_and_adjoint_options():
     n, d = 6, 3
-    K, I = _poisson_1d(n)
-    A = tensap.LaplacianLikeOperatorFactory(K, I, d).make_canonical_tensor()
+    K, Id = _poisson_1d(n)
+    A = tensap.LaplacianLikeOperatorFactory(K, Id, d).make_canonical_tensor()
     b = _rank_one_ones(n, d)
 
     for options in (

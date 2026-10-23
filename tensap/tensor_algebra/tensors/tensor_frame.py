@@ -97,7 +97,7 @@ class TFrame:
                 "The number of matrices must match the number of specified dimensions."
             )
 
-        new_frames = list(self.frames) # shallow copy
+        new_frames = list(self.frames)  # shallow copy
         for dim, mat in zip(dims, matrices):
             new_frames[dim] = self.frames[dim].matrix_times_space(mat)
 
@@ -129,7 +129,7 @@ class TFrame:
                 "The number of matrices must match the number of specified dimensions."
             )
 
-        new_frames = list(self.frames) # shallow copy
+        new_frames = list(self.frames)  # shallow copy
         for dim, mat in zip(dims, matrices):
             new_frames[dim] = self.frames[dim].space_times_matrix(mat)
 
@@ -196,7 +196,7 @@ class TFrame:
         """Return the Tucker factors in vectorized (2D) format for specified dims.
 
         Each 3D array (Rank, N1, N2) is flattened to 2D (N1 * N2, Rank).
-        # todo : C-order -> le documenter ! sens pour les opérateurs ? 
+        # todo : C-order -> le documenter ! sens pour les opérateurs ?
 
         Parameters
         ----------

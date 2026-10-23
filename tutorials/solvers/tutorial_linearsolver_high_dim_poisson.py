@@ -74,7 +74,7 @@ n = 12
 h = L / (n + 1)
 
 K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
-I = sp.identity(n)
+Id = sp.identity(n)
 
 print(f"1D discretization: n = {n} interior points, mesh size h = {h:.4f}")
 
@@ -82,7 +82,7 @@ print(f"1D discretization: n = {n} interior points, mesh size h = {h:.4f}")
 # The order d of the problem is the number of spatial dimensions.
 d = 3
 
-factory = tensap.LaplacianLikeOperatorFactory(K, I, d)
+factory = tensap.LaplacianLikeOperatorFactory(K, Id, d)
 A = factory.make_tucker_tensor()
 b = tensap.TuckerTensorVector.ones([1] * d, [n] * d)
 
@@ -167,7 +167,7 @@ d = 6
 h = L / (n + 1)
 
 K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
-I = sp.identity(n)
+Id = sp.identity(n)
 
 print(f"\nPart 2: n = {n} interior points, d = {d}, n^d = {float(n)**d:.0e} unknowns")
 
@@ -175,7 +175,7 @@ print(f"\nPart 2: n = {n} interior points, d = {d}, n^d = {float(n)**d:.0e} unkn
 # Canonical format: A = sum_k A^(1)_k x ... x A^(d)_k with A^(mu)_k = K if
 # k == mu, I otherwise, i.e. a Tucker tensor with a diagonal core of ones
 # and rank d in every dimension.
-factory = tensap.LaplacianLikeOperatorFactory(K, I, d)
+factory = tensap.LaplacianLikeOperatorFactory(K, Id, d)
 A_can = factory.make_canonical_tensor()
 
 ones_frames = tensap.TFrameVector(
@@ -260,4 +260,3 @@ plt.title("Greedy rank-one corrections, with and without updates")
 plt.legend()
 plt.grid(True, which="both")
 plt.show()
-

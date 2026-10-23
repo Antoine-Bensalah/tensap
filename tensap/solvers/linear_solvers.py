@@ -223,6 +223,7 @@ class TruncatedPCG(LinearSolver):
         }
         return x, output
 
+
 def _contract_except_dim(core, other, matrices, mu):
     """core.tensordot_matrix_product_except_dim as a numpy array.
 

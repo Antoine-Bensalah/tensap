@@ -18,8 +18,8 @@ import tensap
 def _poisson(n, d):
     h = 1.0 / (n + 1)
     K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
-    I = sp.identity(n)
-    factory = tensap.LaplacianLikeOperatorFactory(K, I, d)
+    Id = sp.identity(n)
+    factory = tensap.LaplacianLikeOperatorFactory(K, Id, d)
     frames = tensap.TFrameVector(
         [tensap.FrameVector(np.ones((1, n, 1))) for _ in range(d)]
     )

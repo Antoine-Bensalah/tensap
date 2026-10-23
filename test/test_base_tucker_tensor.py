@@ -2,9 +2,8 @@
 
 import numpy as np
 import pytest
-import tensap
-from tensap.tensor_algebra.tensors.frame import Frame, FrameVector, FrameOperator
-from tensap.tensor_algebra.tensors.tensor_frame import TFrame, TFrameVector, TFrameOperator
+from tensap.tensor_algebra.tensors.frame import FrameVector, FrameOperator
+from tensap.tensor_algebra.tensors.tensor_frame import TFrameVector, TFrameOperator
 from tensap.tensor_algebra.tensors.full_tensor import FullTensor
 from tensap.tensor_algebra.tensors.tree_based_tensor import TreeBasedTensor
 from tensap.tensor_algebra.tensors.tucker_like_tensor import (
@@ -58,7 +57,6 @@ class TestConstruction:
 
     @staticmethod
     def test_from_tree_based_tensor():
-        rng = np.random.RandomState(0)
         t1 = BaseTuckerTensor.randn([2, 3], [5, 6])
         tbt = t1.tree_based_tensor()
         t2 = BaseTuckerTensor.from_tree_based_tensor(tbt)

@@ -100,11 +100,11 @@ def test_operator_products_with_mixed_cores():
     assert np.allclose(_dense_operator(W, n, d), W_dense)
     assert np.allclose(_dense_operator(B, n, d), B_dense)
     # products with a diagonal and a full core
-    I = tensap.BaseTuckerTensor.eye([n] * d)
+    Id = tensap.BaseTuckerTensor.eye([n] * d)
     for X, X_dense in (
         (W @ B, W_dense @ B_dense),
         (B @ W, B_dense @ W_dense),
-        (I - W @ B, np.eye(n**d) - W_dense @ B_dense),
+        (Id - W @ B, np.eye(n**d) - W_dense @ B_dense),
     ):
         assert np.allclose(_dense_operator(X, n, d), X_dense)
         assert np.isclose(X.norm(), np.linalg.norm(X_dense))
@@ -128,10 +128,10 @@ def test_rank_one_inverse_is_exact_for_a_rank_one_operator():
         tensap.DiagonalTensor(np.array([1.0]), d),
         tensap.TFrameOperator([tensap.FrameOperator(K[None]) for _ in range(d)]),
     )
-    I = tensap.BaseTuckerTensor.eye([n] * d)
+    Id = tensap.BaseTuckerTensor.eye([n] * d)
 
     W, output = tensap.RankOneInverseApproximatorByALS(
-        A, I, max_iterations=20, stagnation=1e-12, display=False
+        A, Id, max_iterations=20, stagnation=1e-12, display=False
     ).solve()
 
     K_inv = np.linalg.inv(K)
@@ -142,13 +142,13 @@ def test_rank_one_inverse_is_exact_for_a_rank_one_operator():
     )
 
     W_sym, _ = tensap.RankOneInverseApproximatorByALS(
-        A, I, symmetric=True, display=False
+        A, Id, symmetric=True, display=False
     ).solve()
     for frame in W_sym.tensor_frame.frames:
         assert np.allclose(frame.data[0], frame.data[0].T)
 
     W_sparse, _ = tensap.RankOneInverseApproximatorByALS(
-        A, I, sparse=True, sparse_options=("tridiag",), display=False
+        A, Id, sparse=True, sparse_options=("tridiag",), display=False
     ).solve()
     mask = np.abs(np.subtract.outer(range(n), range(n))) <= 1
     for frame in W_sparse.tensor_frame.frames:
@@ -158,8 +158,8 @@ def test_rank_one_inverse_is_exact_for_a_rank_one_operator():
 def test_greedy_inverse_approximator():
     np.random.seed(0)
     n, d = 8, 3
-    K, I = _poisson_1d(n)
-    A = tensap.LaplacianLikeOperatorFactory(K, I, d).make_tucker_tensor()
+    K, Id = _poisson_1d(n)
+    A = tensap.LaplacianLikeOperatorFactory(K, Id, d).make_tucker_tensor()
 
     P, output = tensap.GreedyInverseApproximator(A, max_iterations=6, display=False).solve()
 
@@ -179,8 +179,8 @@ def test_greedy_inverse_approximator():
 def test_truncated_pcg_poisson_3d():
     np.random.seed(0)
     n, d = 10, 3
-    K, I = _poisson_1d(n)
-    A = tensap.LaplacianLikeOperatorFactory(K, I, d).make_tucker_tensor()
+    K, Id = _poisson_1d(n)
+    A = tensap.LaplacianLikeOperatorFactory(K, Id, d).make_tucker_tensor()
     b = tensap.TuckerTensorVector.ones([1] * d, [n] * d)
     truncator = tensap.Truncator()
     x_direct = np.linalg.solve(_dense_laplacian(K, d), np.ones(n**d))
