@@ -311,3 +311,13 @@ def test_singular_values_full_and_order_two(rng):
 def test_singular_values_diagonal_core_not_implemented(rng):
     with pytest.raises(NotImplementedError):
         _vector(rng, "diagonal", [3, 3, 3], [2]).singular_values()
+
+
+def test_rank_one_constructors_have_a_diagonal_core():
+    # as TuckerLikeTensor.ones in MATLAB: no full core of shape (1, ..., 1)
+    x = TuckerTensorVector.ones([1, 1, 1], [3, 4, 5])
+    assert isinstance(x.core, tensap.DiagonalTensor)
+    npt.assert_allclose(x.numpy(), np.ones((3, 4, 5)))
+    A = tensap.BaseTuckerTensor.rand([1, 1], [(2, 3), (4, 2)])
+    assert isinstance(A.core, tensap.DiagonalTensor)
+    assert isinstance(TuckerTensorVector.ones([2, 1], [3, 4]).core, tensap.FullTensor)

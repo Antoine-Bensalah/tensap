@@ -78,6 +78,22 @@ def test_diagonal_core_greedy_recompression(rng):
     assert max(y.representation_rank()) <= 5  # at most n_1 corrections
 
 
+def test_diagonal_core_pure_greedy_option(rng):
+    # pure greedy algorithm (MATLAB): less accurate than with updates
+    x = _redundant_canonical(rng, [5, 4, 6], 4)
+    errors = []
+    for greedy_updates in [False, True]:
+        np.random.seed(0)
+        truncator = tensap.Truncator(tolerance=1e-12, max_rank=3,
+                                     greedy_updates=greedy_updates)
+        with pytest.warns(UserWarning, match="not accurate enough"):
+            y = truncator.truncate(x)
+        assert isinstance(y.core, tensap.DiagonalTensor)
+        errors.append(_relative_error(y, x))
+    assert errors[1] <= errors[0]
+    assert "greedy_updates = True" in repr(truncator)
+
+
 def test_diagonal_core_not_accurate_enough_warns(rng):
     np.random.seed(0)
     x = _redundant_canonical(rng, [5, 4, 6], 3)

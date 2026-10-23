@@ -4,8 +4,7 @@
 """
 Tutorial: truncation of the solution of a Poisson equation in several
 formats. Python counterpart of the MATLAB tutorial
-tutorial_LinearSolvers_truncationPoissonSolution.m (canonical and tree-based
-parts; the TT part needs the TT formats, not ported yet).
+tutorial_LinearSolvers_truncationPoissonSolution.m.
 
 Problem
 -------
@@ -23,7 +22,10 @@ then truncated at the relative precision 1e-4:
    core). The best approximation in canonical format is a hard problem: the
    requested precision is not reached with fewer terms than u, and the
    truncator warns about it;
-2. in tree-based format: the diagonal core is converted to a tree-based
+2. in Tucker format with a TT core: the diagonal core is converted to a
+   TTTensor (exactly, ranks 50), then rounded, and the frames are truncated
+   by SVD;
+3. in tree-based format: the diagonal core is converted to a tree-based
    tensor on a balanced tree, the frames are absorbed into the leaves and the
    tree-based tensor is truncated by hsvd.
 """
@@ -47,13 +49,8 @@ K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
 Id = sp.identity(n)
 
 # %% Right-hand side and operator in canonical format
-# b has a diagonal core, as TuckerLikeTensor.ones in MATLAB: with a full core
-# of shape (1, ..., 1), the residual b - A u would convert the diagonal core of
-# A u (rank up to 50 d) to a full core with (50 d)^d entries.
-b = tensap.TuckerTensorVector(
-    tensap.DiagonalTensor(np.array([1.0]), d),
-    tensap.TFrameVector([tensap.FrameVector(np.ones((1, n, 1))) for _ in range(d)]),
-)
+# b is of rank one, with a diagonal core (as TuckerLikeTensor.ones in MATLAB)
+b = tensap.TuckerTensorVector.ones([1] * d, [n] * d)
 factory = tensap.LaplacianLikeOperatorFactory(K, Id, d)
 A = factory.make_canonical_tensor()
 
@@ -80,7 +77,13 @@ for warning in caught:
     print(f"Warning: {warning.message}")
 error_can = report(f"Canonical, ranks {u_can.representation_rank()}", u_can)
 
-# %% 2. Truncation in tree-based format
+# %% 2. Truncation in Tucker format with a TT core
+u_tt = tensap.TuckerTensorVector(tensap.TTTensor.from_diagonal_tensor(u.core), u.tensor_frame)
+u_tt_t = t.truncate(u_tt)
+error_tt = report(f"Tucker-TT, Tucker ranks {u_tt_t.representation_rank()}, "
+                  f"TT ranks {u_tt_t.core.ranks}", u_tt_t)
+
+# %% 3. Truncation in tree-based format
 tree = tensap.DimensionTree.balanced(d)
 u_tree = tensap.TuckerTensorVector(u.core.tree_based_tensor(tree), u.tensor_frame)
 u_tree_t = t.truncate(u_tree)
@@ -88,7 +91,8 @@ error_tree = report("Tree-based, ranks "
                     f"{u_tree_t.tree_based_tensor().ranks.tolist()}", u_tree_t)
 
 # %% Self-check
-# The tree-based truncation reaches the requested precision; the canonical one
-# stays within a factor 10 of it (with as many terms as u).
+# The Tucker-TT and tree-based truncations reach the requested precision; the
+# canonical one stays within a factor 10 of it (with as many terms as u).
+assert error_tt <= t.tolerance, error_tt
 assert error_tree <= t.tolerance, error_tree
 assert error_can <= 10 * t.tolerance, error_can

@@ -5,7 +5,7 @@
 Module laplacian_like_operator_factory.
 
 Port of ApproximationToolbox/TensorAlgebra/Tools/LaplacianLikeOperatorFactory.m
-(canonical, Tucker and tree-based constructions; the TT ones are left).
+(canonical, Tucker, tree-based and TT constructions).
 """
 
 import numpy as np
@@ -124,6 +124,56 @@ class LaplacianLikeOperatorFactory:
             tensors.append(tensap.FullTensor(data))
         core = tensap.TreeBasedTensor(tensors, tree)
         return tensap.TuckerTensorOperator(core, self.make_tensor_frame())
+
+    def make_tt_tucker_tensor(self) -> "tensap.TuckerTensorOperator":
+        """Build the operator in Tucker format with a TT core (MATLAB
+        makeTTTuckerLikeTensor).
+
+        Frames [K, I] in every dimension and a TTTensor core of ranks 2 over
+        the indices (0 = K, 1 = I) of the frames. The rank index of a bond
+        tells whether K has been placed on its left (0: placed, 1: not yet).
+        Entries (left rank, frame index, right rank): first core (0, 0, 0)
+        and (0, 1, 1); middle cores (0, 1, 0), (1, 0, 0) and (1, 1, 1); last
+        core (0, 1, 0) and (1, 0, 0). K is placed exactly once.
+
+        Returns
+        -------
+        TuckerTensorOperator
+        """
+        d = self.order
+        if d == 1:
+            core = tensap.TTTensor([np.array([1.0, 0.0]).reshape(1, 2, 1)])
+            return tensap.TuckerTensorOperator(core, self.make_tensor_frame())
+        first = np.zeros((1, 2, 2))
+        first[0, 0, 0] = first[0, 1, 1] = 1.0
+        middle = np.zeros((2, 2, 2))
+        middle[0, 1, 0] = middle[1, 0, 0] = middle[1, 1, 1] = 1.0
+        last = np.zeros((2, 2, 1))
+        last[0, 1, 0] = last[1, 0, 0] = 1.0
+        core = tensap.TTTensor([first] + [middle] * (d - 2) + [last])
+        return tensap.TuckerTensorOperator(core, self.make_tensor_frame())
+
+    def make_tt_operator(self) -> "tensap.TTOperator":
+        """Build the operator as a TTOperator of ranks 2 (MATLAB
+        makeOperatorTTTensor): first core [K, I], middle cores
+        [[I, 0], [K, I]], last core [I; K].
+
+        Returns
+        -------
+        TTOperator
+        """
+        d = self.order
+        K, Id = _to_dense(self.K), _to_dense(self.I)
+        n = K.shape[0]
+        if d == 1:
+            return tensap.TTOperator([K[None, :, :, None]])
+        first = np.zeros((1, n, n, 2))
+        first[0, :, :, 0], first[0, :, :, 1] = K, Id
+        middle = np.zeros((2, n, n, 2))
+        middle[0, :, :, 0], middle[1, :, :, 0], middle[1, :, :, 1] = Id, K, Id
+        last = np.zeros((2, n, n, 1))
+        last[0, :, :, 0], last[1, :, :, 0] = Id, K
+        return tensap.TTOperator([first] + [middle] * (d - 2) + [last])
 
     def make_tensor_frame(self) -> "tensap.TFrameOperator":
         """Frames [K, I] in every dimension (MATLAB makeTSpaceForTuckerLikeTensor).

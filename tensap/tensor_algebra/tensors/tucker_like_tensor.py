@@ -551,6 +551,8 @@ class BaseTuckerTensor:
 
         Automatically returns a TuckerTensorVector or TuckerTensorOperator
         depending on the shape entries (integer for vector, tuple for operator).
+        The core is full, filled by the generator, except for ranks all equal
+        to 1: then it is a DiagonalTensor of order d, as in MATLAB.
 
         Parameters
         ----------
@@ -580,7 +582,13 @@ class BaseTuckerTensor:
         else:
             raise ValueError("Unrecognized shape format.")
 
-        core = tensap.FullTensor(generator(tuple(ranks)))
+        if np.all(ranks == 1):
+            # rank one: diagonal core, as TuckerLikeTensor.create in MATLAB (a
+            # full core would be made full again by convert_tensors when
+            # combined with canonical tensors, with R^d entries)
+            core = tensap.DiagonalTensor(generator((1,)).ravel(), len(ranks))
+        else:
+            core = tensap.FullTensor(generator(tuple(ranks)))
 
         return BaseTuckerTensor._factory(core, frames)
 

@@ -102,7 +102,9 @@ def test_update_core_full_core_operator():
     x = _greedy_iterate(A_can, b_can, 2)
 
     A = factory.make_tucker_tensor()
+    # the solver requires cores of the same type: ones() has a diagonal core
     b = tensap.TuckerTensorVector.ones([1] * d, [n] * d)
+    b = tensap.TuckerTensorVector(b.core.full(), b.tensor_frame)
     x_core = tensap.TuckerTensorALSLinearSolver(A, b, display=False).update_core(x)
 
     # Galerkin on the whole Tucker space spanned by the (orthonormalized) frames
