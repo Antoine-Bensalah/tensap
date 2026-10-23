@@ -74,7 +74,7 @@ class FunctionalBasisArray(tensap.Function):
         self.shape = np.atleast_1d(shape)
         self.output_shape = self.shape
         self.data = np.reshape(
-            self.data, np.concatenate(([basis.cardinal()], self.shape))
+            self.data, np.concatenate(([basis.cardinal()], self.shape)), order="F"
         )
 
     def __add__(self, g):

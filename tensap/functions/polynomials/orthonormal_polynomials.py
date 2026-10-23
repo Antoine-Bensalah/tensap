@@ -304,6 +304,9 @@ class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
         self.polynomials = polynomials
         self.shift = shift
         self.scaling = scaling
+        # normalization: the shifted measure of a Lebesgue measure has a mass
+        # multiplied by the scaling (it is not the pushforward measure)
+        self._factor = np.sqrt(polynomials.measure.mass() / self.measure.mass())
 
     def __repr__(self):
         return "<{}>".format(self.__class__.__name__)
@@ -351,30 +354,38 @@ class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
         """
         return self.shift + self.scaling * self.polynomials.truncated_domain()
 
-    def mean(self, ind, *measure):
-        return self.polynomials.mean(ind, *measure)
-
-    def moment(self, ind, *measure):
-        if measure:
-            if measure[0] == self.measure:
-                measure = ()
-            else:
-                measure = tuple(
-                    [measure[0].shift(-self.shift / self.scaling, 1 / self.scaling)]
-                )
-        return self.polynomials.moment(ind, *measure)
+    def moment(self, ind, measure=None):
+        # int prod_k f p_k((x - shift) / scaling) dmu(x), with f = self._factor,
+        # computed with the measure mu mapped to the variable of the
+        # polynomials, of mass corrected to the one of mu
+        ind = np.atleast_2d(ind)
+        if measure is None or measure == self.measure:
+            measure = self.measure
+            mapped = self.polynomials.measure
+        else:
+            mapped = measure.shift(-self.shift / self.scaling, 1 / self.scaling)
+        mass_ratio = measure.mass() / mapped.mass()
+        return (
+            self._factor ** ind.shape[1]
+            * mass_ratio
+            * self.polynomials.moment(ind, mapped)
+        )
 
     def polyval(self, ind, x):
         x = (x - self.shift) / self.scaling
-        return self.polynomials.polyval(ind, x)
+        return self._factor * self.polynomials.polyval(ind, x)
 
     def d_polyval(self, ind, x):
         x = (x - self.shift) / self.scaling
-        return self.polynomials.d_polyval(ind, x) / self.scaling
+        return self._factor * self.polynomials.d_polyval(ind, x) / self.scaling
 
     def dn_polyval(self, n, ind, x):
         x = (x - self.shift) / self.scaling
-        return self.polynomials.dn_polyval(n, ind, x) / (self.scaling**n)
+        return (
+            self._factor
+            * self.polynomials.dn_polyval(n, ind, x)
+            / (self.scaling**n)
+        )
 
     def random(self, ind, n=1, measure=None):
         """

@@ -288,10 +288,7 @@ class FunctionalBasis:
 
         """
 
-        try:
-            y = fun(G.points)
-        except Exception:
-            pass
+        y = fun(G.points) if callable(fun) else fun
 
         A = self.eval(G.points)
         W = diags(np.sqrt(G.weights))
@@ -326,10 +323,7 @@ class FunctionalBasis:
 
         A = self.eval(G.points)
         W = diags(G.weights)
-        try:
-            y = fun(G.points)
-        except Exception:
-            pass
+        y = fun(G.points) if callable(fun) else fun
 
         u = np.matmul(np.transpose(A), W.dot(y))
 

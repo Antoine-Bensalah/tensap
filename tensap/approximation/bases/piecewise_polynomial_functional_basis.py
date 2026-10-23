@@ -134,14 +134,16 @@ class PiecewisePolynomialFunctionalBasis(tensap.FunctionalBasis):
 
     def mean(self):
         """
-        Computes the mean of the functional basis.
+        Computes the mean of the functional basis, with respect to the uniform
+        probability measure on [a, b] (as for the polynomial bases: the
+        integral divided by the mass of the measure).
         """
         p1 = self.points[:-1]
         p2 = self.points[1:]
         h = p2 - p1
         m = np.zeros(self.cardinal())
-        q = np.cumsum(np.concatenate((0, self.p[:-1] + 1)))
-        m[q] = np.sqrt(h)
+        q = np.cumsum(np.concatenate(([0], self.p[:-1] + 1)))
+        m[q] = np.sqrt(h) / self.measure.mass()
         return m
 
     def interpolation_points(self):

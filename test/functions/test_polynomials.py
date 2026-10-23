@@ -46,6 +46,10 @@ FAMILIES = {
         lambda: tensap.NormalRandomVariable(1, 2).orthonormal_polynomials(),
         lambda p: (1 + 2 * _gauss_hermite(20)[0], _gauss_hermite(20)[1]),
     ),
+    "lebesgue on [2, 5]": (
+        lambda: tensap.LebesgueMeasure(2, 5).orthonormal_polynomials(),
+        lambda p: _gauss_legendre(20, 2.0, 5.0, mass=3.0),
+    ),
     "discrete": (
         lambda: tensap.DiscreteRandomVariable(np.arange(8.0)).orthonormal_polynomials(),
         lambda p: (np.arange(8.0), np.full(8, 1 / 8)),
@@ -131,7 +135,7 @@ def test_monomial_coefficients(family):
 
 def test_random_evaluations(family):
     name, p, _, _ = family
-    if name == "legendre lebesgue":
+    if "lebesgue" in name:
         with pytest.raises(AssertionError):  # not a probability measure
             p.random([0, 1], 4)
         return
