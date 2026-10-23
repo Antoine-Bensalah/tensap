@@ -35,7 +35,7 @@ def _minimize_active_subspace(jac_u, jac_basis=None, m=1):
 
     # if no basis provided, take identity
     if jac_basis is None:
-        jac_basis == np.eye(jac_u.shape[-1])
+        jac_basis = np.eye(jac_u.shape[-1])
 
     # check that basis only contains linear functions
     if jac_basis.ndim == 3:
@@ -166,15 +166,17 @@ def _iteration_qn(jac_u, jac_basis, G, R=None, precond_method='sigma', precond_k
 
         elif precond_method == "hessian":
             P = _eval_HessG_full(G, jac_u, jac_basis)
-            (G, jac_u, jac_basis)
 
-        dG, _, _, _ = np.linalg.lstsq(P, b.reshape(-1, order='F'))
+        else:
+            raise ValueError("Precond method not implemented: %s" % precond_method)
+
+        dG, _, _, _ = np.linalg.lstsq(P, b.reshape(-1, order='F'), rcond=-1)
 
     elif precond_method == "cg_sigma":
         dG = _eval_SGinv_X(Gmat, b, jac_u, jac_basis, jac_g, cg_kwargs=precond_kwargs)
 
     else:
-        Warning("Precond method not implemented", precond_method)
+        raise ValueError("Precond method not implemented: %s" % precond_method)
 
     Gaux = Gmat + dG.reshape(K, -1, order='F')
     M = Gaux.T @ R @ Gaux
@@ -503,7 +505,7 @@ def _build_pymanopt_problem(jac_u, jac_basis, m, use_precond=False, optimizer_kw
         if K * m <= 2000:  # TODO: parse as argument
             def precond(G, x):
                 S = _eval_SG_full(G, jac_u, jac_basis)
-                out, _, _, _ = np.linalg.lstsq(S, x.reshape(-1, order='F'))
+                out, _, _, _ = np.linalg.lstsq(S, x.reshape(-1, order='F'), rcond=-1)
                 return out.reshape((K, m), order='F')
         else:
             def precond(G, x):

@@ -277,7 +277,7 @@ def _eval_SG_diag(G, jac_u, jac_basis, jac_g=None):
         M = np.linalg.solve(GBG.T, GAG.T).T
         M = np.linalg.solve(GBG, M)
         diag1 = np.diag(M)
-        diag2 = np.linalg.norm(jb, axis=1)
+        diag2 = np.linalg.norm(jb, axis=1)**2  # diagonal of jb jb^T
         diag += np.kron(diag1, diag2) / N
     return diag
 
@@ -498,10 +498,12 @@ def _eval_HessG_diag(G, jac_u, jac_basis, jac_g=None):
         jg_inv = scipy.linalg.pinv(jg)
         p = np.eye(jb.shape[1]) - jg_inv @ jg
         d1 = (jb @ p @ grad_u @ grad_u.T @ jg_inv) * (jb @ jg_inv)
-        d2 = (jb @ p @ grad_u)**2 @ np.ones((ju.shape[0], 1)) @ np.diag(jg_inv.T @ jg_inv)
+        # outer products of a column (K) and a row (m)
+        d2 = np.sum((jb @ p @ grad_u)**2, 1)[:, None] * np.diag(jg_inv.T @ jg_inv)[None, :]
         d3 = (jb @ jg_inv) * (jb @ p @ grad_u @ grad_u.T @ jg_inv)
-        d4 = (jb @ p)**2 @ np.ones((d, 1)) @ np.diag(jg_inv.T @ grad_u @ grad_u.T @ jg_inv)
-        diag_mat += d1 - d2.reshape(1, -1) + d3 + d4.reshape(1, -1)
+        d4 = np.sum((jb @ p)**2, 1)[:, None] * np.diag(
+            jg_inv.T @ grad_u @ grad_u.T @ jg_inv)[None, :]
+        diag_mat += d1 - d2 + d3 + d4
     diag_mat = 2 * diag_mat / N
     diag = diag_mat.flatten(order="F")
     return diag
