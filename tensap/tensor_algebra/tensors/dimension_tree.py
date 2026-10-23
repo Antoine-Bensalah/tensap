@@ -154,7 +154,7 @@ class DimensionTree:
                 nodes1 = self.nodes_with_level(level)
                 nodes2 = T.nodes_with_level(level)
                 if len(nodes1) != len(nodes2):
-                    return is_equal
+                    return False
                 dims1 = [self.dims[i] for i in nodes1 - 1]
                 dims2 = [T.dims[i] for i in nodes2 - 1]
                 for i, dim1 in enumerate(dims1):
@@ -529,7 +529,7 @@ class DimensionTree:
         """
         Plot the tree with the nodes indices.
 
-        This method requires the package igraph.
+        This method requires the packages networkx and matplotlib.
 
         Parameters
         ----------
@@ -551,7 +551,7 @@ class DimensionTree:
         """
         Plot the tree with labels at nodes.
 
-        This method requires the package igraph.
+        This method requires the packages networkx and matplotlib.
 
         Parameters
         ----------
@@ -574,6 +574,8 @@ class DimensionTree:
         import networkx as nx
         import matplotlib.pyplot as plt
 
+        if colored_nodes is not None:
+            colored_nodes = np.asarray(colored_nodes)
         plt.figure()
         g = nx.convert_matrix.from_numpy_array(self.adjacency_matrix)
         pos = self.tree_layout()
@@ -624,7 +626,7 @@ class DimensionTree:
         """
         Plot the dimensions associated with the nodes of the tree.
 
-        This method requires the package igraph.
+        This method requires the packages networkx and matplotlib.
 
         Parameters
         ----------

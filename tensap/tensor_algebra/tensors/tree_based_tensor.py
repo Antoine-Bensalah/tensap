@@ -2028,7 +2028,7 @@ class TreeBasedTensor:
         """
         Plot the tree with the nodes indices and the active nodes.
 
-        This method requires the package igraph.
+        This method requires the packages networkx and matplotlib.
 
         Parameters
         ----------

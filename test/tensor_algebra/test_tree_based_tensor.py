@@ -590,6 +590,12 @@ def test_optimizations_preserve_the_tensor_and_do_not_increase_storage(tree, met
     assert y.storage() <= x.storage()
 
 
-def test_plot_requires_igraph(tree):
-    pytest.importorskip("igraph")
-    _diag_tensor(tree).plot()
+def test_plot(tree, tmp_path):
+    matplotlib = pytest.importorskip("matplotlib")
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fname = tmp_path / "tree.png"
+    _diag_tensor(tree, inactive_first_leaf=True).plot(title="x", fname=str(fname))
+    plt.close("all")
+    assert fname.stat().st_size > 0
