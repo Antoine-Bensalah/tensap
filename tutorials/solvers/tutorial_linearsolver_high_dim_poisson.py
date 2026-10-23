@@ -73,7 +73,7 @@ L = 1.0
 n = 12
 h = L / (n + 1)
 
-K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n))
+K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
 I = sp.identity(n)
 
 print(f"1D discretization: n = {n} interior points, mesh size h = {h:.4f}")
@@ -166,7 +166,7 @@ n = 100
 d = 6
 h = L / (n + 1)
 
-K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n))
+K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
 I = sp.identity(n)
 
 print(f"\nPart 2: n = {n} interior points, d = {d}, n^d = {float(n)**d:.0e} unknowns")

@@ -20,7 +20,7 @@ def test_truncated_richardson_poisson_3d():
     n = 10
     h = L / (n + 1)
 
-    K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n))
+    K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
     I = sp.identity(n)
 
     d = 3

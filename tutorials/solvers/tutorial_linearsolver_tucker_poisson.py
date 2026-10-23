@@ -35,7 +35,7 @@ np.random.seed(0)
 L = 1.0
 n = 50
 h = L / (n + 1)
-K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n))
+K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
 I = sp.identity(n)
 f = np.ones(n)
 d = 3

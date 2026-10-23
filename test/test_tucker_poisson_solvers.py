@@ -17,7 +17,7 @@ import tensap
 
 def _poisson_1d(n):
     h = 1.0 / (n + 1)
-    K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n))
+    K = 1 / h**2 * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
     return K, sp.identity(n)
 
 
