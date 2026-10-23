@@ -57,7 +57,8 @@ def test_square_loss(rng):
     # a function, and vector-valued outputs
     x = rng.standard_normal((10, 1))
     f = tensap.UserDefinedFunction(lambda z: 2 * z[:, 0], 1)
-    npt.assert_allclose(tensap.SquareLossFunction().eval(lambda z: 2 * z[:, 0], [x, 2 * x[:, 0]]), 0)
+    npt.assert_allclose(
+        tensap.SquareLossFunction().eval(lambda z: 2 * z[:, 0], [x, 2 * x[:, 0]]), 0)
     npt.assert_allclose(tensap.SquareLossFunction().eval(f, [x, 2 * x[:, 0] + 1]), 1)
     Y = np.stack([y, y], 1)
     npt.assert_allclose(tensap.SquareLossFunction().eval(Y + 0.1, [None, Y]), 0.02)
