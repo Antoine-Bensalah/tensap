@@ -254,6 +254,51 @@ class TFrame:
         ]
         return self.__class__(new_frames)
 
+    def hadamard_product(self, other: "TFrame") -> "TFrame":
+        """Entrywise product of every pair of frame elements, dimension by dimension.
+
+        Parameters
+        ----------
+        other : TFrame
+            Must have the same order and physical shape.
+
+        Returns
+        -------
+        TFrame
+        """
+        if self.order != other.order:
+            raise ValueError("Spaces must have the same order.")
+        new_frames = [
+            f_self.hadamard_product(f_other)
+            for f_self, f_other in zip(self.frames, other.frames)
+        ]
+        return self.__class__(new_frames)
+
+    def super_frame(self, shape, indices) -> "TFrame":
+        """Embed the frame elements of every dimension in larger zero matrices.
+
+        Parameters
+        ----------
+        shape : sequence of tuple of int
+            New physical shape (M1, M2) of each dimension.
+        indices : sequence of tuple
+            For each dimension, the pair (rows, cols) of indices of the current
+            entries (see Frame.super_frame); None keeps an axis unchanged.
+
+        Returns
+        -------
+        TFrame
+        """
+        if len(shape) != self.order or len(indices) != self.order:
+            raise ValueError(
+                "shape and indices must have one entry per dimension."
+            )
+        new_frames = [
+            frame.super_frame(sz, rows, cols)
+            for frame, sz, (rows, cols) in zip(self.frames, shape, indices)
+        ]
+        return self.__class__(new_frames)
+
     def eval_in_space(self, dim: int, coefs: np.ndarray) -> np.ndarray:
         """Evaluate a vector/operator from its coefficients on a given dim.
 

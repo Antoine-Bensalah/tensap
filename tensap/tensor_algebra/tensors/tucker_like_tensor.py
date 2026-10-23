@@ -93,29 +93,16 @@ class BaseTuckerTensor:
     def full(self):
         """Convert the object to a dense tensap.FullTensor.
 
+        The core is contracted with the vectorized frames: the result has one
+        dimension of size N1 * N2 per tensor dimension. TuckerTensorOperator
+        reshapes it into the matrix geometry.
+
         Returns
         -------
         FullTensor
         """
-        # TODO : faire un full() spécifique aux TuckerTensorOperator TuckerTensorVector
-        #        ne pas tester les dims = 1
-        # 1. Extract matrices of shape (Physical_size, Rank)
         matrices = self.tensor_frame.get_vectorize_factors()
-
-        # 2. Contract the core with these matrices
-        result = self.core.tensor_matrix_product(matrices).full()
-
-        # 3. Reshape the resulting 1D/flat array into the actual physical tensor geometry
-        target_shape = []
-        for frame in self.tensor_frame.frames:
-            if frame.shape[1] == 1:
-                target_shape.append(frame.shape[0])
-            else:
-                target_shape.extend([frame.shape[0], frame.shape[1]])
-
-        # C order, as in get_vectorize_factors (FullTensor.reshape uses the
-        # Fortran order, which would transpose every operator factor)
-        return tensap.FullTensor(result.numpy().reshape(target_shape))
+        return self.core.tensor_matrix_product(matrices).full()
 
     def numpy(self) -> np.ndarray:
         """Convert to a dense numpy.ndarray.
@@ -410,21 +397,70 @@ class BaseTuckerTensor:
             # fallback: unfold and compute SVD for each dimension
             return [None] * self.order
 
-    def normalize_basis(self):
-        """Normalize the elements of the bases of subspaces in-place.
+    def normalize_basis(self) -> 'BaseTuckerTensor':
+        """Normalize the elements of the bases of subspaces.
+
+        Each frame element is divided by its Frobenius norm and the core is
+        multiplied by the norms, so that the tensor is unchanged. A zero frame
+        element is left as it is.
 
         Returns
         -------
         BaseTuckerTensor
-            Self, after in-place normalization.
+            A new tensor, equal to self, whose frame elements have unit norm.
         """
-        N = self.tensor_frame.dot(self.tensor_frame)
-        N = [np.sqrt(np.diag(n)) for n in N]
-        diag_mats = [np.diag(n) for n in N]
-        self.core = self.core.tensor_matrix_product(diag_mats)
-        inv_mats = [np.diag(1.0 / n) for n in N]
-        self.tensor_frame = self.tensor_frame.space_times_matrix(inv_mats)
-        return self
+        norms = [
+            np.sqrt(np.diag(gram)) for gram in self.tensor_frame.dot(self.tensor_frame)
+        ]
+        # a zero frame element has no direction: scale it (and its core
+        # coefficients) by 1 instead of dividing by 0
+        norms = [np.where(n > 0, n, 1.0) for n in norms]
+        new_core = self.core.tensor_diagonal_matrix_product(norms)
+        new_frames = self.tensor_frame.space_times_matrix(
+            [np.diag(1.0 / n) for n in norms]
+        )
+        return self.__class__(new_core, new_frames)
+
+    def hadamard_product(self, other: 'BaseTuckerTensor') -> 'BaseTuckerTensor':
+        """Entrywise (Hadamard) product of two Tucker tensors.
+
+        The core is the Kronecker product of the cores and, in each dimension,
+        the frame contains the entrywise products of every pair of frame
+        elements. The ranks are multiplied.
+
+        Parameters
+        ----------
+        other : BaseTuckerTensor
+            Tensor of the same type (vector or operator) and shape.
+
+        Returns
+        -------
+        BaseTuckerTensor
+        """
+        if type(self) is not type(other):
+            raise TypeError(
+                f"Cannot compute the Hadamard product of {type(self).__name__} "
+                f"and {type(other).__name__}."
+            )
+        core_self, core_other = tensap.convert_tensors(self.core, other.core)
+        new_core = core_self.kron(core_other)
+        new_frames = self.tensor_frame.hadamard_product(other.tensor_frame)
+        return self.__class__(new_core, new_frames)
+
+    def convert_cores(self, other: 'BaseTuckerTensor'):
+        """Convert the cores of two Tucker tensors into a common format.
+
+        Parameters
+        ----------
+        other : BaseTuckerTensor
+
+        Returns
+        -------
+        tuple of BaseTuckerTensor
+            self and other, with cores of the same type (see convert_tensors);
+            the frames are unchanged.
+        """
+        return tensap.convert_tensors(self, other)
 
     # ---- Magic Methods ----
 
@@ -640,6 +676,32 @@ class TuckerTensorVector(BaseTuckerTensor):
         new_frames = self.tensor_frame.eval_at_indices(indices, dims)
         return self.__class__(self.core, new_frames)
 
+    def super_tensor(
+        self, shape: List[int], indices: List[Optional[np.ndarray]]
+    ) -> 'TuckerTensorVector':
+        """Embed the tensor in a larger tensor filled with zeros.
+
+        Returns s of shape (M1, ..., Md) with s[I1[k1], ..., Id[kd]] =
+        self[k1, ..., kd] and s = 0 outside I1 x ... x Id. Reciprocal of
+        sub_tensor. The frames are stored densely.
+
+        Parameters
+        ----------
+        shape : list of int
+            New size of each dimension.
+        indices : list of ndarray or None
+            For each dimension, the indices I_mu of the current entries; None
+            keeps the dimension unchanged.
+
+        Returns
+        -------
+        TuckerTensorVector
+        """
+        new_frames = self.tensor_frame.super_frame(
+            [(m, 1) for m in shape], [(idx, None) for idx in indices]
+        )
+        return self.__class__(self.core, new_frames)
+
     def tensor_vector_product(
         self,
         vectors: Union[np.ndarray, List[np.ndarray]],
@@ -820,6 +882,47 @@ class TuckerTensorOperator(BaseTuckerTensor):
         super().__init__(core, frames)
         if not isinstance(frames, TFrameOperator):
             raise TypeError("TuckerTensorOperator requires a TFrameOperators object.")
+
+    def full(self):
+        """Convert the operator to a dense tensap.FullTensor.
+
+        The result has shape (N1_1, N2_1, ..., N1_d, N2_d): the entry
+        (i_1, j_1, ..., i_d, j_d) is the coefficient of the operator between
+        the input index (j_1, ..., j_d) and the output index (i_1, ..., i_d).
+        Dimensions of size 1 are kept.
+
+        Returns
+        -------
+        FullTensor
+        """
+        result = super().full().numpy()
+        target_shape = [n for frame_shape in self.shape for n in frame_shape]
+        # C order, as in get_vectorize_factors (FullTensor.reshape uses the
+        # Fortran order, which would transpose every operator factor)
+        return tensap.FullTensor(result.reshape(target_shape))
+
+    def super_tensor(self, shape: List[Tuple[int, int]], indices: List[tuple]
+                     ) -> 'TuckerTensorOperator':
+        """Embed the operator in a larger operator filled with zeros.
+
+        In each dimension mu, every frame matrix A becomes a matrix S of shape
+        shape[mu] with S[I_mu, J_mu] = A and S = 0 elsewhere. The frames are
+        stored densely.
+
+        Parameters
+        ----------
+        shape : list of tuple of int
+            New shape (M1, M2) of each dimension.
+        indices : list of tuple
+            For each dimension, the pair (I_mu, J_mu) of row and column indices
+            of the current entries; None keeps an axis unchanged.
+
+        Returns
+        -------
+        TuckerTensorOperator
+        """
+        new_frames = self.tensor_frame.super_frame(shape, indices)
+        return self.__class__(self.core, new_frames)
 
     def __matmul__(self, other: BaseTuckerTensor) -> BaseTuckerTensor:
         """

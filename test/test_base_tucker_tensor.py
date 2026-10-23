@@ -635,7 +635,7 @@ class TestSingularValuesNormalize:
         core = FullTensor(rng.rand(*ranks))
         t = TuckerTensorVector(core, frames)
         expected_norm = t.norm()
-        t.normalize_basis()
+        t = t.normalize_basis()
         for mu in range(t.order):
             col_norms = np.linalg.norm(
                 t.tensor_frame.frames[mu].data[:, :, 0], axis=1)

@@ -217,6 +217,71 @@ class Frame:
                 new_data[i * r2 + j] = np.kron(self.data[i], other.data[j])
         return self.__class__(new_data)
 
+    def hadamard_product(self, other: 'Frame') -> 'Frame':
+        """Entrywise (Hadamard) product of every pair of frame elements.
+
+        The element i * other.dim + j of the result is self[i] * other[j],
+        the same ordering as kron, so that the core of the Hadamard product of
+        two Tucker tensors is the Kronecker product of their cores.
+
+        Parameters
+        ----------
+        other : Frame
+            Frame with the same physical dimensions.
+
+        Returns
+        -------
+        Frame
+            New frame with rank = self.dim * other.dim.
+        """
+        if self.shape != other.shape:
+            raise ValueError("Frames must have the same physical dimensions "
+                             "for the Hadamard product.")
+        # (R1, 1, N1, N2) * (1, R2, N1, N2) -> (R1 * R2, N1, N2)
+        new_data = self.data[:, None] * other.data[None, :]
+        return self.__class__(new_data.reshape(-1, *self.shape))
+
+    def super_frame(self, shape, rows=None, cols=None) -> 'Frame':
+        """Embed the frame elements in larger matrices filled with zeros.
+
+        The element k of the result is a matrix S_k of the given shape such
+        that S_k[rows, cols] = self[k], and S_k is zero elsewhere.
+
+        Parameters
+        ----------
+        shape : tuple of int
+            Physical shape (M1, M2) of the new frame elements.
+        rows : array-like of int, optional
+            The N1 row indices of the current entries. The default is None,
+            which keeps the rows unchanged (M1 must be N1).
+        cols : array-like of int, optional
+            The N2 column indices of the current entries. The default is None,
+            which keeps the columns unchanged (M2 must be N2).
+
+        Returns
+        -------
+        Frame
+            New frame with shape (R, M1, M2).
+        """
+        index = []
+        for axis, idx in enumerate((rows, cols)):
+            if idx is None:
+                if shape[axis] != self.shape[axis]:
+                    raise ValueError(
+                        f"Without indices, the size {shape[axis]} must be the "
+                        f"current size {self.shape[axis]}.")
+                idx = np.arange(self.shape[axis])
+            idx = np.asarray(idx, dtype=int).ravel()
+            if idx.size != self.shape[axis]:
+                raise ValueError(
+                    f"Got {idx.size} indices for a dimension of size "
+                    f"{self.shape[axis]}.")
+            index.append(idx)
+
+        new_data = np.zeros((self.dim, *shape), dtype=self.data.dtype)
+        new_data[:, index[0][:, None], index[1][None, :]] = self.data
+        return self.__class__(new_data)
+
     def eval_in_space(self, coefs: np.ndarray) -> np.ndarray:
         """Evaluate a vector/operator from its coefficients in the frame.
 

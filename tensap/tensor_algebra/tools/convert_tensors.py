@@ -43,6 +43,13 @@ def convert_tensors(x, y):
             "to a common tensor type."
         )
 
+    # BaseTuckerTensor + BaseTuckerTensor — align cores (checked before the
+    # same-type shortcut: two Tucker tensors of the same class may have cores
+    # of different types)
+    if isinstance(x, tensap.BaseTuckerTensor) and isinstance(y, tensap.BaseTuckerTensor):
+        cx, cy = convert_tensors(x.core, y.core)
+        return type(x)._factory(cx, x.tensor_frame), type(y)._factory(cy, y.tensor_frame)
+
     if type(x) is type(y):
         return x, y
 
@@ -71,11 +78,6 @@ def convert_tensors(x, y):
     if isinstance(y, tensap.CanonicalTensor) and isinstance(x, tensap.BaseTuckerTensor):
         y = _canonical_to_tucker(y)
         return convert_tensors(x, y)
-
-    # BaseTuckerTensor + BaseTuckerTensor — align cores
-    if isinstance(x, tensap.BaseTuckerTensor) and isinstance(y, tensap.BaseTuckerTensor):
-        cx, cy = convert_tensors(x.core, y.core)
-        return type(x)._factory(cx, x.tensor_frame), type(y)._factory(cy, y.tensor_frame)
 
     raise NotImplementedError(
         f"Cannot convert {type(x).__name__} and {type(y).__name__} "
