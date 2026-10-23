@@ -77,28 +77,24 @@ class MultiIndices:
         if not isinstance(J, MultiIndices):
             ok = False
         else:
-            if J.cardinal() == 1:
-                J.array = np.tile(J.array, (self.cardinal(), 1))
             ok = np.all(self.array == J.array, axis=1)
         return ok
 
     def __le__(self, J):
         assert isinstance(J, MultiIndices), "Must provide a MultiIndices."
-        if J.cardinal() == 1:
-            J.array = np.tile(J.array, (self.cardinal(), 1))
         return np.all(self.array <= J.array, axis=1)
 
     def __add__(self, m):
         return MultiIndices(self.array + m)
 
     def __radd__(self, m):
-        self.array += m
+        return self + m
 
     def __sub__(self, m):
         return MultiIndices(self.array - m)
 
     def __rsub__(self, m):
-        self.array -= m
+        return MultiIndices(m - self.array)
 
     def cardinal(self):
         """
@@ -291,16 +287,11 @@ class MultiIndices:
         if columns is None:
             columns = np.arange(self.array.shape[1] - 1, -1, -1)
 
-        array = np.array(self.array)
-        for k in np.flip(columns):
-            if k == columns[-1]:
-                ind = np.argsort(array[:, k])
-            else:
-                ind = np.argsort(array[:, k], kind="mergesort")
-            if mode == "descend":
-                ind = np.flip(ind)
-            array = array[ind, :]
-        return MultiIndices(array.astype(int))
+        # np.lexsort sorts by its last key first
+        ind = np.lexsort([self.array[:, k] for k in np.flip(np.atleast_1d(columns))])
+        if mode == "descend":
+            ind = np.flip(ind)
+        return MultiIndices(self.array[ind, :].astype(int))
 
     def add_indices(self, J):
         """
@@ -420,7 +411,7 @@ class MultiIndices:
             The MultiIndices with retained dimensions.
 
         """
-        array = self.array[:, dims]
+        array = self.array[:, np.atleast_1d(dims)]
         ind = np.unique(array, axis=0, return_index=True)[1]
         array = np.array([array[index, :] for index in sorted(ind)])
         return MultiIndices(array.astype(int))
@@ -497,6 +488,7 @@ class MultiIndices:
             + "of multi-indices."
         )
 
+        u = np.asarray(u)
         env = np.array(u)
         for i in range(n):
             ind_sup = np.all(array >= np.tile(array[i, :], (n, 1)), axis=1)
@@ -641,7 +633,7 @@ class MultiIndices:
                 M = ind.get_margin()
                 n = M.norm(p)
                 k = np.nonzero(n <= m)[0]
-                if np.all(np.logical_not(k)):
+                if k.size == 0:
                     add = False
                 else:
                     j = np.argsort(n[k])
@@ -737,10 +729,13 @@ class MultiIndices:
 
         """
 
+        if d is not None and np.ndim(L) == 1 and np.ndim(L[0]) == 0:
+            L = [L]  # a single set of indices
+        L = list(L)
         if d is None:
             d = len(L)
         if len(L) == 1 and d > 1:
-            L = list(L) * d
+            L = L * d
 
         for i in range(len(L)):
             if isinstance(L[i], MultiIndices):
@@ -851,7 +846,7 @@ class MultiIndices:
             M = M.remove_indices(rem)
             n = np.delete(n, rem)
             k = np.nonzero(n <= m)[0]
-            if np.all(np.logical_not(k)):
+            if k.size == 0:
                 add = False
             else:
                 j = np.argsort(n[k])
@@ -886,7 +881,7 @@ class MultiIndices:
             M = ind.get_margin()
             n = np.prod((M.array + 1) ** w_k, axis=-1)
             k = np.nonzero(n <= p + 1)[0]
-            if np.all(np.logical_not(k)):
+            if k.size == 0:
                 add = False
             else:
                 j = np.argsort(n[k])

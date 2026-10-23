@@ -23,10 +23,10 @@ def _fun_torch_wrapper(fun_torch):
     vfun_jac_torch = torch.vmap(torch.func.jacrev(fun_torch))
 
     def fun(x):
-        return np.array(vfun_torch(torch.asarray(x)))
+        return vfun_torch(torch.asarray(x)).detach().numpy()
 
     def fun_jac(x):
-        return np.array(vfun_jac_torch(torch.asarray(x)))
+        return vfun_jac_torch(torch.asarray(x)).detach().numpy()
 
     return fun, fun_jac
 
@@ -93,7 +93,8 @@ def _build_sin_of_a_sum(d=3, c=None):
     X = tensap.RandomVector(tensap.UniformRandomVariable(), d)
 
     if c is None:
-        c = torch.asarray(np.ones(1, d))
+        c = np.ones(d)
+    c = torch.asarray(c, dtype=torch.float64)
 
     def fun_torch(x):
         return torch.sin(torch.matmul(c, x))
@@ -165,7 +166,7 @@ def _build_sin_squared_norm(d=8, c=1., R=None):
     X = tensap.RandomVector(tensap.UniformRandomVariable(-1, 1), d)
 
     def fun_torch(x):
-        return torch.sin(c**2 * x.T @ R_torch @ x)
+        return torch.sin(c**2 * x @ R_torch @ x)
 
     return fun_torch, X
 
@@ -180,7 +181,7 @@ def _build_cos_squared_norm(d=8, c=1., R=None):
     X = tensap.RandomVector(tensap.UniformRandomVariable(-1, 1), d)
 
     def fun_torch(x):
-        return torch.cos(c**2 * (x.T @ R_torch @ x))
+        return torch.cos(c**2 * (x @ R_torch @ x))
 
     return fun_torch, X
 
@@ -198,8 +199,8 @@ def _build_sum_cos_sin_squared_norm(d=8, c=1., R1=None, R2=None):
     X = tensap.RandomVector(tensap.UniformRandomVariable(-1, 1), d)
 
     def fun_torch(x):
-        u1 = torch.cos(c**2 * (x.T @ R1_torch @ x))
-        u2 = torch.sin(c**2 * (x.T @ R2_torch @ x))
+        u1 = torch.cos(c**2 * (x @ R1_torch @ x))
+        u2 = torch.sin(c**2 * (x @ R2_torch @ x))
         return u1 + u2
 
     return fun_torch, X
@@ -224,7 +225,7 @@ def _build_cos_low_rank(d=8):
     def fun_torch(x):
         z1 = torch.flatten(torch.outer(x[:d // 2], x[:d // 4]))
         z2 = torch.flatten(torch.outer(x[-d // 2:], x[-d // 4:]))
-        z = z1.T @ z2
+        z = z1 @ z2
         return torch.cos(z)
 
     return fun_torch, X
@@ -248,9 +249,9 @@ def _build_ackley(d=7):
 
     def fun_torch(x):
         y = x * 32.768
-        z0 = 20 + torch.exp(torch.ones(1))
-        z1 = torch.mean(torch.sum(y**2))
-        z2 = torch.mean(torch.sum(torch.cos(2 * torch.pi * y)))
+        z0 = 20 + np.exp(1)
+        z1 = torch.mean(y**2)
+        z2 = torch.mean(torch.cos(2 * torch.pi * y))
         return z0 - 20 * torch.exp(- 0.2 * torch.sqrt(z1)) - torch.exp(z2)
 
     return fun_torch, X
@@ -272,11 +273,9 @@ def _build_robot_arm(d=8):
 
 def _build_piston(d=6):
 
-    X = tensap.RandomVector(tensap.UniformRandomVariable(-1, 1), d)
-
     X = np.empty(7, dtype=object)
     X[0] = tensap.UniformRandomVariable(30, 60)
-    X[1] = tensap.UniformRandomVariable(0.005, 0.002)
+    X[1] = tensap.UniformRandomVariable(0.005, 0.02)
     X[2] = tensap.UniformRandomVariable(0.002, 0.01)
     X[3] = tensap.UniformRandomVariable(1000, 5000)
     X[4] = tensap.UniformRandomVariable(90000, 110000)
@@ -292,8 +291,8 @@ def _build_piston(d=6):
         x = x * scaling + shift
         aux = x[4] * x[2] / x[6]
         A = x[1] * x[4] + 19.62 * x[0] - x[2] * x[3] / x[1]
-        V = x[1] / (2 * x[3]) * (A**2 + 4 * x[3] * aux * x[5] - A)**0.5
-        out = 2 * torch.pi * (x[0] / (x[3] + x[1] * aux * x[5] / V**2))**0.5
+        V = x[1] / (2 * x[3]) * ((A**2 + 4 * x[3] * aux * x[5])**0.5 - A)
+        out = 2 * torch.pi * (x[0] / (x[3] + x[1]**2 * aux * x[5] / V**2))**0.5
         return out
 
     return fun_torch, X
@@ -331,7 +330,7 @@ def _build_quartic_sin_collective(d=9, mat_lst=[]):
     def fun_torch(x):
         z = 0.
         for i, M in enumerate(mat_lst_torch):
-            zi = (x[:-1].T @ M @ x[:-1])
+            zi = (x[:-1] @ M @ x[:-1])
             zi = zi**2
             c = (torch.pi * (i + 1)) / (2 * len(mat_lst))
             zi *= torch.sin(c * x[-1])

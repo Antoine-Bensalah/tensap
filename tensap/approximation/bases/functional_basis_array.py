@@ -74,7 +74,7 @@ class FunctionalBasisArray(tensap.Function):
         self.shape = np.atleast_1d(shape)
         self.output_shape = self.shape
         self.data = np.reshape(
-            self.data, np.concatenate(([basis.cardinal()], self.shape))
+            self.data, np.concatenate(([basis.cardinal()], self.shape)), order="F"
         )
 
     def __add__(self, g):
@@ -364,7 +364,9 @@ class FunctionalBasisArray(tensap.Function):
                 self.data, [self.basis.cardinal(), np.prod(self.shape)], order="F"
             ),
         )
-        f.data = np.reshape(f.data, (f.data.shape[0], f.shape), order="F")
+        f.data = np.reshape(
+            f.data, np.concatenate(([f.data.shape[0]], f.shape)), order="F"
+        )
         f.basis = h.basis
         return f
 
@@ -390,7 +392,7 @@ class FunctionalBasisArray(tensap.Function):
         v = np.zeros((np.shape(alpha)[0], np.prod(self.shape)))
         for i in range(np.shape(alpha)[0]):
             u = alpha[i, :]
-            if np.all([isinstance(x, bool) for x in u]):
+            if np.asarray(u).dtype == bool:
                 u = np.nonzero(u)[0]
 
             if np.size(u) == 0:
@@ -608,6 +610,9 @@ class FunctionalBasisArray(tensap.Function):
         if indices is None:
             if isinstance(basis, tensap.SparseTensorProductFunctionalBasis):
                 indices = basis.indices
+            elif isinstance(basis, tensap.FullTensorProductFunctionalBasis):
+                # the first index varies fastest, as in the evaluations
+                indices = tensap.MultiIndices.bounded_by(basis.bases.cardinals() - 1)
             else:
                 raise ValueError("Must specify a MultiIndices.")
 
@@ -622,7 +627,7 @@ class FunctionalBasisArray(tensap.Function):
                 d = np.reshape(d, [basis.cardinal(), self.shape], order="F")
 
             if isinstance(basis, tensap.FullTensorProductFunctionalBasis):
-                H = tensap.FullTensorProductIntegrationRule(basis.bases)
+                H = basis
             elif isinstance(basis, tensap.SparseTensorProductFunctionalBasis):
                 H = tensap.SparseTensorProductFunctionalBasis(basis.bases, indices)
             g = FunctionalBasisArray(d, H, self.shape)

@@ -181,7 +181,11 @@ class EmpiricalRandomVariable(tensap.RandomVariable):
 
         """
         # TODO Optimize the method
-        sup = self.truncated_support()
+        # bracket: the gaussian kernels are negligible 10 bandwidths away
+        sup = [
+            np.min(self.sample) - 10 * self.bandwidth,
+            np.max(self.sample) + 10 * self.bandwidth,
+        ]
         return np.vectorize(
             lambda p: scipy.optimize.brentq(
                 lambda y: self.cdf(y) - p, sup[0], sup[1], *args, **kwargs

@@ -321,6 +321,14 @@ class Truncator:
         if isinstance(tensor, np.ndarray):
             tensor = tensap.FullTensor(tensor)
 
+        # self.max_rank is set node by node for trunc_svd: restore it after
+        max_rank = self.max_rank
+        try:
+            return self._hosvd(tensor)
+        finally:
+            self.max_rank = max_rank
+
+    def _hosvd(self, tensor):
         order = tensor.order
         if order == 2:
             out = self.svd(tensor)
@@ -375,6 +383,14 @@ class Truncator:
             The truncated tensor in tree-based tensor format.
 
         """
+        # self.max_rank is set node by node for trunc_svd: restore it after
+        max_rank = self.max_rank
+        try:
+            return self._hsvd(tensor, tree, is_active_node)
+        finally:
+            self.max_rank = max_rank
+
+    def _hsvd(self, tensor, tree, is_active_node):
         if isinstance(tensor, tensap.TreeBasedTensor):
             if tree is not None or is_active_node is not None:
                 warnings.warn(

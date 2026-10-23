@@ -108,8 +108,9 @@ class SparseTensor:
             ), "data and indices must have the same number of elements."
         else:
             raise ValueError("Wrong input arguments.")
-        self.data = np.squeeze(self.data)
-        self.shape = np.squeeze(self.shape)
+        # at least 1d: an order-1 tensor or a single entry stays an array
+        self.data = np.atleast_1d(np.squeeze(self.data))
+        self.shape = np.atleast_1d(np.squeeze(self.shape))
 
     @property
     def size(self):
@@ -235,9 +236,10 @@ class SparseTensor:
             The evaluations of the tensor.
 
         """
-        assert dims is None or np.all(
-            dims == np.arange(self.order)
-        ), "Method not implemented."
+        if dims is not None and not np.array_equal(
+            np.sort(np.atleast_1d(dims)), np.arange(self.order)
+        ):
+            raise NotImplementedError("Method not implemented.")
 
         if isinstance(ind, tensap.MultiIndices):
             ind = ind.array
@@ -337,6 +339,9 @@ class SparseTensor:
 
                 a = a[a != 0]
                 out.data = np.bincount(ind, weights=a)
+            else:
+                # last dimension contracted: the result is the sum
+                out.data = np.sum(a)
 
             dims -= dims > dims[i]
 
@@ -385,10 +390,13 @@ class SparseTensor:
         k = 0
         out = deepcopy(self)
         for mu in dims:
+            if out.order == 1:
+                # order-1 tensor: plain matrix-vector product
+                out = SparseTensor(np.asarray(matrices[k]) @ out.full().numpy())
+                k += 1
+                continue
             perm_dims = np.concatenate(([mu], np.setdiff1d(np.arange(out.order), mu)))
             out = out.transpose(perm_dims)
-            if out.order == 1:
-                out.shape[1] = 1
             ind = tensap.MultiIndices(out.indices.array[out.data != 0, :]).sub2ind(
                 out.shape
             )
@@ -532,7 +540,7 @@ class SparseTensor:
                 len(matrices) == dims.size
             ), "len(matrices) must be equal to dims.size."
 
-        matrices = [tensap.FullTensor(np.diag(np.reshape(x, [-1]))) for x in matrices]
+        matrices = [np.diag(np.reshape(x, [-1])) for x in matrices]
         return self.tensor_matrix_product(matrices, dims)
 
     def dot(self, y):

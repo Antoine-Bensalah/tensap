@@ -97,10 +97,15 @@ class DeltaFunctionalBasis(tensap.FunctionalBasis):
         return self.measure.support()
 
     def mean(self):
-        return self.measure.values.ravel()
+        # E(delta_i(X)) = P(X = values[i]): the weights of the normalized measure
+        if isinstance(self.measure, tensap.DiscreteRandomVariable):
+            return np.ravel(self.measure.probabilities)
+        if isinstance(self.measure, tensap.DiscreteMeasure):
+            return self.measure.weights / self.measure.mass()
+        raise NotImplementedError("Method not implemented.")
 
     def ndim(self):
         return self.input_dimension
 
     def cardinal(self):
-        return self.values.shape[1]
+        return self.values.shape[0]

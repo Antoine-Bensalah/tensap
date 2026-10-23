@@ -20,7 +20,6 @@ Module linear_model_learning_square_loss.
 """
 
 import numpy as np
-from scipy.sparse import diags
 import tensap
 
 
@@ -107,10 +106,16 @@ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
 
         output = {}
 
+        unweighted = None
         if self.weights is not None:
-            weights = diags(np.sqrt(self.weights))
-            A = np.matmul(weights, A)
-            y = np.matmul(weights, y)
+            # weighted least squares: the solvers read self.basis_eval and
+            # self.training_data, restored after the resolution
+            unweighted = (self.basis_eval, self.training_data)
+            w = np.sqrt(np.ravel(self.weights))
+            A = A * w[:, None]
+            y = y * np.reshape(w, [-1] + [1] * (np.ndim(y) - 1))
+            self.basis_eval = A
+            self.training_data = [self.training_data[0], y]
 
         if not self.basis_adaptation:
             if not self.regularization:
@@ -139,6 +144,9 @@ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
                     sol[:, ind], output_tmp = self._solve_basis_adaptation()
                     output["error"][ind] = output_tmp["error"]
                     output["outputs"][ind] = output_tmp
+
+        if unweighted is not None:
+            self.basis_eval, self.training_data = unweighted
 
         if self.test_error:
             if n == 1:
@@ -194,7 +202,7 @@ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
             second_moment = np.var(y, 0) + np.mean(y, 0) ** 2
             if self.error_estimation_type == "residuals":
                 delta = y - np.matmul(A, sol)
-                error = np.mean(delta**2, 0) / second_moment
+                error = np.sqrt(np.mean(delta**2, 0) / second_moment)
             else:
                 if self.linear_solver == "solve":
                     try:
@@ -238,9 +246,9 @@ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
 
         options = self.regularization_options
         if self.regularization_type == "l0":
-            options_loc = {i: output[i] for i in output if i != "alpha"}
+            options_loc = {i: options[i] for i in options if i != "alpha"}
             D = np.linalg.norm(A, axis=0)
-            A_omp = np.matmul(A, diags(1 / D))
+            A_omp = A / D
             solpath = linear_model.orthogonal_mp(
                 A_omp,
                 y,
@@ -249,8 +257,8 @@ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
                 return_path=True,
                 **options_loc
             )
-            solpath = np.atleast_2d(solpath)
-            sol = np.matmul(diags(1 / D), solpath[:, -1])
+            solpath = np.atleast_2d(solpath) / D[:, None]
+            sol = solpath[:, -1]
         elif self.regularization_type == "l1":
             reg = linear_model.LassoLars(copy_X=True, fit_intercept=False, **options)
             reg.fit(A, y)
@@ -266,7 +274,7 @@ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
         if (self.model_selection and np.linalg.norm(
                 solpath) != 0) and solpath.shape[1] > 1:
             if "non_zero_blocks" in self.options:
-                rep = np.true(solpath.shape[1])
+                rep = np.ones(solpath.shape[1], dtype=bool)
                 rep = np.logical_and(rep, np.any(solpath, 0))
                 for block in self.options["non_zero_blocks"]:
                     rep = np.logical_and(rep, np.any(solpath[block, :], 0))
@@ -281,7 +289,7 @@ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
             second_moment = np.var(y, 0) + np.mean(y, 0) ** 2
             if self.error_estimation_type == "residuals":
                 delta = y - np.matmul(A, sol)
-                error = np.mean(delta ** 2, 0) / second_moment
+                error = np.sqrt(np.mean(delta ** 2, 0) / second_moment)
             else:
                 # if len(sol) > 1:
                 if np.all(sol != 0):

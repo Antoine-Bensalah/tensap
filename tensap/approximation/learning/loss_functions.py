@@ -163,8 +163,9 @@ class SquareLossFunction(LossFunction):
             except Exception:
                 y_pred = fun
 
-        y_pred = np.atleast_2d(y_pred)
-        y_true = np.atleast_2d(sample[1])
+        # one row per sample (a vector of scalar outputs is a column)
+        y_pred = np.reshape(y_pred, (np.shape(y_pred)[0], -1))
+        y_true = np.reshape(sample[1], (np.shape(sample[1])[0], -1))
         loss = np.sum((y_pred - y_true) ** 2, 1)
 
         if nargout == 1:

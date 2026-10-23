@@ -30,7 +30,7 @@ def _build_sin_squared_norm(d=8, c=1., R=None):
 
     def fun_jac(x):
         z = c**2 * np.einsum('ki,ki->k', x, x @ R).reshape(-1, 1)
-        out = 2 * c**2 * np.cos(z) * (x @ R)
+        out = c**2 * np.cos(z) * (x @ (R + R.T))
         return out[:, None, :]
 
     return fun, fun_jac, X
@@ -49,7 +49,7 @@ def _build_cos_squared_norm(d=8, c=1., R=None):
 
     def fun_jac(x):
         z = c**2 * np.einsum('ki,ki->k', x, x @ R).reshape(-1, 1)
-        out = -2 * c**2 * np.sin(z) * (x @ R)
+        out = -c**2 * np.sin(z) * (x @ (R + R.T))
         return out[:, None, :]
 
     return fun, fun_jac, X
@@ -72,8 +72,8 @@ def _build_sum_cos_sin_squared_norm(d=8, c=1., R1=None, R2=None):
     def fun_jac(x):
         z1 = c**2 * np.einsum('ki,ki->k', x, x @ R1).reshape(-1, 1)
         z2 = c**2 * np.einsum('ki,ki->k', x, x @ R2).reshape(-1, 1)
-        du1 = - 2 * c**2 * np.sin(z1) * (x @ R1)
-        du2 = 2 * c**2 * np.cos(z2) * (x @ R2)
+        du1 = -c**2 * np.sin(z1) * (x @ (R1 + R1.T))
+        du2 = c**2 * np.cos(z2) * (x @ (R2 + R2.T))
         out = du1 + du2
         return out[:, None, :]
 

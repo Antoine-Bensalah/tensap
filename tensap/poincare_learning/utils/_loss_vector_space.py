@@ -277,7 +277,7 @@ def _eval_SG_diag(G, jac_u, jac_basis, jac_g=None):
         M = np.linalg.solve(GBG.T, GAG.T).T
         M = np.linalg.solve(GBG, M)
         diag1 = np.diag(M)
-        diag2 = np.linalg.norm(jb, axis=1)
+        diag2 = np.linalg.norm(jb, axis=1)**2  # diagonal of jb jb^T
         diag += np.kron(diag1, diag2) / N
     return diag
 
@@ -498,10 +498,12 @@ def _eval_HessG_diag(G, jac_u, jac_basis, jac_g=None):
         jg_inv = scipy.linalg.pinv(jg)
         p = np.eye(jb.shape[1]) - jg_inv @ jg
         d1 = (jb @ p @ grad_u @ grad_u.T @ jg_inv) * (jb @ jg_inv)
-        d2 = (jb @ p @ grad_u)**2 @ np.ones((ju.shape[0], 1)) @ np.diag(jg_inv.T @ jg_inv)
+        # outer products of a column (K) and a row (m)
+        d2 = np.sum((jb @ p @ grad_u)**2, 1)[:, None] * np.diag(jg_inv.T @ jg_inv)[None, :]
         d3 = (jb @ jg_inv) * (jb @ p @ grad_u @ grad_u.T @ jg_inv)
-        d4 = (jb @ p)**2 @ np.ones((d, 1)) @ np.diag(jg_inv.T @ grad_u @ grad_u.T @ jg_inv)
-        diag_mat += d1 - d2.reshape(1, -1) + d3 + d4.reshape(1, -1)
+        d4 = np.sum((jb @ p)**2, 1)[:, None] * np.diag(
+            jg_inv.T @ grad_u @ grad_u.T @ jg_inv)[None, :]
+        diag_mat += d1 - d2 + d3 + d4
     diag_mat = 2 * diag_mat / N
     diag = diag_mat.flatten(order="F")
     return diag
@@ -586,7 +588,7 @@ def poincare_loss_surrogate_vector_space(G, jac_u, jac_basis, G0=None, jac_g=Non
     """
     if jac_g is None:
         jac_g = _eval_jac_g(G, jac_basis)
-    if jac_g0 is None and not (G0 is None):
+    if jac_g0 is None and G0 is not None:
         jac_g0 = _eval_jac_g(G0, jac_basis)
     out = poincare_loss_surrogate(jac_u, jac_g, jac_g0)
     return out
@@ -640,7 +642,7 @@ def _eval_surrogate_matrices(jac_u, jac_basis, G0=None, R=None):
 
     for jb, ju in zip(jac_basis, jac_u):
 
-        if not (G0 is None):
+        if G0 is not None:
             jg0 = G0.T @ jb
             P_g0 = jg0.T @ scipy.linalg.pinv(jg0.T)
 
@@ -655,7 +657,7 @@ def _eval_surrogate_matrices(jac_u, jac_basis, G0=None, R=None):
         A += w * Ax / jac_u.shape[0]
         B += w * Bx / jac_u.shape[0]
 
-    if not (G0 is None):
+    if G0 is not None:
         R12inv = np.linalg.inv(np.linalg.cholesky(R))
         Minv = np.linalg.inv(G0.T @ R @ G0)
         C = R @ G0 @ Minv @ G0.T @ R

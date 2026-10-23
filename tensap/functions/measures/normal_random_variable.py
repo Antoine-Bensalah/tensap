@@ -22,6 +22,7 @@ Module normal_random_variable.
 from numpy import inf, array
 from scipy.stats import norm
 from numpy.random import randn
+import numpy as np
 import tensap
 
 
@@ -126,8 +127,9 @@ class NormalRandomVariable(tensap.RandomVariable):
         Shift the normal random variable using the provided bias and scaling
         factor.
 
-        The mean mu of the random variable becomes mu + bias, and its standard
-        deviation sigma becomes sigma * scaling.
+        The shifted random variable is bias + scaling * X, as for the other
+        random variables: the mean mu becomes bias + scaling * mu, and the
+        standard deviation sigma becomes |scaling| * sigma.
 
         Parameters
         ----------
@@ -143,8 +145,8 @@ class NormalRandomVariable(tensap.RandomVariable):
 
         """
         shifted_rv = tensap.NormalRandomVariable(self.mu, self.sigma)
-        shifted_rv.mu += bias
-        shifted_rv.sigma *= scaling
+        shifted_rv.mu = bias + scaling * shifted_rv.mu
+        shifted_rv.sigma *= np.abs(scaling)
         return shifted_rv
 
     @staticmethod

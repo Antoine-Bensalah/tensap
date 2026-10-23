@@ -64,16 +64,18 @@ class OrthonormalPolynomials(tensap.UnivariatePolynomials):
         if not isinstance(poly_2, OrthonormalPolynomials):
             out = False
         else:
+            # the classical families compute their recurrence coefficients,
+            # the others store them
             out = (
-                self.measure == poly_2.measure
-                and np.array_equal(
-                    self._recurrence_coefficients, poly_2._recurrence_coefficients
+                type(self) is type(poly_2)
+                and self.measure == poly_2.measure
+                and all(
+                    np.array_equal(getattr(self, a, None), getattr(poly_2, a, None))
+                    for a in (
+                        "_recurrence_coefficients",
+                        "_orthogonal_polynomials_norms",
+                    )
                 )
-                and np.array_equal(
-                    self._orthogonal_polynomials_norms,
-                    poly_2._orthogonal_polynomials_norms,
-                )
-                and self.is_orthonormal == poly_2.is_orthonormal
             )
         return out
 
@@ -109,7 +111,8 @@ class OrthonormalPolynomials(tensap.UnivariatePolynomials):
         ):
             out = np.zeros(ind.shape[0])
             if ind.shape[1] == 1:
-                out[ind[:, 0] == 0] = 1
+                # int p_0 dmu, with p_0 = 1 / sqrt(mass)
+                out[ind[:, 0] == 0] = np.sqrt(self.measure.mass())
             else:
                 out[ind[:, 0] == ind[:, 1]] = 1
         else:
@@ -179,7 +182,7 @@ class OrthonormalPolynomials(tensap.UnivariatePolynomials):
             out[:, 0] = 0
             if max_ind > 0:
                 if k == 1:
-                    out[:, 1] = 1 / np.sqrt(b[1])
+                    out[:, 1] = 1 / np.sqrt(b[1] * self.measure.mass())
                 else:
                     out[:, 1] = 0
             for deg in np.arange(2, max_ind + 1):
@@ -259,7 +262,7 @@ class OrthonormalPolynomials(tensap.UnivariatePolynomials):
             jacobi_matrix = (
                 np.diag(a) + np.diag(np.sqrt(b[1:]), -1) + np.diag(np.sqrt(b[1:]), 1)
             )
-        return np.sort(np.linalg.eig(jacobi_matrix)[0])
+        return np.sort(np.linalg.eigh(jacobi_matrix)[0])
 
 
 class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
@@ -301,6 +304,9 @@ class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
         self.polynomials = polynomials
         self.shift = shift
         self.scaling = scaling
+        # normalization: the shifted measure of a Lebesgue measure has a mass
+        # multiplied by the scaling (it is not the pushforward measure)
+        self._factor = np.sqrt(polynomials.measure.mass() / self.measure.mass())
 
     def __repr__(self):
         return "<{}>".format(self.__class__.__name__)
@@ -348,30 +354,38 @@ class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
         """
         return self.shift + self.scaling * self.polynomials.truncated_domain()
 
-    def mean(self, ind, *measure):
-        return self.polynomials.mean(ind, *measure)
-
-    def moment(self, ind, *measure):
-        if measure:
-            if measure[0] == self.measure:
-                measure = ()
-            else:
-                measure = tuple(
-                    [measure[0].shift(-self.shift / self.scaling, 1 / self.scaling)]
-                )
-        return self.polynomials.moment(ind, *measure)
+    def moment(self, ind, measure=None):
+        # int prod_k f p_k((x - shift) / scaling) dmu(x), with f = self._factor,
+        # computed with the measure mu mapped to the variable of the
+        # polynomials, of mass corrected to the one of mu
+        ind = np.atleast_2d(ind)
+        if measure is None or measure == self.measure:
+            measure = self.measure
+            mapped = self.polynomials.measure
+        else:
+            mapped = measure.shift(-self.shift / self.scaling, 1 / self.scaling)
+        mass_ratio = measure.mass() / mapped.mass()
+        return (
+            self._factor ** ind.shape[1]
+            * mass_ratio
+            * self.polynomials.moment(ind, mapped)
+        )
 
     def polyval(self, ind, x):
         x = (x - self.shift) / self.scaling
-        return self.polynomials.polyval(ind, x)
+        return self._factor * self.polynomials.polyval(ind, x)
 
     def d_polyval(self, ind, x):
         x = (x - self.shift) / self.scaling
-        return self.polynomials.d_polyval(ind, x) / self.scaling
+        return self._factor * self.polynomials.d_polyval(ind, x) / self.scaling
 
     def dn_polyval(self, n, ind, x):
         x = (x - self.shift) / self.scaling
-        return self.polynomials.dn_polyval(n, ind, x) / (self.scaling**n)
+        return (
+            self._factor
+            * self.polynomials.dn_polyval(n, ind, x)
+            / (self.scaling**n)
+        )
 
     def random(self, ind, n=1, measure=None):
         """
@@ -632,7 +646,7 @@ class EmpiricalPolynomials(OrthonormalPolynomials):
             self.measure = sample.get_standard_random_variable()
         else:
             # Standardization of the sample
-            x = np.reshape(self.sample, [-1, 1])
+            x = np.reshape(sample, [-1, 1])
             x = (x - np.tile(np.mean(x, 0), (x.shape[0], 1))) / np.tile(
                 np.std(x, 0), (x.shape[0], 1)
             )

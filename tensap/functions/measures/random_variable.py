@@ -75,10 +75,11 @@ class RandomVariable(tensap.ProbabilityMeasure):
             param_1 = self.get_parameters()
             param_2 = rv_2.get_parameters()
             for ind in zip(param_1, param_2):
-                is_equal = is_equal and (ind[0] == ind[1])
+                # parameters may be arrays (discrete and empirical variables)
+                is_equal = is_equal and np.array_equal(ind[0], ind[1])
         return is_equal
 
-    def __neq__(self, rv_2):
+    def __ne__(self, rv_2):
         return not (self == rv_2)
 
     def number_of_parameters(self):
@@ -91,7 +92,7 @@ class RandomVariable(tensap.ProbabilityMeasure):
             The number of parameters that admits the random variable.
 
         """
-        return np.size(self.get_parameters())
+        return int(sum(np.size(p) for p in self.get_parameters()))
 
     def pdf(self, x):
         """
@@ -277,7 +278,7 @@ class RandomVariable(tensap.ProbabilityMeasure):
 
         # Quadrature points are the eigenvalues of the Jacobi matrix, weights
         # are deduced from the eigenvectors
-        eig_values, eig_vectors = np.linalg.eig(jacobi_matrix)
+        eig_values, eig_vectors = np.linalg.eigh(jacobi_matrix)
         points = np.sort(eig_values)
         ind = np.argsort(eig_values)
         eig_vectors = eig_vectors[:, ind]

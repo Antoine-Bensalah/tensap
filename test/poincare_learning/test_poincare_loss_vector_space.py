@@ -1,5 +1,11 @@
+"""
+Unit tests of tensap.PoincareLossVectorSpace.
 
-
+The features are g(x) = G0^T phi(x) on a polynomial basis phi, and
+u = f o g: the loss vanishes at G0 and is additive over the outputs of u;
+the gradient, Hessian and surrogate matrices are checked through exact
+identities.
+"""
 import numpy as np
 import scipy
 import tensap
@@ -148,11 +154,3 @@ def test_eval_surrogate_matrices():
 
     np.testing.assert_allclose(sigma, 1, err_msg="Expected exact recovery of all features")
     np.testing.assert_allclose(sigma1, 1, err_msg="Expected exact recovery of second feature")
-
-
-if __name__ == "__main__":
-    test_eval()
-    test_eval_gradient()
-    test_eval_SGinv()
-    test_hessian()
-    test_eval_surrogate_matrices()

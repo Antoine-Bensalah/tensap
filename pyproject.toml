@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools"]
+
+[project]
+name = "tensap"
+version = "1.8"
+description = "Tensor Approximation Package: a Python package for the approximation of functions and tensors."
+readme = "README.md"
+dependencies = [
+  "numpy",
+  "scipy",
+  "networkx",
+]
+authors = [
+  {name = "Anthony Nouy"},
+  {name = "Erwan Grelier"},
+]
+license = {text= "LGPL-3.0-or-later"}
+classifiers = [
+  "Intended Audience :: Science/Research",
+  "Natural Language :: English",
+  "Topic :: Scientific/Engineering",
+]
+
+[tool.setuptools]
+packages = ["tensap",
+            "tensap.tools",
+            "tensap.tensor_algebra",
+            "tensap.tensor_algebra.tools",
+            "tensap.tensor_algebra.tensors",
+            "tensap.approximation.tensor_approximation",
+            "tensap.approximation.tensor_approximation.tensor_learning",
+            "tensap.approximation.tensor_approximation.principal_component_analysis",
+            "tensap.approximation.learning",
+            "tensap.approximation",
+            "tensap.approximation.tools",
+            "tensap.approximation.bases",
+            "tensap.approximation.integration",
+            "tensap.poincare_learning",
+            "tensap.poincare_learning.benchmarks",
+            "tensap.poincare_learning.utils",
+            "tensap.functions",
+            "tensap.functions.measures",
+            "tensap.functions.sets",
+            "tensap.functions.polynomials",
+            "tensap.linear_algebra",
+           ]
+
+[project.optional-dependencies]
+doc = ["numpydoc", "sphinx-gallery", "sphinx"]
+test = ["pytest", "pytest-xdist", "pytest-timeout", "pytest-cov", "matplotlib", "scikit-learn"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+markers = [
+  "slow: long test (more than about 10 s), excluded by default; run with -m slow",
+  "tutorial: runs a tutorial script end to end",
+]
+# Fast run by default: `pytest` skips the slow tests. Run everything with
+# `pytest -m ""`, in parallel with `pytest -n auto` (pytest-xdist).
+addopts = "-m 'not slow' --durations=10"
+# Fail a test stuck for more than 20 min (pytest-timeout).
+timeout = 1200
+# Warnings are errors, so that deprecations show up before they break the
+# code; the expected ones are filtered explicitly, here or in the tests.
+filterwarnings = [
+  "error",
+  # the tutorials call plt.show() with the non-interactive backend Agg
+  "ignore:FigureCanvasAgg is non-interactive:UserWarning",
+]
+
+# Coverage (pytest --cov=tensap): branches are measured, and the run fails
+# below the threshold. The fast suite covers 78 % of the branches and lines
+# (80 % with PyTorch and pymanopt): the threshold leaves a small margin for the
+# environments without optional dependencies.
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = false
+
+[project.urls]
+Homepage = "https://github.com/anthony-nouy/tensap"
+Documentation = "https://anthony-nouy.github.io/sphinx/tensap/master/"
+Repository = "https://github.com/anthony-nouy/tensap"
