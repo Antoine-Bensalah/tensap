@@ -106,6 +106,25 @@ class Axis:
             D2 = tensap.Truncator(tolerance=tolerance).truncate(D2)
         return D2 * (1.0 / self.h**2)
 
+    @property
+    def is_singular(self) -> bool:
+        """True if the constants are in the kernel of the second difference:
+        periodic axis, or Neumann on both faces."""
+        return self.periodic or (isinstance(self.left, Neumann)
+                                 and isinstance(self.right, Neumann))
+
+    def smallest_nonzero_eigenvalue(self) -> float:
+        """Smallest non-zero eigenvalue of -D2, for a singular axis.
+
+        The eigenvalues of -D2 are (4 / h^2) sin^2(pi k / (2 N)), k = 0, ...,
+        N - 1, with Neumann on both faces (cosine modes), and
+        (4 / h^2) sin^2(pi k / N) for a periodic axis (Fourier modes).
+        """
+        if not self.is_singular:
+            raise ValueError("The second difference of this axis is not singular.")
+        angle = np.pi / self.size if self.periodic else np.pi / (2 * self.size)
+        return 4.0 / self.h**2 * np.sin(angle) ** 2
+
     def boundary_weight(self, side: str) -> float:
         """Weight of the data g of the condition of a side in the source of the
         first (left) or last (right) cell: 2 / h^2 for Dirichlet, 1 / h for
@@ -211,6 +230,42 @@ class Grid:
                 term = sp.kron(term, block)
             result = term if result is None else result + term
         return result.tocsr()
+
+    @property
+    def is_singular(self) -> bool:
+        """True if the constants are in the kernel of the Laplacian: every
+        axis periodic or with Neumann on both faces."""
+        return all(axis.is_singular for axis in self.axes)
+
+    def constant_mode_regularization(self, sigma: float = None) -> "tensap.TTOperator":
+        """The rank-one term R = (sigma / N) 1 1^T for a singular Laplacian.
+
+        -Delta_h + R is symmetric positive definite: writing u = u_0 + c 1
+        with u_0 of zero mean, (-Delta_h + R) u = b gives
+        -Delta_h u_0 = b - mean(b) 1 and c = mean(b) / sigma. For compatible
+        data (mean(b) = 0, the discrete form of int f + int_boundary g = 0)
+        the solution is the solution of zero mean; otherwise the least-squares
+        solution, shifted by a constant. The eigenvalues of -Delta_h + R are
+        those of -Delta_h with 0 replaced by sigma.
+
+        Parameters
+        ----------
+        sigma : float, optional
+            The default is the smallest non-zero eigenvalue of -Delta_h (the
+            minimum over the axes of their smallest non-zero eigenvalue): the
+            smallest value that does not degrade the conditioning.
+
+        Returns
+        -------
+        tensap.TTOperator
+            Of rank one, to be added to -1.0 * self.laplacian().
+        """
+        if not self.is_singular:
+            raise ValueError("The Laplacian of this grid is not singular.")
+        if sigma is None:
+            sigma = min(axis.smallest_nonzero_eigenvalue() for axis in self.axes)
+        N = int(np.prod(self.shape))
+        return tensap.qtt_ones_matrix(int(self.tensorizer.levels.sum())) * (sigma / N)
 
     def boundary_source(self, data=None, tolerance: float = 1e-12) -> "tensap.TTTensor":
         """The source s of the boundary data: Delta u ~ Delta_h u + s.

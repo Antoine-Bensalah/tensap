@@ -3,7 +3,7 @@
 
 """
 Tutorial: Poisson equation on a rectangle in QTT format, by cell-centred
-finite volumes, with Dirichlet and Neumann conditions.
+finite volumes, with Dirichlet, Neumann and periodic conditions.
 
 No MATLAB counterpart: ApproximationToolbox has no quantized tensor trains.
 
@@ -36,7 +36,11 @@ Steps
    function, then a "lid" problem (u = 1 on the top wall, 0 elsewhere);
 5. Neumann conditions du/dn = g (outward normal) on the vertical walls,
    closed by the centred flux at the face (ghost u_ghost = u_0 + h g): order 2
-   on the same harmonic function.
+   on the same harmonic function;
+6. singular problems, periodic in both directions or Neumann on every wall:
+   the constants are in the kernel, and the rank-one term (sigma / N) 1 1^T is
+   added (Grid.constant_mode_regularization), which gives the solution of zero
+   mean for compatible data.
 """
 
 # %% Imports
@@ -64,6 +68,8 @@ def solve(grid, f, tolerance=1e-8):
     """- Delta u = f by truncated PCG (no preconditioner): - Delta_h u = f + s,
     s the boundary source of the data of the conditions of the grid."""
     A = -1.0 * grid.laplacian()
+    if grid.is_singular:  # constants in the kernel: rank-one regularization
+        A = A + grid.constant_mode_regularization()
     b = grid.quantize(f, tolerance=1e-10)
     source = grid.boundary_source()
     if source.norm() > 0:  # homogeneous conditions: no source (and no extra rank)
@@ -206,6 +212,34 @@ for level in [3, 4, 5]:
 ratios = np.array(errors[:-1]) / np.array(errors[1:])
 print(f"Neumann and Dirichlet, error ratios: {np.round(ratios, 2)} (order 2: 4)")
 assert np.all((ratios > 3.5) & (ratios < 4.5)), ratios
+
+# %% 6. Singular problems: periodic in both directions, Neumann on every wall
+# Manufactured solutions of zero mean, - Delta u = k^2 u: the regularized
+# problem gives the solution of zero mean.
+cases = {
+    "periodic": (lambda lx, ly: Grid([Axis(Lx, lx, periodic=True),
+                                      Axis(Ly, ly, periodic=True)]),
+                 lambda p: np.sin(2 * np.pi * p[:, 0] / Lx) * np.cos(2 * np.pi * p[:, 1] / Ly),
+                 4 * np.pi**2 / Lx**2 + 4 * np.pi**2 / Ly**2),
+    "pure Neumann": (lambda lx, ly: Grid([Axis(Lx, lx, Neumann(), Neumann()),
+                                          Axis(Ly, ly, Neumann(), Neumann())]),
+                     lambda p: np.cos(np.pi * p[:, 0] / Lx) * np.cos(np.pi * p[:, 1] / Ly),
+                     np.pi**2 / Lx**2 + np.pi**2 / Ly**2),
+}
+for name, (make, solution, k2_case) in cases.items():
+    errors = []
+    for level in [3, 4, 5]:
+        g = make(level + 1, level)
+        assert g.is_singular
+        u, output, A_reg, _ = solve(g, lambda p: k2_case * solution(p), tolerance=1e-10)
+        u_dense = g.dequantize(u)
+        errors.append(np.sqrt(np.mean((u_dense.ravel()
+                                       - solution(g.cell_centers().reshape(-1, 2))) ** 2)))
+        assert abs(u_dense.mean()) < 1e-8  # the solution of zero mean
+    ratios = np.array(errors[:-1]) / np.array(errors[1:])
+    print(f"{name:>12}: regularized operator ranks {max(A_reg.ranks)}, L2 errors "
+          f"{', '.join(f'{e:.1e}' for e in errors)}, ratios {np.round(ratios, 2)}")
+    assert np.all((ratios > 3.5) & (ratios < 4.5)), ratios
 
 # %% Plot of the solution for the Gaussian right-hand side
 fig, ax = plt.subplots()

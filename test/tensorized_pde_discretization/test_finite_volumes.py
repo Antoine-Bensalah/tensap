@@ -312,3 +312,52 @@ def test_neumann_source_and_solution(ordering):
     x = grid.cell_centers()
     exact = np.exp(x[..., 0]) * np.cos(x[..., 1])
     assert np.sqrt(np.mean((expected - exact) ** 2)) < 1e-2  # coarse grid, order 2
+
+
+# --- singular problems: periodic and pure Neumann (step 4) ---------------------------
+
+
+@pytest.mark.parametrize("axis", [Axis(2.0, 4, Neumann(), Neumann()), Axis(1.5, 3, periodic=True)])
+def test_axis_smallest_nonzero_eigenvalue(axis):
+    assert axis.is_singular
+    eigenvalues = np.sort(np.linalg.eigvalsh(-axis.second_difference_matrix().toarray()))
+    assert np.isclose(eigenvalues[0], 0.0, atol=1e-10)
+    assert np.isclose(axis.smallest_nonzero_eigenvalue(), eigenvalues[1])
+    with pytest.raises(ValueError):
+        Axis(1.0, 3, Neumann(), Dirichlet()).smallest_nonzero_eigenvalue()
+
+
+@pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
+def test_constant_mode_regularization(ordering):
+    grid = Grid([Axis(2.0, 3, Neumann(), Neumann()), Axis(1.0, 2, periodic=True)], ordering)
+    assert grid.is_singular
+    R = grid.constant_mode_regularization()
+    assert R.ranks == (1,) * 4
+    M = -grid.laplacian_matrix().toarray()
+    sigma = min(axis.smallest_nonzero_eigenvalue() for axis in grid.axes)
+    npt.assert_allclose(tensap.dequantize_operator(R, grid.tensorizer),
+                        sigma / M.shape[0] * np.ones(M.shape))
+    # the zero eigenvalue is replaced by sigma: symmetric positive definite,
+    # with the same smallest eigenvalue
+    eigenvalues = np.linalg.eigvalsh(M + tensap.dequantize_operator(R, grid.tensorizer))
+    assert np.isclose(eigenvalues.min(), sigma)
+    assert not Grid([Axis(1.0, 2, Neumann(), Dirichlet())]).is_singular
+    with pytest.raises(ValueError):
+        Grid([Axis(1.0, 2)]).constant_mode_regularization()
+
+
+def test_regularized_solution_of_singular_problems(rng):
+    # compatible data: the solution of zero mean; incompatible: a constant shift
+    grid = Grid([Axis(1.0, 3, Neumann(), Neumann()), Axis(1.0, 3, Neumann(), Neumann())])
+    M = -grid.laplacian_matrix().toarray()
+    A = -1.0 * grid.laplacian() + grid.constant_mode_regularization()
+    sigma = grid.axes[0].smallest_nonzero_eigenvalue()
+    f = rng.standard_normal(grid.shape)
+    f_mean = f.mean()
+    for data, shift in [(f - f_mean, 0.0), (f, f_mean / sigma)]:
+        u, _ = tensap.TruncatedPCG(A, grid.quantize(data), tensap.Truncator(tolerance=1e-13),
+                                   tolerance=1e-11, max_iterations=300, stagnation=1e-15,
+                                   display=False).solve()
+        u = grid.dequantize(u)
+        zero_mean = np.linalg.pinv(M) @ (data - data.mean()).ravel()  # minimum norm
+        npt.assert_allclose(u.ravel(), zero_mean + shift, atol=1e-7)
