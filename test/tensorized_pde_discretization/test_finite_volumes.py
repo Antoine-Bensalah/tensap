@@ -75,8 +75,6 @@ def test_axis_errors():
         Axis(1.0, 3, Dirichlet(), periodic=True)
     with pytest.raises(TypeError):
         Axis(1.0, 3, "dirichlet")
-    with pytest.raises(NotImplementedError):  # step 3 of P4c
-        Axis(1.0, 3, Neumann()).second_difference()
 
     class Robin(BoundaryCondition):
         pass
@@ -215,8 +213,12 @@ def test_boundary_source_errors(rng):
         grid.boundary_source({(0, "top"): 1.0})
     with pytest.raises(ValueError):  # wrong layout of the face data
         grid.boundary_source({(0, "left"): tensap.quantize(rng.standard_normal(8))})
+
+    class Robin(BoundaryCondition):
+        pass
+
     with pytest.raises(NotImplementedError):
-        Axis(1.0, 2, Neumann(1.0)).boundary_weight("left")
+        Axis(1.0, 2, Robin()).boundary_weight("left")
 
 
 @pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
@@ -262,3 +264,51 @@ def test_elementary_vector_and_insert_axis(rng):
     with pytest.raises(ValueError):
         tensap.qtt_insert_axis(tensap.quantize(rng.standard_normal(8)), 1,
                                tensap.qtt_elementary_vector(3, 5), t)
+
+
+# --- Neumann conditions (step 3) -----------------------------------------------------
+
+
+@pytest.mark.parametrize("left, right", [(Neumann(), Dirichlet()), (Dirichlet(), Neumann()),
+                                         (Neumann(), Neumann())])
+def test_axis_neumann_second_difference(left, right):
+    axis = Axis(2.0, 4, left, right)
+    N, h = axis.size, axis.h
+    expected = sp.diags([1.0, -2.0, 1.0], [-1, 0, 1], shape=(N, N)).toarray()
+    # ghosts: u_g = 2 g - u_0 (Dirichlet, -1) or u_g = u_0 + h g (Neumann, +1)
+    expected[0, 0] += 1.0 if isinstance(left, Neumann) else -1.0
+    expected[-1, -1] += 1.0 if isinstance(right, Neumann) else -1.0
+    expected /= h**2
+    npt.assert_allclose(tensap.dequantize_operator(axis.second_difference()), expected,
+                        atol=1e-9)
+    npt.assert_allclose(axis.second_difference_matrix().toarray(), expected)
+    eigenvalues = np.linalg.eigvalsh(expected)  # symmetric
+    if isinstance(left, Neumann) and isinstance(right, Neumann):
+        assert np.isclose(eigenvalues.max(), 0.0, atol=1e-8)  # constants: kernel
+        npt.assert_allclose(expected @ np.ones(N), 0.0, atol=1e-9)
+    else:
+        assert eigenvalues.max() < 0
+    assert np.isclose(axis.boundary_weight("left"),
+                      1 / h if isinstance(left, Neumann) else 2 / h**2)
+
+
+@pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
+def test_neumann_source_and_solution(ordering):
+    # u = exp(x) cos(y) is harmonic: Neumann data on the x faces (outward normal
+    # derivative), Dirichlet data on the y faces; QTT solve against spsolve
+    from scipy.sparse.linalg import spsolve
+    grid = Grid([Axis(2.0, 3, Neumann(lambda y: -np.cos(y[:, 0])),
+                      Neumann(lambda y: np.exp(2.0) * np.cos(y[:, 0]))),
+                 Axis(1.0, 3, Dirichlet(lambda x: np.exp(x[:, 0])),
+                      Dirichlet(lambda x: np.exp(x[:, 0]) * np.cos(1.0)))], ordering)
+    s = grid.boundary_source()
+    npt.assert_allclose(grid.dequantize(s), grid.boundary_source_array(), atol=1e-9)
+    A = -1.0 * grid.laplacian()
+    u, _ = tensap.TruncatedPCG(A, s, tensap.Truncator(tolerance=1e-12), tolerance=1e-12,
+                               max_iterations=300, stagnation=1e-15, display=False).solve()
+    expected = spsolve(-grid.laplacian_matrix().tocsc(),
+                       grid.boundary_source_array().ravel()).reshape(grid.shape)
+    npt.assert_allclose(grid.dequantize(u), expected, rtol=1e-7)
+    x = grid.cell_centers()
+    exact = np.exp(x[..., 0]) * np.cos(x[..., 1])
+    assert np.sqrt(np.mean((expected - exact) ** 2)) < 1e-2  # coarse grid, order 2

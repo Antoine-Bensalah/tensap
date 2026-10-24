@@ -3,7 +3,7 @@
 
 """
 Tutorial: Poisson equation on a rectangle in QTT format, by cell-centred
-finite volumes, with homogeneous and non-homogeneous Dirichlet conditions.
+finite volumes, with Dirichlet and Neumann conditions.
 
 No MATLAB counterpart: ApproximationToolbox has no quantized tensor trains.
 
@@ -33,7 +33,10 @@ Steps
 4. non-homogeneous Dirichlet conditions: the data g enter the boundary source
    s (Delta u ~ Delta_h u + s), built in QTT face by face from e_0 (or
    e_{N-1}) of the normal axis and the data on the face: order 2 on a harmonic
-   function, then a "lid" problem (u = 1 on the top wall, 0 elsewhere).
+   function, then a "lid" problem (u = 1 on the top wall, 0 elsewhere);
+5. Neumann conditions du/dn = g (outward normal) on the vertical walls,
+   closed by the centred flux at the face (ghost u_ghost = u_0 + h g): order 2
+   on the same harmonic function.
 """
 
 # %% Imports
@@ -43,13 +46,12 @@ import numpy as np
 import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
 import tensap
-from tensap.tensorized_pde_discretization import Dirichlet
+from tensap.tensorized_pde_discretization import Dirichlet, Neumann
 from tensap.tensorized_pde_discretization.finite_volumes import Axis, Grid
 
 np.random.seed(0)
 
 Lx, Ly = 2.0, 1.0
-truncator = tensap.Truncator(tolerance=1e-10)
 
 
 def make_grid(lx, ly, ordering="blocks"):
@@ -62,7 +64,13 @@ def solve(grid, f, tolerance=1e-8):
     """- Delta u = f by truncated PCG (no preconditioner): - Delta_h u = f + s,
     s the boundary source of the data of the conditions of the grid."""
     A = -1.0 * grid.laplacian()
-    b = grid.quantize(f, tolerance=1e-10) + grid.boundary_source()
+    b = grid.quantize(f, tolerance=1e-10)
+    source = grid.boundary_source()
+    if source.norm() > 0:  # homogeneous conditions: no source (and no extra rank)
+        b = b + source
+    # the truncation must be finer than the requested residual, otherwise the
+    # truncation errors keep the residual above it and PCG stagnates
+    truncator = tensap.Truncator(tolerance=1e-2 * tolerance)
     solver = tensap.TruncatedPCG(A, b, truncator, tolerance=tolerance,
                                  max_iterations=1000, stagnation=1e-14, display=False)
     u, output = solver.solve()
@@ -173,6 +181,31 @@ print(f"Lid: source ranks {max(b_lid.ranks)} (a constant on one wall), PCG "
 assert error < 1e-6, error
 # the discrete maximum principle: 0 <= u <= 1
 assert np.all(lid.dequantize(u_lid) > -1e-8) and np.all(lid.dequantize(u_lid) < 1 + 1e-8)
+
+# %% 5. Neumann conditions on the vertical walls, Dirichlet on the others
+# u = exp(x) cos(y): du/dn = -du/dx = -cos(y) at x = 0, du/dx = e^Lx cos(y) at
+# x = Lx
+
+
+def neumann_grid(lx, ly):
+    walls_x = [Neumann(lambda y: -np.cos(y[:, 0])),
+               Neumann(lambda y: np.exp(Lx) * np.cos(y[:, 0]))]
+    walls_y = [Dirichlet(lambda x: harmonic(np.column_stack((x[:, 0], np.zeros(len(x)))))),
+               Dirichlet(lambda x: harmonic(np.column_stack((x[:, 0], np.full(len(x), Ly)))))]
+    return Grid([Axis(Lx, lx, *walls_x), Axis(Ly, ly, *walls_y)])
+
+
+errors = []
+for level in [3, 4, 5]:
+    g = neumann_grid(level + 1, level)
+    u, output, _, b = solve(g, lambda p: np.zeros(p.shape[0]), tolerance=1e-10)
+    u_exact = harmonic(g.cell_centers().reshape(-1, 2))
+    errors.append(np.sqrt(np.mean((g.dequantize(u).ravel() - u_exact) ** 2)))
+    print(f"{g.shape[0]} x {g.shape[1]} cells: source ranks {max(b.ranks)}, PCG "
+          f"{output['iter']} iterations, L2 error {errors[-1]:.2e}")
+ratios = np.array(errors[:-1]) / np.array(errors[1:])
+print(f"Neumann and Dirichlet, error ratios: {np.round(ratios, 2)} (order 2: 4)")
+assert np.all((ratios > 3.5) & (ratios < 4.5)), ratios
 
 # %% Plot of the solution for the Gaussian right-hand side
 fig, ax = plt.subplots()

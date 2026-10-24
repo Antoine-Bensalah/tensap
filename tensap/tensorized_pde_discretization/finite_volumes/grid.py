@@ -18,6 +18,9 @@ method):
 - Dirichlet u = g at the face: u_ghost = 2 g - u_0 (the face value is the mean
   of the ghost and the first cell), a correction -1 on the diagonal and the
   source 2 g / h^2;
+- Neumann du/dn = g at the face (n the outward normal): the centred flux at the
+  face, (u_ghost - u_0) / h = g, so u_ghost = u_0 + h g: a correction +1 on the
+  diagonal and the source g / h;
 - periodic axis: the neighbour across the face is the cell at the other end
   (circulant matrix).
 
@@ -105,12 +108,13 @@ class Axis:
 
     def boundary_weight(self, side: str) -> float:
         """Weight of the data g of the condition of a side in the source of the
-        first (left) or last (right) cell: 2 / h^2 for Dirichlet."""
+        first (left) or last (right) cell: 2 / h^2 for Dirichlet, 1 / h for
+        Neumann."""
         condition = self._condition(side)
         if isinstance(condition, Dirichlet):
             return 2.0 / self.h**2
         if isinstance(condition, Neumann):
-            raise NotImplementedError("Neumann conditions: step 3 of P4c.")
+            return 1.0 / self.h
         raise NotImplementedError(f"No finite volume closure for {condition!r}.")
 
     def _condition(self, side: str) -> BoundaryCondition:
@@ -142,7 +146,7 @@ def _diagonal_correction(condition: BoundaryCondition) -> float:
     if isinstance(condition, Dirichlet):
         return -1.0  # u_ghost = 2 g - u_0
     if isinstance(condition, Neumann):
-        raise NotImplementedError("Neumann conditions: step 3 of P4c.")
+        return 1.0  # u_ghost = u_0 + h g
     raise NotImplementedError(f"No finite volume closure for {condition!r}.")
 
 
@@ -228,8 +232,8 @@ class Grid:
         -------
         tensap.TTTensor
             Zero away from the faces; on the cell next to a face, the weight of
-            the closure times g (2 g / h^2 for Dirichlet). Built in QTT, face
-            by face.
+            the closure times g (2 g / h^2 for Dirichlet, g / h for Neumann).
+            Built in QTT, face by face.
         """
         if data is None:
             data = {}
