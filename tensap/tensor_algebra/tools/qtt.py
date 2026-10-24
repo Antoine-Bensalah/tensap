@@ -226,6 +226,79 @@ def dequantize_operator(operator, tensorizer=None) -> np.ndarray:
     return a.reshape(b**D, b**D)
 
 
+# --- tensor products in a layout ------------------------------------------------
+
+
+def qtt_layout_product(factors, tensorizer):
+    """Tensor product of one QTT factor per axis, in the layout of tensorizer.
+
+    factors[k] is a TTTensor (or TTOperator) with tensorizer.levels[k] cores,
+    acting on axis k; the result is their tensor product v_1 (x) ... (x) v_m
+    on the quantized arrays, its cores being placed at the positions of the
+    digits of their axis (Tensorizer.digit_positions). The bond between two
+    cores carries the current rank of every axis (the product of these
+    ranks): with the block ordering it is the concatenation of the chains,
+    with the interleaved ordering the ranks of the axes are multiplied where
+    their digits alternate.
+
+    Parameters
+    ----------
+    factors : list of tensap.TTTensor or list of tensap.TTOperator
+    tensorizer : tensap.Tensorizer
+
+    Returns
+    -------
+    tensap.TTTensor or tensap.TTOperator
+    """
+    m = tensorizer.dim
+    if len(factors) != m:
+        raise ValueError(f"Expected one factor per axis ({m}), got {len(factors)}.")
+    kind = type(factors[0])
+    if any(type(f) is not kind for f in factors):
+        raise TypeError("The factors must all be TTTensor or all TTOperator.")
+    positions = tensorizer.digit_positions()
+    for k, f in enumerate(factors):
+        if f.order != len(positions[k]):
+            raise ValueError(f"Factor {k} has {f.order} cores, expected {len(positions[k])}.")
+    D = int(tensorizer.levels.sum())
+    owner, index = np.empty(D, dtype=int), np.empty(D, dtype=int)
+    for k, p in enumerate(positions):
+        owner[p], index[p] = k, np.arange(len(p))
+    ranks = [1] * m
+    cores = []
+    for q in range(D):
+        k = owner[q]
+        core = factors[k].cores[index[q]]
+        n_phys = core.ndim - 2
+        others = [j for j in range(m) if j != k]
+        # core (a_k, phys, a_k') times identities (a_j, a_j') of the other axes
+        full = core
+        for j in others:
+            full = np.multiply.outer(full, np.eye(ranks[j]))
+        # axes of full: a_k, phys..., a_k', then (a_j, a_j') for j in others
+        left = {k: 0}
+        right = {k: n_phys + 1}
+        for pos, j in enumerate(others):
+            left[j] = n_phys + 2 + 2 * pos
+            right[j] = n_phys + 3 + 2 * pos
+        order = ([left[j] for j in range(m)] + list(range(1, n_phys + 1))
+                 + [right[j] for j in range(m)])
+        new_ranks = list(ranks)
+        new_ranks[k] = core.shape[-1]
+        full = full.transpose(order).reshape(
+            int(np.prod(ranks)), *core.shape[1:-1], int(np.prod(new_ranks)))
+        cores.append(full)
+        ranks = new_ranks
+    return kind(cores)
+
+
+def qtt_embed(operator, axis: int, tensorizer):
+    """A 1D TTOperator acting on one axis of the layout (identity elsewhere)."""
+    factors = [qtt_identity(int(L), tensorizer.b) for L in tensorizer.levels]
+    factors[axis] = operator
+    return qtt_layout_product(factors, tensorizer)
+
+
 # --- QTT primitives of 1D operators on N = b^L points ------------------------------
 
 

@@ -67,6 +67,8 @@ from .tensor_algebra.tools.qtt import (
     dequantize_operator,
     grid_points,
     to_functional_tensor,
+    qtt_layout_product,
+    qtt_embed,
     qtt_identity,
     qtt_shift,
     qtt_elementary_matrix,
@@ -74,6 +76,8 @@ from .tensor_algebra.tools.qtt import (
     qtt_banded,
     qtt_corner,
 )
+
+from . import tensorized_pde_discretization
 
 from .tools.utils import *
 from .tools.multi_indices import MultiIndices

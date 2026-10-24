@@ -44,6 +44,9 @@ packages = ["tensap",
             "tensap.functions.sets",
             "tensap.functions.polynomials",
             "tensap.linear_algebra",
+            "tensap.solvers",
+            "tensap.tensorized_pde_discretization",
+            "tensap.tensorized_pde_discretization.finite_volumes",
            ]
 
 [project.optional-dependencies]

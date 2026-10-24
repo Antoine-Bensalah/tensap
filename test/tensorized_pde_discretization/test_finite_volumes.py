@@ -1,0 +1,162 @@
+"""
+Unit tests of tensap.tensorized_pde_discretization: boundary conditions and
+cell-centred finite volumes (Axis, Grid) in QTT format.
+
+Oracles: the same matrices assembled with scipy.sparse, written here from the
+formulas of the finite volume closures, and Kronecker products.
+"""
+
+import numpy as np
+import numpy.testing as npt
+import pytest
+import scipy.sparse as sp
+import tensap
+from tensap.tensorized_pde_discretization import BoundaryCondition, Dirichlet, Neumann
+from tensap.tensorized_pde_discretization.finite_volumes import Axis, Grid
+
+
+# --- boundary conditions -------------------------------------------------------------
+
+
+def test_boundary_conditions():
+    assert Dirichlet().is_homogeneous and Neumann(0.0).is_homogeneous
+    assert not Dirichlet(1.0).is_homogeneous
+    assert not Neumann(lambda y: y[:, 0]).is_homogeneous
+    assert isinstance(Dirichlet(), BoundaryCondition)
+    assert repr(Dirichlet(2.0)) == "Dirichlet(2.0)"
+
+
+# --- one axis ------------------------------------------------------------------------
+
+
+def _reference_dirichlet(N, h):
+    """Cell centres, ghosts u_g = -u_0 and u_g = -u_{N-1}: diagonal -3 at both ends."""
+    D2 = sp.diags([1.0, -2.0, 1.0], [-1, 0, 1], shape=(N, N)).toarray()
+    D2[0, 0] = D2[-1, -1] = -3.0
+    return D2 / h**2
+
+
+def test_axis_geometry():
+    axis = Axis(2.0, 3)
+    assert axis.size == 8 and np.isclose(axis.h, 0.25)
+    npt.assert_allclose(axis.cell_centers(), 0.125 + 0.25 * np.arange(8))
+    assert isinstance(axis.left, Dirichlet) and isinstance(axis.right, Dirichlet)
+    assert "periodic" in repr(Axis(1.0, 2, periodic=True))
+
+
+@pytest.mark.parametrize("levels", [1, 3, 6])
+def test_axis_dirichlet_second_difference(levels):
+    axis = Axis(1.5, levels, Dirichlet(), Dirichlet(4.0))  # data: only for the source
+    D2 = axis.second_difference()
+    expected = _reference_dirichlet(axis.size, axis.h)
+    npt.assert_allclose(tensap.dequantize_operator(D2), expected, atol=1e-9)
+    npt.assert_allclose(axis.second_difference_matrix().toarray(), expected)
+    assert max(D2.ranks, default=1) <= 5  # independent of the number of cells
+    # symmetric negative definite
+    assert np.all(np.linalg.eigvalsh(expected) < 0)
+
+
+def test_axis_periodic_second_difference():
+    axis = Axis(1.0, 4, periodic=True)
+    N, h = axis.size, axis.h
+    expected = (np.roll(np.eye(N), 1, axis=1) + np.roll(np.eye(N), -1, axis=1)
+                - 2 * np.eye(N)) / h**2
+    npt.assert_allclose(tensap.dequantize_operator(axis.second_difference()), expected,
+                        atol=1e-9)
+    npt.assert_allclose(axis.second_difference_matrix().toarray(), expected)
+
+
+def test_axis_errors():
+    with pytest.raises(ValueError):
+        Axis(0.0, 3)
+    with pytest.raises(ValueError):
+        Axis(1.0, 0)
+    with pytest.raises(ValueError):
+        Axis(1.0, 3, Dirichlet(), periodic=True)
+    with pytest.raises(TypeError):
+        Axis(1.0, 3, "dirichlet")
+    with pytest.raises(NotImplementedError):  # step 3 of P4c
+        Axis(1.0, 3, Neumann()).second_difference()
+
+    class Robin(BoundaryCondition):
+        pass
+
+    with pytest.raises(NotImplementedError):
+        Axis(1.0, 3, Robin()).second_difference_matrix()
+
+
+# --- grids ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
+def test_grid_laplacian(ordering):
+    axes = [Axis(2.0, 4), Axis(1.0, 3), Axis(0.5, 2, periodic=True)]
+    grid = Grid(axes, ordering)
+    assert grid.dim == 3 and grid.shape == (16, 8, 4)
+    A = grid.laplacian()
+    # oracle: Kronecker sum of the 1D reference matrices, unknowns in C order
+    D = [_reference_dirichlet(16, 2.0 / 16), _reference_dirichlet(8, 1.0 / 8),
+         axes[2].second_difference_matrix().toarray()]
+    I = [np.eye(16), np.eye(8), np.eye(4)]  # noqa: E741 (identities)
+    expected = (np.kron(np.kron(D[0], I[1]), I[2]) + np.kron(np.kron(I[0], D[1]), I[2])
+                + np.kron(np.kron(I[0], I[1]), D[2]))
+    npt.assert_allclose(tensap.dequantize_operator(A, grid.tensorizer), expected, atol=1e-8)
+    npt.assert_allclose(grid.laplacian_matrix().toarray(), expected)
+    # small ranks; the interleaved ordering couples the axes digit by digit
+    assert max(A.ranks) <= (6 if ordering == "blocks" else 12)
+
+
+@pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
+def test_grid_cell_centers_and_quantization(ordering, rng):
+    grid = Grid([Axis(2.0, 3), Axis(1.0, 2)], ordering)
+    x = grid.cell_centers()
+    assert x.shape == (8, 4, 2)
+    npt.assert_allclose(x[:, 0, 0], (np.arange(8) + 0.5) * 0.25)
+    npt.assert_allclose(x[0, :, 1], (np.arange(4) + 0.5) * 0.25)
+    a = rng.standard_normal((8, 4))
+    npt.assert_allclose(grid.dequantize(grid.quantize(a)), a)
+
+    def f(p):
+        return np.sin(p[:, 0]) * p[:, 1]
+
+    npt.assert_allclose(grid.dequantize(grid.quantize(f)), f(x.reshape(-1, 2)).reshape(8, 4))
+    # the Laplacian acts on the quantized arrays as the sparse matrix
+    A = grid.laplacian()
+    npt.assert_allclose(grid.dequantize(A @ grid.quantize(a)).ravel(),
+                        grid.laplacian_matrix() @ a.ravel(), atol=1e-8)
+
+
+def test_grid_errors():
+    with pytest.raises(ValueError):
+        Grid([Axis(1.0, 2)], ordering="natural")
+    assert "blocks" in repr(Grid([Axis(1.0, 2)]))
+
+
+# --- tensor products in a layout (qtt.py) --------------------------------------------
+
+
+@pytest.mark.parametrize("ordering_type", [1, 2])
+def test_layout_product_and_embed(rng, ordering_type):
+    t = tensap.Tensorizer(2, [3, 1, 2], 3)
+    t.ordering_type = ordering_type
+    vectors = [rng.standard_normal(2**L) for L in t.levels]
+    v = tensap.qtt_layout_product([tensap.quantize(u) for u in vectors], t)
+    npt.assert_allclose(tensap.dequantize(v, t), np.einsum("i,j,k->ijk", *vectors))
+    matrices = [rng.standard_normal((2**L, 2**L)) for L in t.levels]
+    A = tensap.qtt_layout_product([tensap.quantize_operator(m) for m in matrices], t)
+    npt.assert_allclose(tensap.dequantize_operator(A, t),
+                        np.kron(np.kron(matrices[0], matrices[1]), matrices[2]))
+    E = tensap.qtt_embed(tensap.quantize_operator(matrices[2]), 2, t)
+    npt.assert_allclose(tensap.dequantize_operator(E, t),
+                        np.kron(np.eye(16), matrices[2]))
+
+
+def test_layout_product_errors(rng):
+    t = tensap.Tensorizer(2, [2, 2], 2)
+    x = tensap.quantize(rng.standard_normal(4))
+    with pytest.raises(ValueError):
+        tensap.qtt_layout_product([x], t)
+    with pytest.raises(TypeError):
+        tensap.qtt_layout_product([x, tensap.qtt_identity(2)], t)
+    with pytest.raises(ValueError):
+        tensap.qtt_layout_product([x, tensap.quantize(rng.standard_normal(8))], t)
