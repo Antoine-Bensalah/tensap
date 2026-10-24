@@ -61,8 +61,6 @@ def test_quantize_wrong_shapes():
     with pytest.raises(ValueError):
         tensap.quantize(np.ones(6))
     with pytest.raises(ValueError):
-        tensap.quantize(np.ones((4, 8)))
-    with pytest.raises(ValueError):
         tensap.quantize(np.ones(8), tensap.Tensorizer(2, 4, 1))
     with pytest.raises(ValueError):
         tensap.dequantize(tensap.quantize(np.ones(8)), dim=2)
@@ -99,20 +97,69 @@ def test_quantize_operator_sparse_and_errors():
         tensap.dequantize_operator(A, tensap.Tensorizer(2, 2, 1))
 
 
+# --- rectangular grids: one number of digits per axis ------------------------------
+
+
+@pytest.mark.parametrize("ordering_type", [1, 2])
+def test_quantize_rectangle(rng, ordering_type):
+    t = _tensorizer(2, [2, 4], 2, ordering_type)
+    npt.assert_array_equal(t.levels, [2, 4])
+    a = rng.standard_normal((4, 16))
+    x = tensap.quantize(a, t)
+    assert x.order == 6
+    npt.assert_allclose(tensap.dequantize(x, t), a)
+    # interleaved: digits aligned on the most significant one,
+    # (i_1, j_1, i_2, j_2, j_3, j_4)
+    positions = [list(p) for p in t.digit_positions()]
+    assert positions == ([[0, 1], [2, 3, 4, 5]] if ordering_type == 1
+                         else [[0, 2], [1, 3, 4, 5]])
+    i, j = 2, 11  # digits (1, 0) and (1, 0, 1, 1)
+    digits = np.zeros(6, dtype=int)
+    digits[positions[0]] = [1, 0]
+    digits[positions[1]] = [1, 0, 1, 1]
+    assert np.isclose(x.full().numpy()[tuple(digits)], a[i, j])
+    m = rng.standard_normal((64, 64))
+    A = tensap.quantize_operator(m, t)
+    npt.assert_allclose(tensap.dequantize_operator(A, t), m)
+    w = rng.standard_normal((4, 16))
+    npt.assert_allclose(tensap.dequantize(A @ tensap.quantize(w, t), t).ravel(), m @ w.ravel())
+
+
+def test_default_layout_of_a_rectangle(rng):
+    a = rng.standard_normal((4, 8))
+    x = tensap.quantize(a)
+    t = tensap.qtt.default_tensorizer(a.shape)
+    npt.assert_array_equal(t.levels, [2, 3])
+    npt.assert_allclose(tensap.dequantize(x, t), a)
+
+
+def test_tensorizer_with_one_resolution_per_dimension():
+    for ordering_type in [1, 2]:
+        t = _tensorizer(2, [3, 1, 2], 3, ordering_type)
+        x = np.random.default_rng(0).random((20, 3))
+        z = t.map(x)
+        assert z.shape == (20, 6 + 3)
+        npt.assert_allclose(t.inverse_map(z), x)
+    with pytest.raises(ValueError):
+        tensap.Tensorizer(2, [3, 2], 3)
+
+
 # --- link with the Tensorizer --------------------------------------------------------
 
 
 @pytest.mark.parametrize("ordering_type", [1, 2])
 @pytest.mark.parametrize("y0", [0.0, 0.5])
-def test_quantize_function_is_the_tensorized_function(ordering_type, y0):
-    t = _tensorizer(2, 3, 2, ordering_type)
+@pytest.mark.parametrize("levels", [3, [2, 4]])
+def test_quantize_function_is_the_tensorized_function(ordering_type, y0, levels):
+    t = _tensorizer(2, levels, 2, ordering_type)
 
     def f(x):
         return np.cos(x[:, 0]) + x[:, 0] * x[:, 1] ** 2
 
     x = tensap.quantize_function(f, t, y0=y0)
     g = t.tensorize(f)
-    digits = tensap.integer2baseb(np.arange(2**6), 2, 6)  # all the digit tuples
+    D = int(t.levels.sum())
+    digits = tensap.integer2baseb(np.arange(2**D), 2, D)  # all the digit tuples
     z = np.hstack((digits, np.full((digits.shape[0], 2), y0)))
     npt.assert_allclose(x.full().numpy().ravel(), g.fun(z))
 

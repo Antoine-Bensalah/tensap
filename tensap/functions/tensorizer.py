@@ -31,8 +31,9 @@ class Tensorizer:
     ----------
     b : int
         The base of the map.
-    d : int
-        The resolution of the map.
+    d : int or list of int
+        The resolution of the map: the number of digits, the same for all the
+        dimensions (int) or one per dimension (list of length dim).
     dim : int
         The input dimension of the function to be tensorized.
     X : tensap.RandomVector
@@ -57,12 +58,18 @@ class Tensorizer:
         or from [0,1]^dim to {{0, ..., b-1}^dim}^d x [0,1]^dim if property
         orderingType == 2.
 
+        With one resolution per dimension (d = [d_1, ..., d_dim]), dimension k
+        has d_k digits. The interleaved ordering then takes the first digit of
+        every dimension, then the second digit of the dimensions that have
+        one, and so on (digits aligned on the most significant one).
+
         Parameters
         ----------
         b : int
         The base of the map.
-        d : int
-            The resolution of the map.
+        d : int or list of int
+            The resolution of the map, for all the dimensions or one per
+            dimension.
         dim : int, optional
             The input dimension of the function to be tensorized. The default
             is 1.
@@ -84,6 +91,8 @@ class Tensorizer:
         self.dim = dim
         self.b = b
         self.d = d
+        if np.ndim(d) != 0 and len(d) != dim:
+            raise ValueError("d must be an integer or a list of dim integers.")
 
         self.ordering_type = 1
 
@@ -100,6 +109,35 @@ class Tensorizer:
             self.Y = Y
         else:
             self.Y = tensap.RandomVector(tensap.UniformRandomVariable(0, 1), self.dim)
+
+    @property
+    def levels(self):
+        """Number of digits of each dimension, array of length dim."""
+        return np.broadcast_to(np.asarray(self.d, dtype=int), (self.dim,)).copy()
+
+    def digit_positions(self):
+        """Positions of the digits of each dimension in z = (i, y).
+
+        Returns
+        -------
+        list of numpy.ndarray
+            For each dimension k, the positions of its digits (most
+            significant first) among the sum(levels) digits of z.
+        """
+        levels = self.levels
+        if self.ordering_type == 1:
+            offsets = np.concatenate(([0], np.cumsum(levels)))
+            return [np.arange(offsets[k], offsets[k + 1]) for k in range(self.dim)]
+        if self.ordering_type == 2:
+            positions = [[] for _ in range(self.dim)]
+            position = 0
+            for level in range(levels.max()):
+                for k in range(self.dim):
+                    if level < levels[k]:
+                        positions[k].append(position)
+                        position += 1
+            return [np.array(p, dtype=int) for p in positions]
+        raise ValueError("Wrong ordering_type")
 
     def map(self, x, nargout=1):
         """
@@ -126,23 +164,16 @@ class Tensorizer:
             x = np.reshape(x, [-1, 1])
 
         y = []
-        i = []
+        positions = self.digit_positions()
+        levels = self.levels
+        i = np.zeros((x.shape[0], levels.sum()), dtype=int)
         for k in range(self.dim):
             uk = self.X.random_variables[k].cdf(x[:, k])
-            y.append(Tensorizer.u2z(uk, self.b, self.d))
+            y.append(Tensorizer.u2z(uk, self.b, levels[k]))
             y[k][:, -1] = self.Y.random_variables[k].icdf(y[k][:, -1])
-            i.append(y[k][:, :-1])
+            i[:, positions[k]] = y[k][:, :-1]
             y[k] = y[k][:, -1]
         y = np.transpose(y)
-        i = np.hstack(i)
-
-        if self.ordering_type == 2:
-            j = []
-            for k in range(self.d):
-                j.append(i[:, np.arange(k, i.shape[1], self.d)])
-            i = np.hstack(j)
-        elif self.ordering_type != 1:
-            raise ValueError("Wrong ordering_type")
 
         if nargout == 2:
             return y, i
@@ -166,14 +197,9 @@ class Tensorizer:
         """
         z = np.atleast_2d(z)
         u = []
+        positions = self.digit_positions()
         for k in range(self.dim):
-            if self.ordering_type == 1:
-                ik = z[:, np.arange(self.d) + k * self.d]
-            elif self.ordering_type == 2:
-                ik = z[:, np.arange(k, self.dim * self.d, self.dim)]
-            else:
-                raise ValueError("Wrong ordering_type")
-
+            ik = z[:, positions[k]]
             zk = z[:, -self.dim + k]
             zk = self.Y.random_variables[k].cdf(zk)
             u.append(Tensorizer.z2u(np.hstack((ik, np.reshape(zk, [-1, 1]))), self.b))
@@ -209,7 +235,7 @@ class Tensorizer:
             fun.evaluation_at_multiple_points = True
 
         f = tensap.UserDefinedFunction(
-            lambda z: fun(self.inverse_map(z)), (self.d + 1) * self.dim
+            lambda z: fun(self.inverse_map(z)), int(self.levels.sum()) + self.dim
         )
         f.evaluation_at_multiple_points = fun.evaluation_at_multiple_points
         return tensap.TensorizedFunction(f, self)
@@ -258,7 +284,7 @@ class Tensorizer:
         )
         p = tensap.PolynomialFunctionalBasis(p, np.arange(self.b))
 
-        bases = [p] * self.d * self.dim + list(h.bases)
+        bases = [p] * int(self.levels.sum()) + list(h.bases)
         return tensap.FunctionalBases(bases)
 
     @staticmethod

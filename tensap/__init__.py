@@ -58,6 +58,7 @@ from .tensor_algebra.tools.convert_tensors import convert_tensors
 from .tensor_algebra.tools.laplacian_like_operator_factory import (
     LaplacianLikeOperatorFactory,
 )
+from .tensor_algebra.tools import qtt
 from .tensor_algebra.tools.qtt import (
     quantize,
     dequantize,

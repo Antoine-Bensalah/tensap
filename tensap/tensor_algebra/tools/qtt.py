@@ -4,8 +4,8 @@
 """
 Module qtt: quantized tensor-train (QTT) representations.
 
-An array of size b^L along each of its dim axes is reshaped into a tensor of
-order L * dim with dimensions of size b, then stored as a TTTensor; a matrix
+An array of size b^L_k along its axis k (k = 1, ..., dim) is reshaped into a
+tensor of order L_1 + ... + L_dim with dimensions of size b, then stored as a TTTensor; a matrix
 acting on such arrays becomes a TTOperator with cores of size b x b.
 
 The layout (base b, number L of digits per axis, number dim of axes, order of
@@ -25,8 +25,6 @@ matrices and corner blocks. They contain no discretization choice (stencils
 and boundary conditions are built on top of them).
 """
 
-from typing import Optional
-
 import numpy as np
 import tensap
 
@@ -34,55 +32,42 @@ import tensap
 # --- layout -----------------------------------------------------------------------
 
 
-def _layout(shape, tensorizer: Optional["tensap.Tensorizer"], base: int = 2):
-    """(b, L, dim, ordering_type) for an array of the given shape."""
-    shape = tuple(int(n) for n in shape)
-    if tensorizer is None:
-        L = _number_of_digits(shape[0], base)
-        if any(n != shape[0] for n in shape):
-            raise ValueError(
-                "All the axes must have the same size b^L (one number of digits "
-                "for all the axes, as in Tensorizer)."
-            )
-        return base, L, len(shape), 1
-    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
-    if shape != (b**L,) * dim:
-        raise ValueError(f"Expected an array of shape {(b**L,) * dim}, got {shape}.")
-    return b, L, dim, tensorizer.ordering_type
+def default_tensorizer(shape, base: int = 2) -> "tensap.Tensorizer":
+    """Tensorizer of the default layout of an array: base b, the number of
+    digits of each axis deduced from its size, blocks, [0, 1]^dim."""
+    levels = [_number_of_digits(int(n), base) for n in shape]
+    return tensap.Tensorizer(base, levels if len(set(levels)) > 1 else levels[0], len(levels))
 
 
 def _number_of_digits(n: int, b: int) -> int:
-    L = int(round(np.log(n) / np.log(b)))
+    L = int(round(np.log(n) / np.log(b))) if n > 1 else 0
     if L < 1 or b**L != n:
         raise ValueError(f"The size {n} is not a power b^L of the base b = {b}.")
     return L
 
 
-def _digit_permutation(L: int, dim: int, ordering_type: int) -> np.ndarray:
-    """Axes of the block-ordered digit tensor, in the order of the layout."""
-    if ordering_type == 1:
-        return np.arange(L * dim)
-    if ordering_type == 2:
-        return np.arange(L * dim).reshape(dim, L).T.ravel()
-    raise ValueError("ordering_type must be 1 (blocks) or 2 (interleaved).")
+def _check_shape(shape, tensorizer):
+    expected = tuple(int(tensorizer.b) ** int(L) for L in tensorizer.levels)
+    if tuple(shape) != expected:
+        raise ValueError(f"Expected an array of shape {expected}, got {tuple(shape)}.")
 
 
-def default_tensorizer(shape, base: int = 2) -> "tensap.Tensorizer":
-    """Tensorizer of the default layout of an array: base b, blocks, [0, 1]^dim."""
-    b, L, dim, _ = _layout(shape, None, base)
-    return tensap.Tensorizer(b, L, dim)
-
+def _permutation(tensorizer) -> np.ndarray:
+    """perm such that the digits in the layout of the tensorizer are the
+    block-ordered digits (C-order reshape) transposed by perm."""
+    positions = np.concatenate(tensorizer.digit_positions())
+    return np.argsort(positions)
 
 # --- vectors and arrays -----------------------------------------------------------
 
 
 def quantize(array, tensorizer=None, tolerance: float = 1e-12, base: int = 2):
-    """QTT representation of an array of shape (b^L, ..., b^L).
+    """QTT representation of an array of shape (b^L_1, ..., b^L_dim).
 
     Parameters
     ----------
     array : numpy.ndarray or tensap.FullTensor
-        Vector of size b^L, or array with dim axes of size b^L.
+        Vector of size b^L, or array with axes of sizes b^L_k.
     tensorizer : tensap.Tensorizer, optional
         Layout (b, L, dim, ordering_type). The default is deduced from the
         shape: base `base`, blocks.
@@ -98,13 +83,16 @@ def quantize(array, tensorizer=None, tolerance: float = 1e-12, base: int = 2):
         Tensor of order L * dim with dimensions of size b.
     """
     a = np.asarray(getattr(array, "data", array), dtype=float)
-    b, L, dim, ordering = _layout(a.shape, tensorizer, base)
-    digits = a.reshape([b] * (L * dim)).transpose(_digit_permutation(L, dim, ordering))
+    if tensorizer is None:
+        tensorizer = default_tensorizer(a.shape, base)
+    _check_shape(a.shape, tensorizer)
+    b = tensorizer.b
+    digits = a.reshape([b] * int(tensorizer.levels.sum())).transpose(_permutation(tensorizer))
     return tensap.TTTensor.from_full(digits, tolerance)
 
 
 def dequantize(tensor, tensorizer=None, dim: int = 1) -> np.ndarray:
-    """Inverse of quantize: the array of shape (b^L,) * dim.
+    """Inverse of quantize: the array of shape (b^L_1, ..., b^L_dim).
 
     Parameters
     ----------
@@ -117,16 +105,14 @@ def dequantize(tensor, tensorizer=None, dim: int = 1) -> np.ndarray:
         Number of axes when no tensorizer is given. The default is 1.
     """
     if tensorizer is None:
-        b = int(tensor.shape[0])
         if tensor.order % dim:
             raise ValueError("The order must be a multiple of dim.")
-        L, ordering = tensor.order // dim, 1
-    else:
-        b, L, dim, ordering = tensorizer.b, tensorizer.d, tensorizer.dim, tensorizer.ordering_type
-        if tensor.order != L * dim:
-            raise ValueError(f"Expected a tensor of order {L * dim}, got {tensor.order}.")
-    digits = tensor.numpy().transpose(np.argsort(_digit_permutation(L, dim, ordering)))
-    return digits.reshape([b**L] * dim)
+        tensorizer = tensap.Tensorizer(int(tensor.shape[0]), tensor.order // dim, dim)
+    b, levels = tensorizer.b, tensorizer.levels
+    if tensor.order != levels.sum():
+        raise ValueError(f"Expected a tensor of order {levels.sum()}, got {tensor.order}.")
+    digits = tensor.numpy().transpose(np.argsort(_permutation(tensorizer)))
+    return digits.reshape([b**int(L) for L in levels])
 
 
 def quantize_function(fun, tensorizer, y0: float = 0.0, tolerance: float = 1e-12):
@@ -153,15 +139,14 @@ def quantize_function(fun, tensorizer, y0: float = 0.0, tolerance: float = 1e-12
     """
     points = grid_points(tensorizer, y0)
     values = np.asarray(fun(points.reshape(-1, tensorizer.dim)), dtype=float)
-    return quantize(values.reshape([tensorizer.b**tensorizer.d] * tensorizer.dim),
-                    tensorizer, tolerance)
+    return quantize(values.reshape(points.shape[:-1]), tensorizer, tolerance)
 
 
 def grid_points(tensorizer, y0: float = 0.0) -> np.ndarray:
-    """Points of the grid of tensorizer, array of shape (b^L, ..., b^L, dim)."""
-    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
+    """Points of the grid of tensorizer, array of shape (b^L_1, ..., b^L_dim, dim)."""
+    b = tensorizer.b
     axes = []
-    for k in range(dim):
+    for k, L in enumerate(tensorizer.levels):
         u = (np.arange(b**L) + tensorizer.Y.random_variables[k].cdf(np.array([y0]))) / b**L
         axes.append(tensorizer.X.random_variables[k].icdf(u))
     return np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1)
@@ -175,8 +160,8 @@ def to_functional_tensor(tensor, tensorizer):
     constant basis in y). The geometry comes from the tensorizer, which is
     therefore required.
     """
-    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
-    if tensor.order != L * dim or np.any(tensor.shape != b):
+    b, dim, D = tensorizer.b, tensorizer.dim, int(tensorizer.levels.sum())
+    if tensor.order != D or np.any(tensor.shape != b):
         raise ValueError("The tensor does not have the layout of the tensorizer.")
     # one core of size 1 per axis for the variable y (constant basis)
     cores = list(tensor.cores) + [np.ones((1, 1, 1))] * dim
@@ -186,7 +171,7 @@ def to_functional_tensor(tensor, tensorizer):
         [tensap.PolynomialFunctionalBasis(y.orthonormal_polynomials(), [0])
          for y in tensorizer.Y.random_variables]
     )
-    bases = tensap.FunctionalBases([digits] * (L * dim) + list(constant.bases))
+    bases = tensap.FunctionalBases([digits] * D + list(constant.bases))
     return tensap.TensorizedFunction(tensap.FunctionalTensor(full, bases), tensorizer)
 
 
@@ -214,11 +199,11 @@ def quantize_operator(matrix, tensorizer=None, tolerance: float = 1e-12, base: i
         raise ValueError("The matrix must be square.")
     if tensorizer is None:
         tensorizer = default_tensorizer([N], base)
-    b, L, dim = tensorizer.b, tensorizer.d, tensorizer.dim
-    if N != b ** (L * dim):
-        raise ValueError(f"Expected a matrix of size {b ** (L * dim)}, got {N}.")
-    D = L * dim
-    perm = _digit_permutation(L, dim, tensorizer.ordering_type)
+    b = tensorizer.b
+    D = int(tensorizer.levels.sum())
+    if N != b**D:
+        raise ValueError(f"Expected a matrix of size {b**D}, got {N}.")
+    perm = _permutation(tensorizer)
     digits = m.reshape([b] * (2 * D)).transpose(np.concatenate((perm, perm + D)))
     # pair the digits (i_k, j_k), then TT-SVD on the paired indices of size b^2
     paired = digits.transpose(np.ravel(np.column_stack((np.arange(D), np.arange(D) + D))))
@@ -231,14 +216,12 @@ def dequantize_operator(operator, tensorizer=None) -> np.ndarray:
     D = operator.order
     b = operator.shape[0][0]
     if tensorizer is None:
-        L, dim, ordering = D, 1, 1
-    else:
-        L, dim, ordering = tensorizer.d, tensorizer.dim, tensorizer.ordering_type
-        if D != L * dim:
-            raise ValueError(f"Expected an operator of order {L * dim}, got {D}.")
+        tensorizer = tensap.Tensorizer(b, D, 1)
+    if D != tensorizer.levels.sum():
+        raise ValueError(f"Expected an operator of order {tensorizer.levels.sum()}, got {D}.")
     # full: (i_1, j_1, ..., i_D, j_D) -> (i_1, ..., i_D, j_1, ..., j_D)
     a = operator.numpy().transpose(list(range(0, 2 * D, 2)) + list(range(1, 2 * D, 2)))
-    inverse = np.argsort(_digit_permutation(L, dim, ordering))
+    inverse = np.argsort(_permutation(tensorizer))
     a = a.transpose(np.concatenate((inverse, inverse + D)))
     return a.reshape(b**D, b**D)
 
