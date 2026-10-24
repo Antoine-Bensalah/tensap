@@ -69,6 +69,8 @@ from .tensor_algebra.tools.qtt import (
     to_functional_tensor,
     qtt_layout_product,
     qtt_embed,
+    qtt_insert_axis,
+    qtt_elementary_vector,
     qtt_identity,
     qtt_shift,
     qtt_elementary_matrix,

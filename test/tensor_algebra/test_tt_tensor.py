@@ -212,6 +212,13 @@ def test_from_full_and_from_diagonal(rng):
     npt.assert_allclose(TTTensor.from_diagonal_tensor(d1).numpy(), d1.full().numpy())
 
 
+def test_from_full_zero_tensor():
+    # used to fail: relative truncation of the SVD of a zero matrix
+    x = TTTensor.from_full(np.zeros((2, 3, 4)))
+    assert x.ranks == (1, 1)
+    npt.assert_array_equal(x.numpy(), np.zeros((2, 3, 4)))
+
+
 def test_as_tt_tensor(rng):
     from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor
     x = _tt(rng)

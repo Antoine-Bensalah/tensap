@@ -299,6 +299,66 @@ def qtt_embed(operator, axis: int, tensorizer):
     return qtt_layout_product(factors, tensorizer)
 
 
+def qtt_insert_axis(face, axis: int, vector, tensorizer):
+    """Tensor product of a tensor on a face with a rank-one vector of one axis.
+
+    face is a TTTensor on the other axes, in their layout (the layout of
+    tensorizer without the axis: the relative order of their digits is
+    unchanged by the removal); vector is a TTTensor of rank one on the axis.
+    The result, on the whole layout, is the tensor u(..., i_axis, ...) =
+    vector(i_axis) face(...): the cores of the vector are inserted at the
+    positions of the digits of the axis, carrying the current rank.
+
+    Parameters
+    ----------
+    face : tensap.TTTensor or float
+        Tensor on the other axes (a float for a one-dimensional layout).
+    axis : int
+    vector : tensap.TTTensor
+        Of rank one, with tensorizer.levels[axis] cores.
+    tensorizer : tensap.Tensorizer
+
+    Returns
+    -------
+    tensap.TTTensor
+    """
+    if any(r != 1 for r in vector.ranks):
+        raise ValueError("The vector must be of rank one.")
+    positions = tensorizer.digit_positions()
+    inserted = set(int(q) for q in positions[axis])
+    if vector.order != len(inserted):
+        raise ValueError(f"The vector must have {len(inserted)} cores.")
+    D = int(tensorizer.levels.sum())
+    if tensorizer.dim == 1:
+        return tensap.TTTensor([c * (float(face) if k == 0 else 1.0)
+                                for k, c in enumerate(vector.cores)])
+    if face.order != D - len(inserted):
+        raise ValueError(f"The face tensor must have {D - len(inserted)} cores.")
+    cores, k_face, k_vec, rank = [], 0, 0, 1
+    for q in range(D):
+        if q in inserted:
+            digit = vector.cores[k_vec][0, :, 0]
+            cores.append(np.einsum("ab,i->aib", np.eye(rank), digit))
+            k_vec += 1
+        else:
+            core = face.cores[k_face]
+            cores.append(core)
+            rank = core.shape[-1]
+            k_face += 1
+    return tensap.TTTensor(cores)
+
+
+def qtt_elementary_vector(L: int, i: int, b: int = 2) -> "tensap.TTTensor":
+    """Canonical vector e_i of size b^L, of rank 1."""
+    digits = tensap.integer2baseb(np.array([i]), b, L)[0]
+    cores = []
+    for p in digits:
+        core = np.zeros((1, b, 1))
+        core[0, p, 0] = 1.0
+        cores.append(core)
+    return tensap.TTTensor(cores)
+
+
 # --- QTT primitives of 1D operators on N = b^L points ------------------------------
 
 

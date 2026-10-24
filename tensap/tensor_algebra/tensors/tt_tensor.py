@@ -419,6 +419,10 @@ class TTTensor(BaseTTTensor):
     def from_full(cls, tensor, tolerance: float = 0.0) -> "TTTensor":
         """TT-SVD of a dense tensor (exact for tolerance = 0)."""
         a = np.asarray(getattr(tensor, "data", tensor), dtype=float)
+        if not np.any(a):
+            # zero tensor: rank one (the SVDs of zero matrices are not defined
+            # for the relative truncation)
+            return cls([np.zeros((1, n, 1)) for n in a.shape])
         truncator = tensap.Truncator(tolerance=tolerance)
         local_tolerance = tolerance / np.sqrt(max(a.ndim - 1, 1))
         cores, r = [], 1

@@ -21,8 +21,14 @@ method):
 - periodic axis: the neighbour across the face is the cell at the other end
   (circulant matrix).
 
+The operators only depend on the types of the conditions; the data g enter the
+boundary source s, so that Delta u ~ Delta_h u + s at the cell centres, and
+-Delta u = f becomes -Delta_h u = f + s.
+
 The operators are tensap.TTOperator objects built from the QTT primitives of
-tensap (qtt_banded, qtt_corner), assembled in dimension d by qtt_embed.
+tensap (qtt_banded, qtt_corner), assembled in dimension d by qtt_embed; the
+source of a face is e_0 (or e_{N-1}) of the normal axis times the data on the
+face, built in QTT by qtt_insert_axis (no array of the size of the grid).
 """
 
 import numpy as np
@@ -96,6 +102,23 @@ class Axis:
                                             self.levels, corner)
             D2 = tensap.Truncator(tolerance=tolerance).truncate(D2)
         return D2 * (1.0 / self.h**2)
+
+    def boundary_weight(self, side: str) -> float:
+        """Weight of the data g of the condition of a side in the source of the
+        first (left) or last (right) cell: 2 / h^2 for Dirichlet."""
+        condition = self._condition(side)
+        if isinstance(condition, Dirichlet):
+            return 2.0 / self.h**2
+        if isinstance(condition, Neumann):
+            raise NotImplementedError("Neumann conditions: step 3 of P4c.")
+        raise NotImplementedError(f"No finite volume closure for {condition!r}.")
+
+    def _condition(self, side: str) -> BoundaryCondition:
+        if self.periodic:
+            raise ValueError("A periodic axis has no boundary.")
+        if side not in ("left", "right"):
+            raise ValueError("side must be 'left' or 'right'.")
+        return self.left if side == "left" else self.right
 
     def second_difference_matrix(self):
         """The same matrix with scipy.sparse (reference for the tests)."""
@@ -184,6 +207,97 @@ class Grid:
                 term = sp.kron(term, block)
             result = term if result is None else result + term
         return result.tocsr()
+
+    def boundary_source(self, data=None, tolerance: float = 1e-12) -> "tensap.TTTensor":
+        """The source s of the boundary data: Delta u ~ Delta_h u + s.
+
+        Parameters
+        ----------
+        data : dict, optional
+            {(axis, side): g}, side "left" (x_axis = 0) or "right"
+            (x_axis = L_axis), g a scalar, a function of the points of the
+            face (array of shape (n, dim - 1), the coordinates of the other
+            axes in their order), or a TTTensor on the face, in the layout of
+            face_tensorizer(axis). The default takes the values of the
+            conditions of the axes. Missing faces have no data (g = 0).
+        tolerance : float, optional
+            Precision of the quantization of sampled data and of the rounding
+            of the sum of the faces.
+
+        Returns
+        -------
+        tensap.TTTensor
+            Zero away from the faces; on the cell next to a face, the weight of
+            the closure times g (2 g / h^2 for Dirichlet). Built in QTT, face
+            by face.
+        """
+        if data is None:
+            data = {}
+            for k, axis in enumerate(self.axes):
+                if not axis.periodic:
+                    for side in ("left", "right"):
+                        data[(k, side)] = axis._condition(side).value
+        result = None
+        for (k, side), g in data.items():
+            axis = self.axes[k]
+            weight = axis.boundary_weight(side)
+            if not callable(g) and not isinstance(g, tensap.TTTensor) and g == 0:
+                continue
+            index = 0 if side == "left" else axis.size - 1
+            vector = tensap.qtt_elementary_vector(axis.levels, index) * weight
+            face = self._face_tensor(k, g, tolerance)
+            term = tensap.qtt_insert_axis(face, k, vector, self.tensorizer)
+            result = term if result is None else result + term
+        if result is None:
+            return tensap.TTTensor([np.zeros((1, 2, 1))] * int(self.tensorizer.levels.sum()))
+        return tensap.Truncator(tolerance=tolerance).truncate(result)
+
+    def face_tensorizer(self, axis: int) -> "tensap.Tensorizer":
+        """Tensorizer of the face normal to axis: the other axes, same ordering."""
+        others = [a for j, a in enumerate(self.axes) if j != axis]
+        X = tensap.RandomVector([a.random_variable() for a in others])
+        t = tensap.Tensorizer(2, [a.levels for a in others], len(others), X=X)
+        t.ordering_type = self.tensorizer.ordering_type
+        return t
+
+    def _face_tensor(self, axis, g, tolerance):
+        """The data g on the face normal to axis, as a QTT on the face."""
+        if self.dim == 1:
+            if callable(g) or isinstance(g, tensap.TTTensor):
+                raise TypeError("In dimension 1, the data of a face is a scalar.")
+            return float(g)
+        t = self.face_tensorizer(axis)
+        if isinstance(g, tensap.TTTensor):
+            if g.order != int(t.levels.sum()):
+                raise ValueError("The face tensor does not have the layout of the face.")
+            return g
+        if callable(g):
+            return tensap.quantize_function(g, t, 0.5, tolerance)
+        cores = [np.ones((1, 2, 1))] * int(t.levels.sum())
+        return tensap.TTTensor(cores) * float(g)
+
+    def boundary_source_array(self, data=None) -> np.ndarray:
+        """The same source as a dense array (reference for the tests)."""
+        if data is None:
+            data = {(k, side): a._condition(side).value for k, a in enumerate(self.axes)
+                    if not a.periodic for side in ("left", "right")}
+        s = np.zeros(self.shape)
+        x = self.cell_centers()
+        for (k, side), g in data.items():
+            axis = self.axes[k]
+            index = 0 if side == "left" else axis.size - 1
+            face_points = np.take(x, index, axis=k)
+            face_points = np.delete(face_points, k, axis=-1)
+            if isinstance(g, tensap.TTTensor):
+                values = tensap.dequantize(g, self.face_tensorizer(k))
+            elif callable(g):
+                values = g(face_points.reshape(-1, self.dim - 1)).reshape(face_points.shape[:-1])
+            else:
+                values = float(g)
+            slicer = [slice(None)] * self.dim
+            slicer[k] = index
+            s[tuple(slicer)] += axis.boundary_weight(side) * values
+        return s
 
     def quantize(self, values, tolerance: float = 1e-12) -> "tensap.TTTensor":
         """QTT of a function at the cell centres (sampled on the whole grid),

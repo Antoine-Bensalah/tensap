@@ -3,7 +3,7 @@
 
 """
 Tutorial: Poisson equation on a rectangle in QTT format, by cell-centred
-finite volumes.
+finite volumes, with homogeneous and non-homogeneous Dirichlet conditions.
 
 No MATLAB counterpart: ApproximationToolbox has no quantized tensor trains.
 
@@ -29,7 +29,11 @@ Steps
    compared with scipy.sparse.linalg.spsolve, for the two orderings of the
    digits (blocks: all the digits of x, then those of y; interleaved: one digit
    of x, one digit of y, ...);
-3. the order of convergence on a manufactured solution.
+3. the order of convergence on a manufactured solution;
+4. non-homogeneous Dirichlet conditions: the data g enter the boundary source
+   s (Delta u ~ Delta_h u + s), built in QTT face by face from e_0 (or
+   e_{N-1}) of the normal axis and the data on the face: order 2 on a harmonic
+   function, then a "lid" problem (u = 1 on the top wall, 0 elsewhere).
 """
 
 # %% Imports
@@ -55,9 +59,10 @@ def make_grid(lx, ly, ordering="blocks"):
 
 
 def solve(grid, f, tolerance=1e-8):
-    """- Delta u = f by truncated PCG (no preconditioner)."""
+    """- Delta u = f by truncated PCG (no preconditioner): - Delta_h u = f + s,
+    s the boundary source of the data of the conditions of the grid."""
     A = -1.0 * grid.laplacian()
-    b = grid.quantize(f, tolerance=1e-10)
+    b = grid.quantize(f, tolerance=1e-10) + grid.boundary_source()
     solver = tensap.TruncatedPCG(A, b, truncator, tolerance=tolerance,
                                  max_iterations=1000, stagnation=1e-14, display=False)
     u, output = solver.solve()
@@ -122,6 +127,52 @@ for level in [3, 4, 5]:
 ratios = np.array(errors[:-1]) / np.array(errors[1:])
 print(f"Error ratios when the cells are halved: {np.round(ratios, 2)} (order 2: 4)")
 assert np.all((ratios > 3.5) & (ratios < 4.5)), ratios
+
+# %% 4. Non-homogeneous Dirichlet conditions: order 2 on a harmonic function
+# u = exp(x) cos(y), - Delta u = 0, data g = u on the four walls (functions of
+# the coordinate along the wall). The error is measured in the discrete L2
+# norm: the maximum error is pre-asymptotic near the walls (ghost closure, local
+# truncation error O(1) in the first cells); its ratios tend to 4 more slowly
+# (3.4, 3.7, 3.8, 3.9 from 16 x 8 to 512 x 256 cells).
+
+
+def harmonic(p):
+    return np.exp(p[:, 0]) * np.cos(p[:, 1])
+
+
+def harmonic_grid(lx, ly):
+    walls_x = [Dirichlet(lambda y: harmonic(np.column_stack((np.zeros(len(y)), y[:, 0])))),
+               Dirichlet(lambda y: harmonic(np.column_stack((np.full(len(y), Lx), y[:, 0]))))]
+    walls_y = [Dirichlet(lambda x: harmonic(np.column_stack((x[:, 0], np.zeros(len(x)))))),
+               Dirichlet(lambda x: harmonic(np.column_stack((x[:, 0], np.full(len(x), Ly)))))]
+    return Grid([Axis(Lx, lx, *walls_x), Axis(Ly, ly, *walls_y)])
+
+
+errors = []
+for level in [3, 4, 5]:
+    g = harmonic_grid(level + 1, level)
+    u, _, _, b = solve(g, lambda p: np.zeros(p.shape[0]), tolerance=1e-10)
+    u_exact = harmonic(g.cell_centers().reshape(-1, 2))
+    errors.append(np.sqrt(np.mean((g.dequantize(u).ravel() - u_exact) ** 2)))
+    print(f"{g.shape[0]} x {g.shape[1]} cells: source ranks {max(b.ranks)}, "
+          f"L2 error {errors[-1]:.2e}, QTT ranks of u {max(u.ranks)}")
+ratios = np.array(errors[:-1]) / np.array(errors[1:])
+print(f"Non-homogeneous Dirichlet, error ratios: {np.round(ratios, 2)} (order 2: 4)")
+assert np.all((ratios > 3.5) & (ratios < 4.5)), ratios
+
+# %% 4 (continued). A lid: u = 1 on the top wall, u = 0 on the others
+lid = Grid([Axis(Lx, lx - 1, Dirichlet(), Dirichlet()),
+            Axis(Ly, ly - 1, Dirichlet(), Dirichlet(1.0))])
+u_lid, output, _, b_lid = solve(lid, lambda p: np.zeros(p.shape[0]))
+u_lid_reference = spla.spsolve(-lid.laplacian_matrix().tocsc(),
+                               lid.boundary_source_array().ravel()).reshape(lid.shape)
+error = np.linalg.norm(lid.dequantize(u_lid) - u_lid_reference) / np.linalg.norm(u_lid_reference)
+print(f"Lid: source ranks {max(b_lid.ranks)} (a constant on one wall), PCG "
+      f"{output['iter']} iterations, error w.r.t. spsolve {error:.1e}, "
+      f"solution ranks {max(u_lid.ranks)}")
+assert error < 1e-6, error
+# the discrete maximum principle: 0 <= u <= 1
+assert np.all(lid.dequantize(u_lid) > -1e-8) and np.all(lid.dequantize(u_lid) < 1 + 1e-8)
 
 # %% Plot of the solution for the Gaussian right-hand side
 fig, ax = plt.subplots()

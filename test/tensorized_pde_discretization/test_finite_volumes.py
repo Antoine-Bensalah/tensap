@@ -160,3 +160,105 @@ def test_layout_product_errors(rng):
         tensap.qtt_layout_product([x, tensap.qtt_identity(2)], t)
     with pytest.raises(ValueError):
         tensap.qtt_layout_product([x, tensap.quantize(rng.standard_normal(8))], t)
+
+
+# --- boundary sources (non-homogeneous conditions) -----------------------------------
+
+
+@pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
+def test_boundary_source_2d(ordering):
+    left = Dirichlet(lambda y: np.sin(3 * y[:, 0]))
+    grid = Grid([Axis(2.0, 4, left, Dirichlet(1.5)),
+                 Axis(1.0, 3, Dirichlet(), Dirichlet(lambda x: x[:, 0] ** 2))], ordering)
+    s = grid.boundary_source()  # data of the conditions
+    expected = np.zeros((16, 8))
+    x = grid.cell_centers()
+    hx, hy = 2.0 / 16, 1.0 / 8
+    expected[0, :] += 2 / hx**2 * np.sin(3 * x[0, :, 1])
+    expected[-1, :] += 2 / hx**2 * 1.5
+    expected[:, -1] += 2 / hy**2 * x[:, -1, 0] ** 2  # the corner cells get both faces
+    npt.assert_allclose(grid.dequantize(s), expected, atol=1e-10)
+    npt.assert_allclose(grid.boundary_source_array(), expected)
+
+
+@pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
+def test_boundary_source_3d_and_data_forms(ordering, rng):
+    grid = Grid([Axis(1.0, 2), Axis(1.0, 3), Axis(2.0, 2)], ordering)
+    face = rng.standard_normal((4, 8))  # data on the face normal to axis 2
+    face_qtt = tensap.quantize(face, grid.face_tensorizer(2))
+    data = {(0, "left"): lambda p: p[:, 0] * p[:, 1],
+            (2, "left"): 2.0,
+            (2, "right"): face_qtt}
+    s = grid.boundary_source(data)
+    npt.assert_allclose(grid.dequantize(s), grid.boundary_source_array(data), atol=1e-10)
+    # the face data land on the last cells of axis 2 (h = 0.5), away from the
+    # face x_0 = 0 which also has data
+    npt.assert_allclose(grid.dequantize(s)[1:, :, -1], 2 / 0.5**2 * face[1:], atol=1e-10)
+    # a homogeneous problem has a zero source
+    assert grid.boundary_source().norm() == 0
+
+
+def test_boundary_source_1d():
+    grid = Grid([Axis(1.0, 3, Dirichlet(2.0), Dirichlet(-1.0))])
+    expected = np.zeros(8)
+    expected[0], expected[-1] = 2 * 2.0 * 64, 2 * -1.0 * 64
+    npt.assert_allclose(grid.dequantize(grid.boundary_source()), expected, atol=1e-10)
+    with pytest.raises(TypeError):
+        grid.boundary_source({(0, "left"): lambda p: p})
+
+
+def test_boundary_source_errors(rng):
+    grid = Grid([Axis(1.0, 2), Axis(1.0, 2, periodic=True)])
+    with pytest.raises(ValueError):  # a periodic axis has no face
+        grid.boundary_source({(1, "left"): 1.0})
+    with pytest.raises(ValueError):
+        grid.boundary_source({(0, "top"): 1.0})
+    with pytest.raises(ValueError):  # wrong layout of the face data
+        grid.boundary_source({(0, "left"): tensap.quantize(rng.standard_normal(8))})
+    with pytest.raises(NotImplementedError):
+        Axis(1.0, 2, Neumann(1.0)).boundary_weight("left")
+
+
+@pytest.mark.parametrize("ordering", ["blocks", "interleaved"])
+def test_non_homogeneous_dirichlet_solution(ordering):
+    # -Delta_h u = f + s solved in QTT equals the sparse solve with the same data
+    from scipy.sparse.linalg import spsolve
+    grid = Grid([Axis(1.0, 3, Dirichlet(1.0), Dirichlet(lambda y: y[:, 0])),
+                 Axis(1.0, 3, Dirichlet(0.5), Dirichlet(0.0))], ordering)
+    A = -1.0 * grid.laplacian()
+    b = grid.quantize(lambda p: np.ones(p.shape[0])) + grid.boundary_source()
+    u, _ = tensap.TruncatedPCG(A, b, tensap.Truncator(tolerance=1e-12), tolerance=1e-12,
+                               max_iterations=200, stagnation=1e-15, display=False).solve()
+    rhs = 1.0 + grid.boundary_source_array()
+    expected = spsolve(-grid.laplacian_matrix().tocsc(), rhs.ravel()).reshape(grid.shape)
+    npt.assert_allclose(grid.dequantize(u), expected, rtol=1e-8)
+
+
+# --- QTT helpers for the sources (qtt.py) --------------------------------------------
+
+
+def test_elementary_vector_and_insert_axis(rng):
+    e = tensap.qtt_elementary_vector(4, 11)
+    expected = np.zeros(16)
+    expected[11] = 1.0
+    npt.assert_allclose(tensap.dequantize(e), expected)
+    for ordering_type in [1, 2]:
+        t = tensap.Tensorizer(2, [2, 3, 2], 3)
+        t.ordering_type = ordering_type
+        face_t = tensap.Tensorizer(2, [2, 2], 2)
+        face_t.ordering_type = ordering_type
+        face = rng.standard_normal((4, 4))
+        u = tensap.qtt_insert_axis(tensap.quantize(face, face_t), 1,
+                                   tensap.qtt_elementary_vector(3, 5), t)
+        dense = np.zeros((4, 8, 4))
+        dense[:, 5, :] = face
+        npt.assert_allclose(tensap.dequantize(u, t), dense, atol=1e-12)
+    with pytest.raises(ValueError):  # rank one only
+        tensap.qtt_insert_axis(tensap.quantize(face, face_t), 1,
+                               tensap.quantize(rng.standard_normal(8)), t)
+    with pytest.raises(ValueError):
+        tensap.qtt_insert_axis(tensap.quantize(face, face_t), 1,
+                               tensap.qtt_elementary_vector(2, 1), t)
+    with pytest.raises(ValueError):
+        tensap.qtt_insert_axis(tensap.quantize(rng.standard_normal(8)), 1,
+                               tensap.qtt_elementary_vector(3, 5), t)
