@@ -216,3 +216,60 @@ def test_wrong_arguments(system):
         _solver(A, b, algorithm="cg")
     with pytest.raises(ValueError):
         _solver(A, tensap.TTTensor.randn([5, 5], [2]))
+
+
+# --- AMEn ----------------------------------------------------------------------------
+
+
+def test_amen_from_rank_one(system):
+    A, b = system
+    x0 = tensap.TTTensor.ones([5, 5, 5])
+    x, output = _solver(A, b, x0=x0, algorithm="amen", tolerance=1e-10,
+                        max_iterations=20).solve()
+    npt.assert_allclose(x.full().numpy().ravel(), _dense_solution(A, b), atol=1e-10)
+    assert output["flag"] == 0
+    assert max(x.ranks) > 1
+
+
+def test_amen_max_rank_and_kick_rank(system):
+    A, b = system
+    truncator = tensap.Truncator(tolerance=1e-14, max_rank=3)
+    x, _ = _solver(A, b, algorithm="amen", truncator=truncator, kick_rank=2,
+                   max_iterations=4).solve()
+    assert max(x.ranks) <= 3
+
+
+@pytest.mark.parametrize("d", [1, 2, 4])
+def test_amen_orders(d):
+    np.random.seed(5)
+    A = _laplacian(4, d, shift=1.0)
+    b = tensap.TTTensor.randn([4] * d, [2] * (d - 1))
+    x, _ = _solver(A, b, algorithm="amen", tolerance=1e-11, max_iterations=20).solve()
+    npt.assert_allclose(x.full().numpy().ravel(), _dense_solution(A, b), atol=1e-9)
+
+
+def test_amen_matrix_free_non_symmetric():
+    np.random.seed(6)
+    n, d = 5, 3
+    A = _laplacian(n, d, shift=5.0) + tensap.TTOperator(
+        [(np.eye(n, k=1) * 3.0)[None, :, :, None]] + [np.eye(n)[None, :, :, None]] * 2)
+    b = tensap.TTTensor.randn([n] * d, [2, 2])
+    x, _ = _solver(A, b, algorithm="amen", dense_max_size=0, local_tolerance=1e-13,
+                   tolerance=1e-9, max_iterations=20).solve()
+    npt.assert_allclose(x.full().numpy().ravel(), _dense_solution(A, b), atol=1e-7)
+
+
+def test_qtt_poisson_dirichlet_amen():
+    grid = Grid([Axis(1.0, 4, Dirichlet(), Dirichlet()), Axis(1.0, 4, Dirichlet(), Dirichlet())],
+                ordering="interleaved")
+    A = -1.0 * grid.laplacian()
+    xc, yc = np.meshgrid(grid.axes[0].cell_centers(), grid.axes[1].cell_centers(),
+                         indexing="ij")
+    f = np.exp(-20 * ((xc - 0.5) ** 2 + (yc - 0.4) ** 2))
+    b = grid.quantize(f)
+    truncator = tensap.Truncator(tolerance=1e-10, max_rank=30)
+    x, output = _solver(A, b, algorithm="amen", truncator=truncator, tolerance=1e-8,
+                        max_iterations=30).solve()
+    reference = np.linalg.solve(-grid.laplacian_matrix().toarray(), f.ravel())
+    npt.assert_allclose(grid.dequantize(x).ravel(), reference,
+                        atol=1e-7 * np.abs(reference).max())

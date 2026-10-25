@@ -5,9 +5,11 @@
 Module tt_solvers.
 
 Alternating solvers of A @ x = b in tensor-train format: ALS (one core at a
-time, fixed ranks) and DMRG (two cores at a time, ranks adapted by a
-truncated SVD). Port of ApproximationToolbox/Approximation/TensorApproximation/
-EquationsSolvers/TTTensorALSLinearSolver.m.
+time, fixed ranks), DMRG (two cores at a time, ranks adapted by a truncated
+SVD) and AMEn (one core at a time, ranks adapted by a truncated SVD and an
+enrichment with the residual, Dolgov and Savostyanov 2014). ALS and DMRG are
+a port of ApproximationToolbox/Approximation/TensorApproximation/
+EquationsSolvers/TTTensorALSLinearSolver.m; AMEn is not in Matlab.
 
 Differences with the Matlab code: the interfaces of the operator and of the
 right-hand side are kept in memory and updated from one core to the next
@@ -37,11 +39,17 @@ class TTTensorALSLinearSolver(LinearSolver):
     Attributes
     ----------
     algorithm : str
-        'als' (fixed ranks) or 'dmrg' (ranks adapted at each bond by a
-        truncated SVD of the supercore).
+        'als' (fixed ranks), 'dmrg' (ranks adapted at each bond by a
+        truncated SVD of the supercore) or 'amen' (truncated SVD of the
+        updated core, then enrichment by kick_rank directions of the
+        residual).
     truncator : tensap.Truncator
-        Truncation of the supercores in DMRG (relative tolerance and maximal
-        rank). The default is Truncator(tolerance=1e-12, max_rank=100).
+        Truncation of the supercores in DMRG and of the cores in AMEn
+        (relative tolerance and maximal rank). The default is
+        Truncator(tolerance=1e-12, max_rank=100).
+    kick_rank : int
+        AMEn: rank of the approximation of the residual used to enrich the
+        cores. The default is 4.
     minimize_residual : bool
         If True, solve the normal equations A^T A x = A^T b.
     ranks : int or list of int, optional
@@ -70,11 +78,12 @@ class TTTensorALSLinearSolver(LinearSolver):
         local_tolerance=1e-12,
         local_max_iterations=None,
         check_residual=1,
+        kick_rank=4,
         **kwargs,
     ):
         super().__init__(A, b, **kwargs)
-        if algorithm not in ("als", "dmrg"):
-            raise ValueError("algorithm must be 'als' or 'dmrg'.")
+        if algorithm not in ("als", "dmrg", "amen"):
+            raise ValueError("algorithm must be 'als', 'dmrg' or 'amen'.")
         if A.order != b.order or any(m != n for (_, m), n in zip(A.shape, b.shape)):
             raise ValueError("The operator and the right-hand side are not compatible.")
         self.algorithm = algorithm
@@ -87,6 +96,7 @@ class TTTensorALSLinearSolver(LinearSolver):
         self.local_tolerance = local_tolerance
         self.local_max_iterations = local_max_iterations
         self.check_residual = check_residual
+        self.kick_rank = kick_rank
 
     def is_symmetric(self, tolerance=1e-12):
         """True if the operator of the solved system is symmetric."""
@@ -96,8 +106,9 @@ class TTTensorALSLinearSolver(LinearSolver):
         return (A - A.T).norm() <= tolerance * A.norm()
 
     def solve(self):
-        """Alternating sweeps, back and forth, until the error criterion is
-        below the tolerance or the iterate stagnates.
+        """Alternating sweeps (back and forth for ALS and DMRG, from left to
+        right for AMEn) until the error criterion is below the tolerance or
+        the iterate stagnates.
 
         Returns
         -------
@@ -127,14 +138,16 @@ class TTTensorALSLinearSolver(LinearSolver):
             ranks = np.broadcast_to(ranks, (b.order - 1,))
             x = tensap.TTTensor.randn(b.shape, ranks)
         sweep = _Sweep(A, b, x, self.is_symmetric(), self)
-        two_cores = self.algorithm == "dmrg" and b.order > 1
+        algorithm = self.algorithm if b.order > 1 else "als"
 
         flag, errvec, error, n = 1, [], np.inf, 0
         for n in range(1, self.max_iterations + 1):
             x_old = sweep.tensor()
             forward = n % 2 == 1
-            if two_cores:
+            if algorithm == "dmrg":
                 sweep.dmrg_half_sweep(forward)
+            elif algorithm == "amen":
+                sweep.amen_sweep()
             else:
                 sweep.als_half_sweep(forward)
             x = sweep.tensor()
@@ -195,23 +208,52 @@ class _Sweep:
 
     # --- interfaces ---
 
+    @staticmethod
+    def _left_step(left_a, left_b, test, trial, a, b):
+        """Interfaces of the next core: one more core of (test, A, trial) and
+        of (test, b) contracted from the left."""
+        t = np.tensordot(left_a, test, axes=(0, 0))
+        t = np.tensordot(t, a, axes=([0, 2], [0, 1]))
+        t_b = np.tensordot(left_b, test, axes=(0, 0))
+        return (
+            np.tensordot(t, trial, axes=([0, 2], [0, 1])),
+            np.tensordot(t_b, b, axes=([0, 1], [0, 1])),
+        )
+
+    @staticmethod
+    def _right_step(right_a, right_b, test, trial, a, b):
+        """Interfaces of the previous core, contracted from the right."""
+        t = np.tensordot(test, right_a, axes=(2, 0))
+        t = np.tensordot(t, a, axes=([1, 2], [1, 3]))
+        t_b = np.tensordot(test, right_b, axes=(2, 0))
+        return (
+            np.tensordot(t, trial, axes=([1, 3], [2, 1])),
+            np.tensordot(t_b, b, axes=([1, 2], [1, 2])),
+        )
+
     def _update_left(self, k):
         """Interfaces of the core k + 1 from those of the core k."""
-        x, a, b = self.cores[k], self.a_cores[k], self.b_cores[k]
-        t = np.tensordot(self.left_a[k], x, axes=(0, 0))
-        t = np.tensordot(t, a, axes=([0, 2], [0, 1]))
-        self.left_a[k + 1] = np.tensordot(t, x, axes=([0, 2], [0, 1]))
-        t = np.tensordot(self.left_b[k], x, axes=(0, 0))
-        self.left_b[k + 1] = np.tensordot(t, b, axes=([0, 1], [0, 1]))
+        x = self.cores[k]
+        self.left_a[k + 1], self.left_b[k + 1] = self._left_step(
+            self.left_a[k], self.left_b[k], x, x, self.a_cores[k], self.b_cores[k]
+        )
 
     def _update_right(self, k):
         """Interfaces of the core k - 1 from those of the core k."""
-        x, a, b = self.cores[k], self.a_cores[k], self.b_cores[k]
-        t = np.tensordot(x, self.right_a[k], axes=(2, 0))
-        t = np.tensordot(t, a, axes=([1, 2], [1, 3]))
-        self.right_a[k - 1] = np.tensordot(t, x, axes=([1, 3], [2, 1]))
-        t = np.tensordot(x, self.right_b[k], axes=(2, 0))
-        self.right_b[k - 1] = np.tensordot(t, b, axes=([1, 2], [1, 2]))
+        x = self.cores[k]
+        self.right_a[k - 1], self.right_b[k - 1] = self._right_step(
+            self.right_a[k], self.right_b[k], x, x, self.a_cores[k], self.b_cores[k]
+        )
+
+    def _residual(self, k, core, left_a, left_b, right_a, right_b):
+        """Projection of b - A x, x with the core k replaced by core, on the
+        test bases of the given interfaces."""
+        t_b = np.tensordot(left_b, self.b_cores[k], axes=(1, 0))
+        t_b = np.tensordot(t_b, right_b, axes=(2, 1))
+        t = np.tensordot(left_a, core, axes=(2, 0))
+        t = np.tensordot(t, self.a_cores[k], axes=([1, 2], [0, 2]))
+        t = np.tensordot(t, right_a, axes=([1, 3], [2, 1]))
+        return t_b - t
 
     # --- local problem on the cores k, ..., k + p - 1 ---
 
@@ -303,3 +345,59 @@ class _Sweep:
                 self.cores[k] = right.T.reshape(r0, n0, -1)
                 self.cores[k + 1] = left.T.reshape(-1, n1, r1)
                 self._update_right(k + 1)
+
+    def amen_sweep(self):
+        """One AMEn sweep from left to right: each core is updated by the
+        local Galerkin problem, truncated by an SVD, then enriched by
+        kick_rank directions of the residual b - A x; the residual itself is
+        approximated by a TT tensor z of rank kick_rank, updated along the
+        sweep (Dolgov and Savostyanov 2014)."""
+        d = len(self.cores)
+        options = self.options
+        truncator = options.truncator
+        shape = [c.shape[1] for c in self.cores]
+        if getattr(self, "z_cores", None) is None:
+            z = tensap.TTTensor.randn(shape, [options.kick_rank] * (d - 1))
+            self.z_left_a = [np.ones((1, 1, 1))] + [None] * (d - 1)
+            self.z_left_b = [np.ones((1, 1))] + [None] * (d - 1)
+            self.z_right_a = [None] * (d - 1) + [np.ones((1, 1, 1))]
+            self.z_right_b = [None] * (d - 1) + [np.ones((1, 1))]
+        else:
+            z = tensap.TTTensor(self.z_cores)
+            self.cores = [np.array(c) for c in tensap.TTTensor(self.cores).orth(0).cores]
+            for k in range(d - 1, 0, -1):
+                self._update_right(k)
+        self.z_cores = [np.array(c) for c in z.orth(0).cores]
+        for k in range(d - 1, 0, -1):
+            self.z_right_a[k - 1], self.z_right_b[k - 1] = self._right_step(
+                self.z_right_a[k], self.z_right_b[k], self.z_cores[k], self.cores[k],
+                self.a_cores[k], self.b_cores[k],
+            )
+
+        for k in range(d - 1):
+            core = self._local_solve(k, 1, self.cores[k])
+            r0, n, r1 = core.shape
+            u, v = _truncated_svd(truncator, core.reshape(r0 * n, r1), truncator.tolerance)
+            core = (u @ v).reshape(r0, n, r1)
+            z_core = self._residual(k, core, self.z_left_a[k], self.z_left_b[k],
+                                    self.z_right_a[k], self.z_right_b[k])
+            enrichment = self._residual(k, core, self.left_a[k], self.left_b[k],
+                                        self.z_right_a[k], self.z_right_b[k])
+            enrichment = enrichment.reshape(r0 * n, -1)
+            kick = int(max(0, min(enrichment.shape[1], truncator.max_rank - u.shape[1])))
+            q, r = np.linalg.qr(np.hstack([u, enrichment[:, :kick]]))
+            v = np.vstack([v, np.zeros((kick, r1))])
+            self.cores[k] = q.reshape(r0, n, -1)
+            self.cores[k + 1] = np.tensordot(r @ v, self.cores[k + 1], axes=(1, 0))
+            self._update_left(k)
+            rz0, _, rz1 = z_core.shape
+            z_q, _ = np.linalg.qr(z_core.reshape(rz0 * n, rz1))
+            self.z_cores[k] = z_q.reshape(rz0, n, -1)
+            self.z_left_a[k + 1], self.z_left_b[k + 1] = self._left_step(
+                self.z_left_a[k], self.z_left_b[k], self.z_cores[k], self.cores[k],
+                self.a_cores[k], self.b_cores[k],
+            )
+        k = d - 1
+        self.cores[k] = self._local_solve(k, 1, self.cores[k])
+        self.z_cores[k] = self._residual(k, self.cores[k], self.z_left_a[k], self.z_left_b[k],
+                                         self.z_right_a[k], self.z_right_b[k])
