@@ -126,12 +126,14 @@ def test_order_one():
 
 
 @pytest.mark.parametrize("algorithm", ["als", "dmrg"])
-def test_matrix_free_local_solver_matches_dense(system, algorithm):
+@pytest.mark.parametrize("preconditioner", ["block_jacobi", None])
+def test_matrix_free_local_solver_matches_dense(system, algorithm, preconditioner):
     A, b = system
     x0 = tensap.TTTensor.randn([5, 5, 5], [3, 3])
     dense, _ = _solver(A, b, x0=x0, algorithm=algorithm, max_iterations=3).solve()
     free, _ = _solver(A, b, x0=x0, algorithm=algorithm, max_iterations=3,
-                      dense_max_size=0, local_tolerance=1e-14).solve()
+                      dense_max_size=0, local_tolerance=1e-14,
+                      local_preconditioner=preconditioner).solve()
     npt.assert_allclose(free.full().numpy(), dense.full().numpy(), atol=1e-8)
 
 
@@ -214,6 +216,8 @@ def test_wrong_arguments(system):
     A, b = system
     with pytest.raises(ValueError):
         _solver(A, b, algorithm="cg")
+    with pytest.raises(ValueError):
+        _solver(A, b, local_preconditioner="ilu")
     with pytest.raises(ValueError):
         _solver(A, tensap.TTTensor.randn([5, 5], [2]))
 

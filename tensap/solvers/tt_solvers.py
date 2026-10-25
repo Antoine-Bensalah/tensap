@@ -64,6 +64,10 @@ class TTTensorALSLinearSolver(LinearSolver):
         Maximal number of iterations of the matrix-free local solver.
     check_residual : int
         The error criterion is evaluated every check_residual iterations.
+    local_preconditioner : str or None
+        Preconditioner of the matrix-free local solver: 'block_jacobi'
+        (default; inverse of the blocks of the physical indices for each pair
+        of rank indices) or None.
     """
 
     def __init__(
@@ -79,6 +83,7 @@ class TTTensorALSLinearSolver(LinearSolver):
         local_max_iterations=None,
         check_residual=1,
         kick_rank=4,
+        local_preconditioner="block_jacobi",
         **kwargs,
     ):
         super().__init__(A, b, **kwargs)
@@ -97,6 +102,9 @@ class TTTensorALSLinearSolver(LinearSolver):
         self.local_max_iterations = local_max_iterations
         self.check_residual = check_residual
         self.kick_rank = kick_rank
+        if local_preconditioner not in (None, "block_jacobi"):
+            raise ValueError("local_preconditioner must be None or 'block_jacobi'.")
+        self.local_preconditioner = local_preconditioner
 
     def is_symmetric(self, tolerance=1e-12):
         """True if the operator of the solved system is symmetric."""
@@ -294,6 +302,9 @@ class _Sweep:
             return t.ravel()
 
         operator = spla.LinearOperator((size, size), matvec=matvec, dtype=float)
+        preconditioner = None
+        if options.local_preconditioner == "block_jacobi":
+            preconditioner = self._block_jacobi(left, a_cores, right, shape)
         method = spla.cg if self.symmetric else spla.gmres
         solution, _ = method(
             operator,
@@ -302,8 +313,35 @@ class _Sweep:
             rtol=options.local_tolerance,
             atol=0.0,
             maxiter=options.local_max_iterations,
+            M=preconditioner,
         )
         return solution.reshape(shape)
+
+    @staticmethod
+    def _block_jacobi(left, a_cores, right, shape):
+        """Block Jacobi preconditioner of the local operator: the blocks of
+        the physical indices for each pair (k, k') of rank indices,
+        B_{k k'} = sum L(k, a, k) A(a, :, :, b) R(k', b, k'), inverted once
+        (the preconditioner 'c' of torchTT). A principal submatrix of an SPD
+        matrix is SPD, so the preconditioner is SPD for CG."""
+        left_diag = np.einsum("xax->xa", left)
+        right_diag = np.einsum("cbc->cb", right)
+        a = a_cores[0]
+        for other in a_cores[1:]:
+            a = np.einsum("aijg,gklb->aikjlb", a, other).reshape(
+                a.shape[0], a.shape[1] * other.shape[1], a.shape[2] * other.shape[2], -1
+            )
+        blocks = np.einsum("xa,aijb,cb->xcij", left_diag, a, right_diag)
+        inverses = np.linalg.inv(blocks)  # (r0, r1, n, n)
+        r0, r1 = shape[0], shape[-1]
+        n = int(np.prod(shape[1:-1]))
+
+        def apply(vector):
+            v = vector.reshape(r0, n, r1)
+            return np.einsum("xcij,xjc->xic", inverses, v).ravel()
+
+        size = r0 * n * r1
+        return spla.LinearOperator((size, size), matvec=apply, dtype=float)
 
     # --- half sweeps ---
 
