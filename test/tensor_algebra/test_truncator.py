@@ -260,3 +260,11 @@ def test_truncate_wrong_arguments():
         truncator.truncate(np.ones(3))
     with pytest.raises(NotImplementedError):
         truncator.truncate(tensap.CanonicalTensor.randn(2, SHAPE))
+
+
+@pytest.mark.xfail(strict=True, raises=IndexError,
+                   reason="soft threshold above every singular value: empty index (also Matlab)")
+def test_soft_thresholding_above_all_singular_values():
+    truncator = tensap.Truncator(thresholding_type="soft", thresholding_parameter=100.0)
+    svd = truncator.trunc_svd(np.eye(3))
+    assert np.allclose(svd.full().numpy(), 0.0)

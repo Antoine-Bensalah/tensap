@@ -34,6 +34,7 @@ from .solvers.linear_solvers import (
     GreedyLinearSolver,
     TuckerTensorALSLinearSolver,
 )
+from .solvers.tt_solvers import TTTensorALSLinearSolver
 from .solvers.inverse_approximators import (
     RankOneInverseApproximatorByALS,
     GreedyInverseApproximator,

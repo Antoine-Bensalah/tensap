@@ -1,0 +1,305 @@
+# Copyright (c) 2024
+# This file is part of tensap (tensor approximation package).
+
+"""
+Module tt_solvers.
+
+Alternating solvers of A @ x = b in tensor-train format: ALS (one core at a
+time, fixed ranks) and DMRG (two cores at a time, ranks adapted by a
+truncated SVD). Port of ApproximationToolbox/Approximation/TensorApproximation/
+EquationsSolvers/TTTensorALSLinearSolver.m.
+
+Differences with the Matlab code: the interfaces of the operator and of the
+right-hand side are kept in memory and updated from one core to the next
+(O(d) contractions per sweep instead of O(d^2)), the sweeps go back and forth,
+and the local systems are solved without assembling their matrix (conjugate
+gradient, or GMRES for a non-symmetric operator) when they are large.
+"""
+
+import numpy as np
+import scipy.sparse.linalg as spla
+import tensap
+from tensap.solvers.linear_solvers import LinearSolver
+from tensap.tensor_algebra.tensors.tt_tensor import _truncated_svd
+
+
+class TTTensorALSLinearSolver(LinearSolver):
+    """
+    Solve A @ x = b, with A a TTOperator and b a TTTensor, by alternating
+    sweeps over the cores of x.
+
+    At each step the cores other than the updated ones are orthogonal, and
+    the updated core (ALS) or pair of cores (DMRG) solves the Galerkin
+    projection of the system on the subspace spanned by the other cores: for
+    a symmetric positive definite A, it minimizes the energy
+    J(x) = 1/2 (A x, x) - (b, x) over these cores.
+
+    Attributes
+    ----------
+    algorithm : str
+        'als' (fixed ranks) or 'dmrg' (ranks adapted at each bond by a
+        truncated SVD of the supercore).
+    truncator : tensap.Truncator
+        Truncation of the supercores in DMRG (relative tolerance and maximal
+        rank). The default is Truncator(tolerance=1e-12, max_rank=100).
+    minimize_residual : bool
+        If True, solve the normal equations A^T A x = A^T b.
+    ranks : int or list of int, optional
+        Ranks of the random initial guess when x0 is None. The default is 5
+        for ALS and 2 for DMRG.
+    dense_max_size : int
+        Local systems up to this size are assembled and solved by a dense
+        direct solver; larger ones are solved matrix-free.
+    local_tolerance : float
+        Relative tolerance of the matrix-free local solver.
+    local_max_iterations : int, optional
+        Maximal number of iterations of the matrix-free local solver.
+    check_residual : int
+        The error criterion is evaluated every check_residual iterations.
+    """
+
+    def __init__(
+        self,
+        A,
+        b,
+        algorithm="als",
+        truncator=None,
+        minimize_residual=False,
+        ranks=None,
+        dense_max_size=1000,
+        local_tolerance=1e-12,
+        local_max_iterations=None,
+        check_residual=1,
+        **kwargs,
+    ):
+        super().__init__(A, b, **kwargs)
+        if algorithm not in ("als", "dmrg"):
+            raise ValueError("algorithm must be 'als' or 'dmrg'.")
+        if A.order != b.order or any(m != n for (_, m), n in zip(A.shape, b.shape)):
+            raise ValueError("The operator and the right-hand side are not compatible.")
+        self.algorithm = algorithm
+        if truncator is None:
+            truncator = tensap.Truncator(tolerance=1e-12, max_rank=100)
+        self.truncator = truncator
+        self.minimize_residual = minimize_residual
+        self.ranks = ranks
+        self.dense_max_size = dense_max_size
+        self.local_tolerance = local_tolerance
+        self.local_max_iterations = local_max_iterations
+        self.check_residual = check_residual
+
+    def is_symmetric(self, tolerance=1e-12):
+        """True if the operator of the solved system is symmetric."""
+        if self.minimize_residual:
+            return True
+        A = self.A
+        return (A - A.T).norm() <= tolerance * A.norm()
+
+    def solve(self):
+        """Alternating sweeps, back and forth, until the error criterion is
+        below the tolerance or the iterate stagnates.
+
+        Returns
+        -------
+        x : tensap.TTTensor
+            The computed solution.
+        output : dict
+            Keys 'flag' (0: tolerance reached, 1: maximal number of
+            iterations, 2: stagnation), 'iter', 'error', 'errvec', 'ranks'.
+        """
+        A, b = self.A, self.b
+        if self.minimize_residual:
+            A, b = A.T @ A, A.T @ b
+        if self.error_criterion is None:
+            b_norm = self.b.norm()
+
+            def error_criterion(x):
+                return (self.b - self.A @ x).norm() / b_norm
+
+        else:
+            error_criterion = self.error_criterion
+
+        x = self.x0
+        if x is None:
+            ranks = self.ranks
+            if ranks is None:
+                ranks = 5 if self.algorithm == "als" else 2
+            ranks = np.broadcast_to(ranks, (b.order - 1,))
+            x = tensap.TTTensor.randn(b.shape, ranks)
+        sweep = _Sweep(A, b, x, self.is_symmetric(), self)
+        two_cores = self.algorithm == "dmrg" and b.order > 1
+
+        flag, errvec, error, n = 1, [], np.inf, 0
+        for n in range(1, self.max_iterations + 1):
+            x_old = sweep.tensor()
+            forward = n % 2 == 1
+            if two_cores:
+                sweep.dmrg_half_sweep(forward)
+            else:
+                sweep.als_half_sweep(forward)
+            x = sweep.tensor()
+            stagnation = (x - x_old).norm() / x.norm()
+            checked = n % self.check_residual == 0 or n == self.max_iterations
+            if checked:
+                error = error_criterion(x)
+                errvec.append(error)
+            if self.display:
+                print(
+                    f"{self.algorithm.upper()}: Iteration {n:3d} - Stagnation "
+                    f"{stagnation:.2e} - Error {error:.2e} - Ranks {x.ranks}"
+                )
+            if checked and error < self.tolerance:
+                flag = 0
+                break
+            if stagnation < self.stagnation:
+                flag = 2
+                break
+
+        output = {
+            "flag": flag,
+            "iter": n,
+            "error": error,
+            "errvec": errvec,
+            "ranks": x.ranks,
+        }
+        return x, output
+
+
+class _Sweep:
+    """Cores of the iterate with the interfaces of the operator and of the
+    right-hand side, kept up to date while the orthogonality center moves.
+
+    For the core k, left_a[k] (shape (r_{k-1}, rA_{k-1}, r_{k-1})) contracts
+    the cores 0, ..., k-1 of x, A and x, and right_a[k] (shape (r_k, rA_k,
+    r_k)) the cores k+1, ..., d-1; left_b[k] and right_b[k] do the same with
+    x and b. They are valid when the cores on the left of k are
+    left-orthogonal and those on the right right-orthogonal.
+    """
+
+    def __init__(self, A, b, x, symmetric, options):
+        self.a_cores = list(A.cores)
+        self.b_cores = list(b.cores)
+        self.cores = [np.array(c) for c in x.orth(0).cores]
+        self.symmetric = symmetric
+        self.options = options
+        d = len(self.cores)
+        self.left_a = [np.ones((1, 1, 1))] + [None] * (d - 1)
+        self.right_a = [None] * (d - 1) + [np.ones((1, 1, 1))]
+        self.left_b = [np.ones((1, 1))] + [None] * (d - 1)
+        self.right_b = [None] * (d - 1) + [np.ones((1, 1))]
+        for k in range(d - 1, 0, -1):
+            self._update_right(k)
+
+    def tensor(self):
+        return tensap.TTTensor(self.cores)
+
+    # --- interfaces ---
+
+    def _update_left(self, k):
+        """Interfaces of the core k + 1 from those of the core k."""
+        x, a, b = self.cores[k], self.a_cores[k], self.b_cores[k]
+        t = np.tensordot(self.left_a[k], x, axes=(0, 0))
+        t = np.tensordot(t, a, axes=([0, 2], [0, 1]))
+        self.left_a[k + 1] = np.tensordot(t, x, axes=([0, 2], [0, 1]))
+        t = np.tensordot(self.left_b[k], x, axes=(0, 0))
+        self.left_b[k + 1] = np.tensordot(t, b, axes=([0, 1], [0, 1]))
+
+    def _update_right(self, k):
+        """Interfaces of the core k - 1 from those of the core k."""
+        x, a, b = self.cores[k], self.a_cores[k], self.b_cores[k]
+        t = np.tensordot(x, self.right_a[k], axes=(2, 0))
+        t = np.tensordot(t, a, axes=([1, 2], [1, 3]))
+        self.right_a[k - 1] = np.tensordot(t, x, axes=([1, 3], [2, 1]))
+        t = np.tensordot(x, self.right_b[k], axes=(2, 0))
+        self.right_b[k - 1] = np.tensordot(t, b, axes=([1, 2], [1, 2]))
+
+    # --- local problem on the cores k, ..., k + p - 1 ---
+
+    def _local_solve(self, k, p, guess):
+        """Solution of the Galerkin system on the cores k, ..., k + p - 1, an
+        array of shape (r_{k-1}, n_k, ..., n_{k+p-1}, r_{k+p-1})."""
+        left, right = self.left_a[k], self.right_a[k + p - 1]
+        a_cores = self.a_cores[k:k + p]
+        rhs = np.tensordot(self.left_b[k], self.b_cores[k], axes=(1, 0))
+        for b in self.b_cores[k + 1:k + p]:
+            rhs = np.tensordot(rhs, b, axes=(-1, 0))
+        rhs = np.tensordot(rhs, self.right_b[k + p - 1], axes=(-1, 1))
+        shape = rhs.shape
+        size = rhs.size
+        options = self.options
+
+        if size <= options.dense_max_size:
+            if p == 1:
+                matrix = np.einsum("xay,aijb,cbd->xicyjd", left, a_cores[0], right, optimize=True)
+            else:
+                matrix = np.einsum(
+                    "xay,aijb,bklg,cgd->xikcyjld",
+                    left,
+                    a_cores[0],
+                    a_cores[1],
+                    right,
+                    optimize=True,
+                )
+            solution = np.linalg.solve(matrix.reshape(size, size), rhs.ravel())
+            return solution.reshape(shape)
+
+        def matvec(vector):
+            t = np.tensordot(left, vector.reshape(shape), axes=(2, 0))
+            t = np.tensordot(t, a_cores[0], axes=([1, 2], [0, 2]))
+            for a in a_cores[1:]:
+                t = np.tensordot(t, a, axes=([t.ndim - 1, 1], [0, 2]))
+            t = np.tensordot(t, right, axes=([1, t.ndim - 1], [2, 1]))
+            return t.ravel()
+
+        operator = spla.LinearOperator((size, size), matvec=matvec, dtype=float)
+        method = spla.cg if self.symmetric else spla.gmres
+        solution, _ = method(
+            operator,
+            rhs.ravel(),
+            x0=guess.ravel(),
+            rtol=options.local_tolerance,
+            atol=0.0,
+            maxiter=options.local_max_iterations,
+        )
+        return solution.reshape(shape)
+
+    # --- half sweeps ---
+
+    def als_half_sweep(self, forward):
+        """Update every core once, from left to right or from right to left,
+        the orthogonality center following the updated core."""
+        d = len(self.cores)
+        for k in range(d) if forward else range(d - 1, -1, -1):
+            self.cores[k] = self._local_solve(k, 1, self.cores[k])
+            r0, n, r1 = self.cores[k].shape
+            if forward and k < d - 1:
+                q, r = np.linalg.qr(self.cores[k].reshape(r0 * n, r1))
+                self.cores[k] = q.reshape(r0, n, -1)
+                self.cores[k + 1] = np.tensordot(r, self.cores[k + 1], axes=(1, 0))
+                self._update_left(k)
+            elif not forward and k > 0:
+                q, r = np.linalg.qr(self.cores[k].reshape(r0, n * r1).T)
+                self.cores[k] = q.T.reshape(-1, n, r1)
+                self.cores[k - 1] = np.tensordot(self.cores[k - 1], r.T, axes=(-1, 0))
+                self._update_right(k)
+
+    def dmrg_half_sweep(self, forward):
+        """Update every pair of neighbouring cores once; the supercore is
+        split by a truncated SVD, which sets the rank of the bond."""
+        d = len(self.cores)
+        truncator = self.options.truncator
+        for k in range(d - 1) if forward else range(d - 2, -1, -1):
+            guess = np.tensordot(self.cores[k], self.cores[k + 1], axes=(2, 0))
+            supercore = self._local_solve(k, 2, guess)
+            r0, n0, n1, r1 = supercore.shape
+            matrix = supercore.reshape(r0 * n0, n1 * r1)
+            if forward:
+                left, right = _truncated_svd(truncator, matrix, truncator.tolerance)
+                self.cores[k] = left.reshape(r0, n0, -1)
+                self.cores[k + 1] = right.reshape(-1, n1, r1)
+                self._update_left(k)
+            else:
+                left, right = _truncated_svd(truncator, matrix.T, truncator.tolerance)
+                self.cores[k] = right.T.reshape(r0, n0, -1)
+                self.cores[k + 1] = left.T.reshape(-1, n1, r1)
+                self._update_right(k + 1)
