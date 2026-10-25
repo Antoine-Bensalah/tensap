@@ -43,9 +43,15 @@ def gaussian(grid):
     return np.exp(-20 * sum((c - 0.5 + 0.1 * k) ** 2 for k, c in enumerate(centres)))
 
 
-def reference(matrix, f):
-    """Sparse direct solution of the same discrete problem."""
-    return spla.spsolve(matrix.tocsc(), f.ravel())
+def reference(matrix, f, direct=True):
+    """Solution of the same discrete problem by scipy: sparse direct solver,
+    or conjugate gradient in 3D, where the fill-in of the direct solver makes
+    it very slow (about 30 minutes for 64^3 cells)."""
+    if direct:
+        return spla.spsolve(matrix.tocsc(), f.ravel())
+    u, info = spla.cg(matrix.tocsr(), f.ravel(), rtol=1e-13, atol=0.0, maxiter=10000)
+    assert info == 0
+    return u
 
 
 def solve(name, A, b, tolerance=1e-10):
@@ -122,7 +128,7 @@ for ordering in ("blocks", "interleaved"):
     A = -1.0 * grid.laplacian()
     f = gaussian(grid)
     b = grid.quantize(f)
-    u_ref = reference(-grid.laplacian_matrix(), f)
+    u_ref = reference(-grid.laplacian_matrix(), f, direct=False)
     print(f"4. cube {grid.shape}, {ordering} ordering, b of max rank {max(b.ranks)}")
     for name in ("dmrg", "amen"):
         u, elapsed, iterations = solve(name, A, b)
