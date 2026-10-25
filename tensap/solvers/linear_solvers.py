@@ -18,6 +18,7 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import tensap
+from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor
 
 
 class LinearSolver(abc.ABC):
@@ -525,6 +526,16 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         Stagnation criterion of the core update (iterative core formats only).
     stagnation_frames : float
         Stagnation criterion of update_frames_by_als.
+    core_algorithm : str
+        TT cores: algorithm of the TTTensorALSLinearSolver used for the core
+        update, 'als' (fixed ranks, default), 'dmrg' or 'amen' (Matlab:
+        useDMRG).
+    core_truncator : tensap.Truncator, optional
+        TT cores: truncator of DMRG and AMEn.
+    dense_max_size : int
+        Full cores: Galerkin systems on the core up to this size are
+        assembled and solved directly, larger ones by conjugate gradient
+        without assembling the matrix.
     """
 
     def __init__(
@@ -535,6 +546,9 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         max_iterations_frames=10,
         stagnation_core=1e-6,
         stagnation_frames=1e-6,
+        core_algorithm="als",
+        core_truncator=None,
+        dense_max_size=2000,
         **kwargs,
     ):
         super().__init__(A, b, **kwargs)
@@ -544,6 +558,9 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         self.max_iterations_frames = max_iterations_frames
         self.stagnation_core = stagnation_core
         self.stagnation_frames = stagnation_frames
+        self.core_algorithm = core_algorithm
+        self.core_truncator = core_truncator
+        self.dense_max_size = dense_max_size
 
     def solve(self, x=None):
         """Alternate core and frames updates, starting from x (or x0).
@@ -612,7 +629,13 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         if isinstance(self.A.core, tensap.DiagonalTensor):
             return self._update_diagonal_core(x)
         if isinstance(self.A.core, tensap.FullTensor):
+            if int(np.prod(x.representation_rank())) > self.dense_max_size:
+                return self._update_full_core_matrix_free(x)
             return self._update_full_core(x)
+        if isinstance(self.A.core, tensap.TTTensor):
+            return self._update_tt_core(x)
+        if isinstance(self.A.core, tensap.TreeBasedTensor):
+            return self._update_tree_core(x)
         raise NotImplementedError(
             f"update_core is not implemented for a {type(self.A.core).__name__} "
             "core."
@@ -660,6 +683,123 @@ class TuckerTensorALSLinearSolver(LinearSolver):
 
         core = np.linalg.solve(MA, MB).reshape(ranks)
         return tensap.TuckerTensorVector(tensap.FullTensor(core), x_frames)
+
+    def _projected_problem(self, x):
+        """A and b projected on the (orthonormal) frames of x, on full cores:
+        a function applying the projected operator to arrays of shape
+        ranks + extra axes, and the projected right-hand side, of shape ranks.
+
+        The projected operator is sum_k C_A(k) P^(1)_{k_1} x ... x P^(d)_{k_d},
+        P^(nu)_k(i, j) = (A^(nu)_k w_j, w_i), applied by mode products over the
+        non-zero entries of the core of A, without assembling its matrix."""
+        x_frames = x.tensor_frame
+        order = x.order
+        xAx = x_frames.dot_with_metrics(x_frames, self.A.tensor_frame)
+        xb = self.b.tensor_frame.dot(x_frames)
+        core_A = np.asarray(self.A.core.full().numpy())
+        nonzeros = np.argwhere(core_A != 0)
+
+        def apply(c):
+            result = np.zeros_like(c)
+            for k in nonzeros:
+                t = c
+                for nu in range(order):
+                    t = np.moveaxis(np.tensordot(xAx[nu][k[nu]], t, axes=(1, nu)), 0, nu)
+                result += core_A[tuple(k)] * t
+            return result
+
+        core_b = tensap.FullTensor(np.asarray(self.b.core.full().numpy()))
+        rhs = core_b.tensor_matrix_product([m.T for m in xb]).numpy()
+        return apply, rhs
+
+    def _update_full_core_matrix_free(self, x):
+        """Full core, large Galerkin system: conjugate gradient on the core,
+        the projected operator being applied by mode products."""
+        x = x.orth()
+        ranks = tuple(x.representation_rank())
+        apply, rhs = self._projected_problem(x)
+        size = rhs.size
+        operator = spla.LinearOperator(
+            (size, size), matvec=lambda v: apply(v.reshape(ranks)).ravel(), dtype=float
+        )
+        guess = np.asarray(x.core.full().numpy()).ravel()
+        core, _ = spla.cg(operator, rhs.ravel(), x0=guess, rtol=1e-12, atol=0.0,
+                          maxiter=10 * size)
+        return tensap.TuckerTensorVector(tensap.FullTensor(core.reshape(ranks)),
+                                         x.tensor_frame)
+
+    def _update_tree_core(self, x):
+        """Tree-based core: Galerkin update of the active nodes one after the
+        other, the representation being orthogonal with respect to the
+        updated node (Matlab updateTreeBasedCore). The core tensor depends
+        linearly on the tensor of the node: the columns of the matrix Psi of
+        this map are computed by the full core with the node tensor set to
+        each canonical vector, and the local system is
+        Psi^T A_c Psi c = Psi^T b_c, with A_c, b_c the projected problem
+        (_projected_problem). For cores of moderate size."""
+        tree = self.A.core.tree
+        if not isinstance(x.core, tensap.TreeBasedTensor):
+            x = tensap.TuckerTensorVector(x.core.tree_based_tensor(tree), x.tensor_frame)
+        x = x.orth()
+        apply, rhs = self._projected_problem(x)
+        core = x.core
+        ranks = tuple(core.shape)
+        nodes = [nod for nod in range(1, tree.nb_nodes + 1) if core.is_active_node[nod - 1]]
+
+        for _ in range(self.max_iterations_core):
+            core_old = np.asarray(core.full().numpy())
+            for nod in nodes:
+                core = core.orth_at_node(nod)
+                shape = core.tensors[nod - 1].shape
+                size = int(np.prod(shape))
+                psi = np.empty(ranks + (size,))
+                for n in range(size):
+                    unit = np.zeros(size)
+                    unit[n] = 1.0
+                    core.tensors[nod - 1] = tensap.FullTensor(unit.reshape(shape))
+                    psi[..., n] = core.full().numpy()
+                psi_matrix = psi.reshape(-1, size)
+                M = psi_matrix.T @ apply(psi).reshape(-1, size)
+                f = psi_matrix.T @ rhs.ravel()
+                core.tensors[nod - 1] = tensap.FullTensor(np.linalg.solve(M, f).reshape(shape))
+                core.is_orth = False
+            core_new = np.asarray(core.full().numpy())
+            stagnation = np.linalg.norm(core_new - core_old) / np.linalg.norm(core_new)
+            if self.display:
+                print(f"update_tree_core: stagnation {stagnation:.2e}")
+            if stagnation < self.stagnation_core:
+                break
+        return tensap.TuckerTensorVector(core, x.tensor_frame)
+
+    def _update_tt_core(self, x):
+        """TT core: Galerkin problem on the core alone, A and b being projected
+        on the orthonormalized frames of x (a TTOperator with cores of size
+        R_nu x R_nu and a TTTensor), solved by TTTensorALSLinearSolver from
+        the current core (Matlab reduceProblemToTTCore)."""
+        x = tensap.TuckerTensorVector(as_tt_tensor(x.core), x.tensor_frame).orth()
+        x_frames = x.tensor_frame
+        xAx = x_frames.dot_with_metrics(x_frames, self.A.tensor_frame)
+        xb = self.b.tensor_frame.dot(x_frames)
+        core_A, core_b = as_tt_tensor(self.A.core), as_tt_tensor(self.b.core)
+        A_core = tensap.TTOperator(
+            [np.einsum("alb,lij->aijb", g, m) for g, m in zip(core_A.cores, xAx)]
+        )
+        b_core = tensap.TTTensor(
+            [np.einsum("alb,lj->ajb", g, m) for g, m in zip(core_b.cores, xb)]
+        )
+        solver = tensap.TTTensorALSLinearSolver(
+            A_core,
+            b_core,
+            algorithm=self.core_algorithm,
+            truncator=self.core_truncator,
+            x0=as_tt_tensor(x.core),
+            max_iterations=self.max_iterations_core,
+            stagnation=self.stagnation_core,
+            tolerance=0.0,
+            display=False,
+        )
+        core, _ = solver.solve()
+        return tensap.TuckerTensorVector(core, x_frames)
 
     # ---- update of the frames ----
 

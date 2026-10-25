@@ -321,11 +321,6 @@ def test_tensor_matrix_product_eval_diag(x, rng):
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="TreeBasedTensor.tensordot_matrix_product_except_dim calls the array "
-    "tree.dim2ind and a helper that is commented out: it always fails",
-)
 def test_tensordot_matrix_product_except_dim(x, rng):
     y = _random_like(x)
     a, b = x.full().numpy(), y.full().numpy()

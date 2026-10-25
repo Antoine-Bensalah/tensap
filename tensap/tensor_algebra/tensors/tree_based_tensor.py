@@ -1943,9 +1943,11 @@ class TreeBasedTensor:
             The result of the contraction.
 
         """
-        ind = self.tree.dim2ind(dim - 1)
-        out = self.reduce_dot_with_rank_one_metric_at_node(tensor2, matrices, ind)
-        return out[0]
+        # The contraction through the tree (reduce_dot_with_rank_one_metric_at_node
+        # of Matlab) is not ported: the tensors are contracted in full format,
+        # which is exact and affordable for the cores of Tucker tensors.
+        other = tensor2.full() if isinstance(tensor2, TreeBasedTensor) else tensor2
+        return self.full().tensordot_matrix_product_except_dim(other, matrices, dim)
 
     # def reduce_dot_with_rank_one_metric_at_node(self, tensor2, matrices,
     #                                             alpha):

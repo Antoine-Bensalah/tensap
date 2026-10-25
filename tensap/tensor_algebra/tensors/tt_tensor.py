@@ -332,6 +332,46 @@ class TTTensor(BaseTTTensor):
             z = np.einsum("pa,anb,pn->pb", z, core, m)
         return tensap.FullTensor(z[:, 0])
 
+    def tensordot_matrix_product_except_dim(self, other, matrices, dim) -> np.ndarray:
+        """Contraction of self and other in every dimension but dim, through
+        the matrices: z(i, j) = sum x(..., i, ...) M_k(i_k, j_k) y(..., j, ...),
+        the sum running over the indices of the dimensions k != dim, as
+        FullTensor.tensordot_matrix_product_except_dim.
+
+        Parameters
+        ----------
+        other : TTTensor
+        matrices : list of numpy.ndarray
+            One matrix per dimension, of shape (self.shape[k], other.shape[k])
+            (the matrix of dimension dim is not used).
+        dim : int
+
+        Returns
+        -------
+        numpy.ndarray
+            Of shape (self.shape[dim], other.shape[dim]).
+        """
+        if len(matrices) != self.order:
+            raise ValueError("One matrix per dimension is required.")
+
+        def step(z, x, y, matrix):
+            t = np.tensordot(z, x, axes=(0, 0))  # (c, i, b)
+            t = np.tensordot(t, matrix, axes=(1, 0))  # (c, b, j)
+            return np.tensordot(t, y, axes=([0, 2], [0, 1]))  # (b, d)
+
+        left = np.ones((1, 1))
+        for k in range(dim):
+            left = step(left, self.cores[k], other.cores[k], matrices[k])
+        right = np.ones((1, 1))
+        for k in range(self.order - 1, dim, -1):
+            x, y = self.cores[k], other.cores[k]
+            t = np.tensordot(x, right, axes=(2, 0))  # (a, i, d)
+            t = np.tensordot(t, matrices[k], axes=(1, 0))  # (a, d, j)
+            right = np.tensordot(t, y, axes=([1, 2], [2, 1]))  # (a, c)
+        t = np.tensordot(left, self.cores[dim], axes=(0, 0))  # (c, i, b)
+        t = np.tensordot(t, right, axes=(2, 0))  # (c, i, c')
+        return np.tensordot(t, other.cores[dim], axes=([0, 2], [0, 2]))
+
     def kron(self, other: "TTTensor") -> "TTTensor":
         """Kronecker product, z(i n' + j) = x(i) y(j) in every dimension."""
         cores = []

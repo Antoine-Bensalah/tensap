@@ -21,6 +21,7 @@ SLOW_TUTORIALS = {
     "tutorial_linearsolver_truncation_poisson_solution.py",  # ~35 s
     "tutorial_qtt_poisson_rectangle.py",  # ~50 s
     "tutorial_qtt_tt_solvers.py",  # ~5 min (interleaved cube)
+    "tutorial_linearsolver_update_poisson_solution.py",  # ~30 s
     "tutorial_poincare_learning.py",  # ~25 s
     "tutorial_magic_points.py",  # ~20 s
     "tutorial_poincare_learning_surrogate.py",  # ~15 s
