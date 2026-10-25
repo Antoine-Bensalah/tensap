@@ -498,6 +498,169 @@ class GreedyLinearSolver(LinearSolver):
         return x, output
 
 
+class AnisotropicGreedySpaceLinearSolver(LinearSolver):
+    """
+    Greedy construction of tensor subspaces U_1 x ... x U_d with anisotropic
+    enrichment, the approximation being sought in the Tucker format with a TT
+    core. Port of AnisotropicGreedySpaceLinearSolver.m.
+
+    At each iteration: a rank-one correction c = c_1 x ... x c_d of the
+    residual (local_solver); the spaces U_mu are enriched by c_mu only in the
+    dimensions mu where the smallest mu-singular value of x + c is at least
+    theta times the largest of these values over the dimensions; then the
+    core is updated by the Galerkin problem on U_1 x ... x U_d
+    (TuckerTensorALSLinearSolver.update_core, TT core solved by
+    core_algorithm).
+
+    Attributes
+    ----------
+    local_solver : LinearSolver
+        Solver of the rank-one corrections (its attribute b is overwritten).
+        Default is a RankOneALSLinearSolver.
+    theta : float
+        Bulk parameter of the enrichment, in [0, 1]: 0 enriches every
+        dimension, 1 only the dimension of largest estimated error. The
+        default is 0.8, as in Matlab.
+    minimize_residual : bool
+        If True, apply the algorithm to the normal equations.
+    check_residual : int
+        The error is computed every check_residual iterations.
+    core_algorithm : str
+        Algorithm of the core update, 'dmrg' (default, Matlab useDMRG),
+        'amen' or 'als' (the TT ranks of the core then stay those of the first
+        correction).
+    core_truncator : tensap.Truncator, optional
+        Truncator of the core update (DMRG and AMEn).
+    max_iterations_core, stagnation_core : int, float
+        Stopping criteria of the core update.
+    """
+
+    def __init__(
+        self,
+        A,
+        b,
+        local_solver=None,
+        theta=0.8,
+        minimize_residual=False,
+        check_residual=1,
+        core_algorithm="dmrg",
+        core_truncator=None,
+        max_iterations_core=10,
+        stagnation_core=1e-6,
+        **kwargs,
+    ):
+        super().__init__(A, b, **kwargs)
+        self.local_solver = (
+            RankOneALSLinearSolver(A, b, display=False) if local_solver is None else local_solver
+        )
+        self.theta = theta
+        self.minimize_residual = minimize_residual
+        self.check_residual = check_residual
+        self.core_algorithm = core_algorithm
+        self.core_truncator = core_truncator
+        self.max_iterations_core = max_iterations_core
+        self.stagnation_core = stagnation_core
+
+    def solve(self):
+        """Greedy enrichment of the spaces and Galerkin update of the core.
+
+        Returns
+        -------
+        x : TuckerTensorVector
+            With a TTTensor core.
+        output : dict
+            Keys 'flag', 'iter', 'error', 'errvec', and for each iteration
+            'enriched' (the enriched dimensions), 'dims' (dimensions of the
+            spaces), 'ranks' (TT ranks of the core) and 'storage'.
+        """
+        if not self.minimize_residual:
+            A, b = self.A, self.b
+        else:
+            A, b = self.A.T @ self.A, self.A.T @ self.b
+            self.local_solver.A = A
+        b_norm = self.b.norm()
+        if self.error_criterion is None:
+
+            def error_criterion(x):
+                return (self.b - self.A @ x).norm() / b_norm
+
+        else:
+            error_criterion = self.error_criterion
+
+        updater = TuckerTensorALSLinearSolver(
+            _with_tt_core(A),
+            _with_tt_core(b),
+            core_algorithm=self.core_algorithm,
+            core_truncator=self.core_truncator,
+            max_iterations_core=self.max_iterations_core,
+            stagnation_core=self.stagnation_core,
+            display=False,
+        )
+        x = None if self.x0 is None else _with_tt_core(self.x0)
+        residual = b if x is None else b - A @ x
+        output = {"enriched": [], "dims": [], "ranks": [], "storage": []}
+        flag, errvec, error, k = 1, [], None, 0
+        for k in range(1, self.max_iterations + 1):
+            self.local_solver.b = residual
+            correction, _ = self.local_solver.solve()
+            x_old = x
+            if x is None:
+                x = _with_tt_core(correction)
+                enriched = list(range(x.order))
+            else:
+                values = (x + correction).singular_values()
+                smallest = np.array([v.min() for v in values])
+                enriched = [int(m) for m in np.nonzero(smallest >= self.theta * smallest.max())[0]]
+                x = _enrich(x, correction, enriched)
+                x = updater.update_core(x)
+            output["enriched"].append(enriched)
+            output["dims"].append(tuple(f.dim for f in x.tensor_frame.frames))
+            output["ranks"].append(x.core.ranks)
+            output["storage"].append(x.storage())
+
+            stagnation = 1.0 if x_old is None else (x - x_old).norm() / x.norm()
+            error = error_criterion(x) if k % self.check_residual == 0 else None
+            errvec.append(error)
+            if self.display:
+                message = (f"AnisotropicGreedy: Iteration {k:3d} - Stagnation "
+                           f"{stagnation:.2e} - Enriched {enriched}")
+                if error is not None:
+                    message += f" - Error {error:.2e}"
+                print(message)
+            if stagnation < self.stagnation:
+                flag = 2
+                break
+            if error is not None and error < self.tolerance:
+                flag = 0
+                break
+            residual = b - A @ x
+
+        if error is None:
+            error = error_criterion(x)
+            errvec[-1] = error
+        output.update({"flag": flag, "iter": k, "error": error, "errvec": errvec})
+        return x, output
+
+
+def _with_tt_core(tensor):
+    """The same Tucker tensor (vector or operator) with a TTTensor core."""
+    return tensor.__class__(as_tt_tensor(tensor.core), tensor.tensor_frame)
+
+
+def _enrich(x, correction, dims):
+    """Add the frame vectors of the rank-one correction to the frames of x in
+    the dimensions dims, the TT core being padded with zeros (the tensor is
+    unchanged)."""
+    frames = list(x.tensor_frame.frames)
+    cores = list(x.core.cores)
+    for mu in dims:
+        data = np.concatenate([frames[mu].data, correction.tensor_frame.frames[mu].data])
+        frames[mu] = tensap.FrameVector(data)
+        r0, n, r1 = cores[mu].shape
+        cores[mu] = np.concatenate([cores[mu], np.zeros((r0, 1, r1))], axis=1)
+    return tensap.TuckerTensorVector(tensap.TTTensor(cores), tensap.TFrameVector(frames))
+
+
 def _times_diag_core(core, diag, mu):
     """Multiply a core tensor by diag(diag) along dimension mu."""
     if isinstance(core, tensap.DiagonalTensor):

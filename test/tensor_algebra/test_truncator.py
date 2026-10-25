@@ -260,4 +260,3 @@ def test_truncate_wrong_arguments():
         truncator.truncate(np.ones(3))
     with pytest.raises(NotImplementedError):
         truncator.truncate(tensap.CanonicalTensor.randn(2, SHAPE))
-

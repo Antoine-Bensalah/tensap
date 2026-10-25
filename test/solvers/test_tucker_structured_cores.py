@@ -176,3 +176,12 @@ def test_full_core_matrix_free_matches_dense():
     free = tensap.TuckerTensorALSLinearSolver(A, b, dense_max_size=0,
                                               display=False).update_core(x)
     npt.assert_allclose(free.full().numpy(), dense.full().numpy(), atol=1e-9)
+
+
+def test_tree_core_single_iteration_display(capsys):
+    A, b, _, _ = _tree_problem()
+    x = _random_tucker([2, 2, 2, 2], tensap.DiagonalTensor(np.array([1.0, 0.5]), 4), d=4)
+    solver = tensap.TuckerTensorALSLinearSolver(A, b, max_iterations_core=1, display=True)
+    y = solver.update_core(x)
+    assert isinstance(y.core, tensap.TreeBasedTensor)
+    assert "update_tree_core" in capsys.readouterr().out

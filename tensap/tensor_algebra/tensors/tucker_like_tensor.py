@@ -398,7 +398,10 @@ class BaseTuckerTensor:
             singular values of the matricizations along each dimension.
             TreeBasedTensor core: the tree-based singular values, one array
             per node of the tree (None for the root), the leaves giving the
-            singular values along each dimension.
+            singular values along each dimension. TTTensor core: the
+            singular values of the matricizations along each dimension, one
+            array per dimension (Matlab returns them in sv{2}, with the TT
+            singular values of the core in sv{1}).
 
         Raises
         ------
@@ -413,6 +416,17 @@ class BaseTuckerTensor:
             return vector.tree_based_tensor().singular_values()
         if isinstance(self.core, tensap.FullTensor):
             return self.orth().core.singular_values()
+        if isinstance(self.core, tensap.TTTensor):
+            # orthonormal frames, then the center of the core on mu: the
+            # mu-singular values are those of the middle matricization of
+            # the core mu
+            core = self.orth().core
+            values = []
+            for mu in range(self.order):
+                center = core.orth(mu).cores[mu]
+                matrix = np.moveaxis(center, 1, 0).reshape(center.shape[1], -1)
+                values.append(np.linalg.svd(matrix, compute_uv=False))
+            return values
         raise NotImplementedError(
             f"singular_values is not implemented for a {type(self.core).__name__} core."
         )

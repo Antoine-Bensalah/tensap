@@ -33,6 +33,7 @@ from .solvers.linear_solvers import (
     RankOneALSLinearSolver,
     GreedyLinearSolver,
     TuckerTensorALSLinearSolver,
+    AnisotropicGreedySpaceLinearSolver,
 )
 from .solvers.tt_solvers import TTTensorALSLinearSolver
 from .solvers.inverse_approximators import (
