@@ -225,6 +225,15 @@ def test_wrong_arguments(system):
 # --- AMEn ----------------------------------------------------------------------------
 
 
+@pytest.mark.parametrize("algorithm", ["als", "dmrg", "amen"])
+def test_zero_right_hand_side(system, algorithm):
+    """b = 0: the solution x = 0, without sweeps (they normalize x)."""
+    A, b = system
+    x, output = _solver(A, b * 0.0, algorithm=algorithm).solve()
+    assert x.norm() == 0 and output["flag"] == 0 and output["iter"] == 0
+    assert list(x.shape) == list(b.shape)
+
+
 def test_amen_from_rank_one(system):
     A, b = system
     x0 = tensap.TTTensor.ones([5, 5, 5])

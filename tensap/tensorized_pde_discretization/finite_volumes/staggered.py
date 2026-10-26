@@ -251,19 +251,57 @@ class StaggeredGrid:
         return [self.embed(axis.divergence(right), k)
                 for k, (axis, right) in enumerate(zip(self.axes, rights))]
 
-    def pressure_laplacian(self, tolerance: float = 1e-14) -> "tensap.TTOperator":
-        """sum_k D_k G_k: the cell-centred Laplacian with Neumann conditions
-        on the bounded axes (circulant on the periodic ones)."""
-        terms = [self.embed(axis.cell_laplacian(*(() if axis.periodic
-                                                  else (Neumann(), Neumann()))), k)
-                 for k, axis in enumerate(self.axes)]
+    def pressure_laplacian(self, conditions=None,
+                           tolerance: float = 1e-14) -> "tensap.TTOperator":
+        """The pressure Laplacian L_p = sum_k D_k G_k: the cell-centred
+        Laplacian with the conditions of the pressure, conditions[k] = (left,
+        right) on the axis k (default: homogeneous Neumann on the bounded axes,
+        the walls; circulant on the periodic ones). A Dirichlet condition (p
+        given at an outlet face x_k = L_k) comes from the gradient at that face,
+        (p_ghost - p_{N-1}) / h with p_ghost = 2 g - p_{N-1}, in the divergence
+        of the corrected velocity."""
+        conditions = self._pressure_conditions(conditions)
+        terms = [self.embed(axis.cell_laplacian(*condition), k)
+                 for k, (axis, condition) in enumerate(zip(self.axes, conditions))]
         return _sum(terms, tolerance)
+
+    def _pressure_conditions(self, conditions):
+        if conditions is None:
+            conditions = [(None, None) if axis.periodic else (Neumann(), Neumann())
+                          for axis in self.axes]
+        return [(None, None) if axis.periodic else tuple(condition)
+                for axis, condition in zip(self.axes, conditions)]
+
+    def pressure_is_singular(self, conditions=None) -> bool:
+        """True if the constants are in the kernel of the pressure Laplacian
+        (no Dirichlet condition on the pressure)."""
+        conditions = self._pressure_conditions(conditions)
+        return not any(isinstance(c, Dirichlet) for pair in conditions for c in pair)
+
+    def interior_mask(self, field: str) -> "tensap.TTOperator":
+        """Diagonal operator that zeroes the stored boundary values of a field:
+        face 0 along every bounded axis where the field is on the faces (the
+        known normal velocity on a wall or an inflow). Left-multiplying an
+        operator by it keeps those values unchanged in a time step."""
+        mask = None
+        for k, (axis, location) in enumerate(zip(self.axes, self.locations(field))):
+            if location != "face" or axis.periodic:
+                continue
+            block = tensap.qtt_identity(axis.levels) + tensap.qtt_corner(
+                np.array([[-1.0]]), axis.levels, "top-left")
+            block = self.embed(tensap.Truncator(tolerance=1e-14).truncate(block), k)
+            mask = block if mask is None else mask @ block
+        if mask is None:
+            return self.embed(tensap.qtt_identity(self.axes[0].levels), 0)
+        return mask
 
     def laplacian(self, field: str, conditions, tolerance: float = 1e-14) -> "tensap.TTOperator":
         """Laplacian of a field: the second difference of its location along
         each axis, conditions[k] = (left, right) the conditions of the field at
         the two ends of the axis k (the left one is not used along the axis
-        where the field is on the faces: face 0 is stored)."""
+        where the field is on the faces: face 0 is stored). The rows of the
+        stored boundary faces are zero (interior_mask): the second differences
+        along the other axes do not act on the known values there."""
         locations = self.locations(field)
         if field == "corner":
             raise ValueError("No Laplacian at the corners.")
@@ -273,7 +311,12 @@ class StaggeredGrid:
             block = (axis.face_laplacian(right) if location == "face"
                      else axis.cell_laplacian(left, right))
             terms.append(self.embed(block, k))
-        return _sum(terms, tolerance)
+        operator = _sum(terms, tolerance)
+        if any(location == "face" and not axis.periodic
+               for axis, location in zip(self.axes, locations)):
+            operator = tensap.Truncator(tolerance=tolerance).truncate(
+                self.interior_mask(field) @ operator)
+        return operator
 
     def curl(self) -> list:
         """Discrete curl in 2D, corners -> faces: u = d psi / dy, v = -d psi / dx
@@ -301,7 +344,8 @@ class StaggeredGrid:
         N = int(np.prod(self.shape))
         return tensap.qtt_ones_matrix(int(self.tensorizer.levels.sum())) * (sigma / N)
 
-    def project(self, velocity, rights=None, truncator=None, **solver_options):
+    def project(self, velocity, rights=None, truncator=None, pressure=None,
+                **solver_options):
         """Helmholtz--Hodge decomposition of a face velocity w = u + G phi with
         D u = 0: solve L_p phi = D w (L_p = D G regularized by the rank-one
         term, by TTTensorALSLinearSolver, AMEn by default), then u = w - G phi.
@@ -316,6 +360,13 @@ class StaggeredGrid:
         truncator : tensap.Truncator, optional
             Truncation of the solver and of the results (default tolerance
             1e-10, maximal rank 100).
+        pressure : list, optional
+            Conditions of the pressure, (left, right) per axis
+            (pressure_laplacian); default: homogeneous Neumann (walls). With a
+            homogeneous Dirichlet condition at an outlet, the pressure problem
+            is not singular and is not regularized; the corrected velocity is
+            divergence-free with, at the outlet face, u_N = u*_N - (G phi)_N,
+            the gradient at that face using the ghost of the condition.
         solver_options
             Passed to TTTensorALSLinearSolver (default algorithm 'amen',
             tolerance 1e-12, stagnation 1e-10, 30 iterations, no display).
@@ -336,7 +387,9 @@ class StaggeredGrid:
         options.update(solver_options)
         divergence = self.divergence(rights)
         rhs = truncator.truncate(_sum([D @ w for D, w in zip(divergence, velocity)], 1e-14))
-        operator = self.pressure_laplacian() + self.constant_mode_regularization()
+        operator = self.pressure_laplacian(pressure)
+        if self.pressure_is_singular(pressure):
+            operator = operator + self.constant_mode_regularization()
         phi, _ = tensap.TTTensorALSLinearSolver(
             operator, rhs, truncator=truncator, **options).solve()
         u = [truncator.truncate(w - G @ phi) for w, G in zip(velocity, self.gradient())]

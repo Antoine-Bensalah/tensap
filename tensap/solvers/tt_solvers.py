@@ -127,6 +127,10 @@ class TTTensorALSLinearSolver(LinearSolver):
             iterations, 2: stagnation), 'iter', 'error', 'errvec', 'ranks'.
         """
         A, b = self.A, self.b
+        if self.b.norm() == 0:
+            # x = 0 is the solution; the sweeps would divide by its norm
+            x = tensap.TTTensor.zeros(self.b.shape)
+            return x, {"flag": 0, "iter": 0, "error": 0.0, "errvec": [], "ranks": x.ranks}
         if self.minimize_residual:
             A, b = A.T @ A, A.T @ b
         if self.error_criterion is None:

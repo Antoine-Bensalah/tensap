@@ -271,17 +271,23 @@ def test_grid_locations_and_quantization():
 
 
 def test_grid_laplacians_of_the_velocity():
-    """Viscous term of u: faces along x, cells along y; of v: the reverse."""
+    """Viscous term of u: faces along x, cells along y; of v: the reverse. The
+    rows of the stored boundary faces (face 0 along the face axis) are zero."""
     grid = _grid()
     ax, ay = grid.axes
+    mask_x = np.diag(np.r_[0.0, np.ones(7)])
+    mask_y = np.diag(np.r_[0.0, np.ones(3)])
     Lu = grid.laplacian("u", [(Dirichlet(), Dirichlet()), (Dirichlet(), Dirichlet())])
     expected = (np.kron(_matrix(ax.face_laplacian(Dirichlet())), np.eye(4))
-                + np.kron(np.eye(8), _matrix(ay.cell_laplacian(Dirichlet(), Dirichlet()))))
+                + np.kron(mask_x, _matrix(ay.cell_laplacian(Dirichlet(), Dirichlet()))))
     npt.assert_allclose(_matrix(Lu), expected, atol=1e-7)
+    npt.assert_allclose(_matrix(grid.interior_mask("u")), np.kron(mask_x, np.eye(4)), atol=1e-12)
     Lv = grid.laplacian("v", [(Dirichlet(), Neumann()), (Dirichlet(), Dirichlet())])
-    expected = (np.kron(_matrix(ax.cell_laplacian(Dirichlet(), Neumann())), np.eye(4))
+    expected = (np.kron(_matrix(ax.cell_laplacian(Dirichlet(), Neumann())), mask_y)
                 + np.kron(np.eye(8), _matrix(ay.face_laplacian(Dirichlet()))))
     npt.assert_allclose(_matrix(Lv), expected, atol=1e-7)
+    npt.assert_allclose(_matrix(grid.interior_mask("corner")), np.kron(mask_x, mask_y), atol=1e-12)
+    npt.assert_allclose(_matrix(grid.interior_mask("p")), np.eye(32), atol=1e-12)
     Lp = grid.laplacian("p", [(Neumann(), Neumann()), (Neumann(), Neumann())])
     npt.assert_allclose(_matrix(Lp), _matrix(grid.pressure_laplacian()), atol=1e-7)
     with pytest.raises(ValueError):
@@ -342,3 +348,76 @@ def test_curl_and_regularization_errors():
     sigma = np.sort(eigenvalues)[1]
     npt.assert_allclose(_matrix(grid.constant_mode_regularization()),
                         np.full((32, 32), sigma / 32), rtol=1e-8)
+
+
+# --- level 2: time stepping, outlet pressure, channel --------------------------------
+
+
+@pytest.mark.parametrize("field", ["u", "p"])
+def test_sine_modes_are_eigenvectors_of_the_laplacian(field):
+    """sin(k pi x) sin(m pi y) on the faces (f_0 = f_N = 0) as on the cells
+    (ghosts -f_0, -f_{N-1}): L f = -(lambda_k + lambda_m) f exactly."""
+    grid = StaggeredGrid([StaggeredAxis(1.0, 4), StaggeredAxis(1.0, 3)])
+    x, y = grid.positions(field)
+    mode = np.sin(2 * np.pi * x) * np.sin(3 * np.pi * y)
+    lam = sum(4 / a.h**2 * np.sin(j * np.pi * a.h / 2) ** 2 for a, j in zip(grid.axes, (2, 3)))
+    L = grid.laplacian(field, [(Dirichlet(), Dirichlet())] * 2)
+    npt.assert_allclose(grid.dequantize(L @ grid.quantize(mode)), -lam * mode, atol=1e-8)
+
+
+def _channel():
+    grid = StaggeredGrid([StaggeredAxis(2.0, 4), StaggeredAxis(1.0, 3)])
+    pressure = [(Neumann(), Dirichlet()), (Neumann(), Neumann())]
+    return grid, [Neumann(), Dirichlet()], pressure
+
+
+def test_outlet_pressure_projection():
+    """p = 0 at the outlet: L_p is not singular and not regularized; the
+    corrected velocity, with the outlet face u_N = u*_{N-1} + 2 phi_{N-1} / h,
+    is divergence-free in every cell."""
+    grid, rights, pressure = _channel()
+    assert grid.pressure_is_singular() and not grid.pressure_is_singular(pressure)
+    ax, ay = grid.axes
+    Lp = _matrix(grid.pressure_laplacian(pressure))
+    expected = (np.kron(_matrix(ax.cell_laplacian(Neumann(), Dirichlet())), np.eye(8))
+                + np.kron(np.eye(16), _matrix(ay.cell_laplacian(Neumann(), Neumann()))))
+    npt.assert_allclose(Lp, expected, atol=1e-8)
+    rng = np.random.default_rng(5)
+    u_star = rng.standard_normal(grid.shape)
+    v_star = rng.standard_normal(grid.shape)
+    v_star[:, 0] = 0.0  # wall at y = 0
+    star = [grid.quantize(u_star), grid.quantize(v_star)]
+    (u, v), phi = grid.project(star, rights=rights, pressure=pressure)
+    u, v, phi = (grid.dequantize(a) for a in (u, v, phi))
+    u_faces = np.vstack([u, u_star[-1] + 2 * phi[-1] / ax.h])
+    v_faces = np.hstack([v, np.zeros((16, 1))])
+    divergence = np.diff(u_faces, axis=0) / ax.h + np.diff(v_faces, axis=1) / ay.h
+    npt.assert_allclose(divergence, 0.0, atol=1e-6)
+    npt.assert_allclose(u[0], u_star[0], atol=1e-10)  # inflow face unchanged
+
+
+def test_poiseuille_is_a_fixed_point_of_the_pressure_correction():
+    """u = U_h(y) (-L_y U_h = 8), v = 0, p = 8 (L - x): one step of the
+    incremental pressure correction leaves it unchanged."""
+    grid, rights, pressure = _channel()
+    ax, ay = grid.axes
+    profile = np.linalg.solve(-_matrix(ay.cell_laplacian(Dirichlet(), Dirichlet())),
+                              8 * np.ones(ay.size))
+    xc, _ = grid.positions("p")
+    u = grid.quantize(np.tile(profile, (ax.size, 1)))
+    v = grid.quantize(np.zeros(grid.shape))
+    p = grid.quantize(8 * (2.0 - xc))
+    dt = 0.01
+    conditions = {"u": [(None, Neumann()), (Dirichlet(), Dirichlet())],
+                  "v": [(Dirichlet(), Neumann()), (None, Dirichlet())]}
+    identity = grid.interior_mask("p")
+    star = []
+    for k, (c, w) in enumerate(zip("uv", (u, v))):
+        A = identity + grid.laplacian(c, conditions[c]) * (-dt)
+        rhs = w - (grid.gradient()[k] @ p) * dt
+        star.append(tensap.TTTensorALSLinearSolver(A, rhs, algorithm="amen", tolerance=1e-10,
+                                                   stagnation=1e-10, display=False).solve()[0])
+    (u1, v1), phi = grid.project(star, rights=rights, pressure=pressure, tolerance=1e-10)
+    npt.assert_allclose(grid.dequantize(u1), grid.dequantize(u), atol=1e-8)
+    npt.assert_allclose(grid.dequantize(v1), 0.0, atol=1e-8)
+    npt.assert_allclose(grid.dequantize(phi), 0.0, atol=1e-8)
