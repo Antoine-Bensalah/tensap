@@ -64,9 +64,13 @@ def _tutorial_params():
 
 
 @pytest.mark.tutorial
-# the tutorials may show the warnings of tensap to the user (as the truncation
-# tutorial does): they are displayed, not errors
-@pytest.mark.filterwarnings("default::UserWarning:tensap")
+# warnings are errors in the tutorials too (an unexpected warning of a solver
+# or of a truncation is a failed acceptance); the expected ones are listed,
+# narrowly: tutorial_tensor_truncation truncates a TreeBasedTensor with a tree
+# argument on purpose (the truncation tutorial of the Poisson solution catches
+# its own warning)
+@pytest.mark.filterwarnings(
+    "default:The provided tree and/or is_active_node are not taken into account:UserWarning")
 # some tutorials open many figures, closed at the end of the test
 @pytest.mark.filterwarnings("ignore:More than 20 figures have been opened:RuntimeWarning")
 @pytest.mark.parametrize("f", _tutorial_params())

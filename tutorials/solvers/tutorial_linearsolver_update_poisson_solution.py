@@ -25,6 +25,12 @@ by a Galerkin problem (TuckerTensorALSLinearSolver):
 3. tree-based core (balanced tree), updated node by node;
 4. TT core, the Galerkin problem on the core being solved by
    TTTensorALSLinearSolver (ALS, then DMRG).
+
+Acceptance: the updates must improve on the pure greedy iterate (ordering) and
+reach an absolute relative residual ||A x - b|| / ||b|| (thresholds about 4
+times the values observed with seed 0: 5e-3, 4e-3 and 2e-4 for the canonical
+variants, 3e-2 for 10 pure greedy corrections, 2e-6 to 3e-6 for the updated
+Tucker, tree-based and TT cores).
 """
 
 # %% Imports
@@ -37,7 +43,9 @@ from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor
 
 
 def residual(A, b, x):
-    return (A @ x - b).norm() / b.norm()
+    value = (A @ x - b).norm() / b.norm()
+    assert np.isfinite(value)
+    return value
 
 
 def greedy(A, b, update=None, **kwargs):
@@ -72,6 +80,7 @@ print(f"  pure greedy          residual {residual(A, b, u0):.2e}  ({t0:.1f} s)")
 print(f"  update of the core   residual {residual(A, b, u1):.2e}  ({t1:.1f} s)")
 print(f"  core and frames      residual {residual(A, b, u2):.2e}  ({t2:.1f} s)")
 assert residual(A, b, u2) < residual(A, b, u1) < residual(A, b, u0)
+assert residual(A, b, u0) < 2e-2 and residual(A, b, u1) < 2e-2 and residual(A, b, u2) < 1e-3
 
 # %% 2. Updates: Tucker case (full core)
 A = factory.make_tucker_tensor()
@@ -88,6 +97,8 @@ print(f"  update of the core   residual {residual(A, b, u4):.2e}  ({t4:.1f} s), 
       f"core of size {np.prod(u4.representation_rank())}")
 print(f"  core and frames      residual {residual(A, b, u5):.2e}  ({t5:.1f} s)")
 assert residual(A, b, u4) < residual(A, b, u3)
+assert residual(A, b, u5) <= residual(A, b, u4)
+assert residual(A, b, u3) < 0.1 and residual(A, b, u4) < 1e-5 and residual(A, b, u5) < 1e-5
 
 # %% 3. Updates: tree-based core
 Ah = factory.make_tree_based_tensor()
@@ -97,7 +108,7 @@ uh, th = greedy(Ah, b, update=su.update_core, max_iterations=10)
 print("TREE-BASED CORE")
 print(f"  update of the core   residual {residual(Ah, b, uh):.2e}  ({th:.1f} s), "
       f"tree ranks {uh.core.ranks}")
-assert residual(Ah, b, uh) < residual(A, b, u3)
+assert residual(Ah, b, uh) < residual(A, b, u3) and residual(Ah, b, uh) < 1e-5
 
 # %% 4. Updates: TT core
 At = factory.make_tt_tucker_tensor()
@@ -109,4 +120,4 @@ for algorithm in ("als", "dmrg"):
     print(f"TT CORE ({algorithm})")
     print(f"  update of the core   residual {residual(At, b, ut):.2e}  ({tt:.1f} s), "
           f"TT ranks of the core {ut.core.ranks}")
-    assert residual(At, b, ut) < residual(A, b, u3)
+    assert residual(At, b, ut) < residual(A, b, u3) and residual(At, b, ut) < 1e-5

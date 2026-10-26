@@ -62,10 +62,21 @@ print(f"Greedy solution: ranks {u.representation_rank()}, storage {u.storage()}"
 t = tensap.Truncator(tolerance=1e-4)
 
 
+def pde_residual(v):
+    """||b - A v|| / ||b||: how well v solves the PDE (not only how well it
+    approximates u)."""
+    return (b - A @ v).norm() / b.norm()
+
+
+residuals = {"greedy": pde_residual(u)}
+print(f"Greedy solution: PDE residual {residuals['greedy']:.2e}")
+
+
 def report(name, v):
     error = (v - u).norm() / u.norm()
-    print(f"{name}: relative error {error:.2e}, storage {v.storage()} "
-          f"({v.storage() / u.storage():.1%} of the greedy solution)")
+    residuals[name] = pde_residual(v)
+    print(f"{name}: relative error {error:.2e}, PDE residual {residuals[name]:.2e}, "
+          f"storage {v.storage()} ({v.storage() / u.storage():.1%} of the greedy solution)")
     return error
 
 
@@ -75,20 +86,21 @@ with warnings.catch_warnings(record=True) as caught:
     u_can = t.truncate(u)
 for warning in caught:
     print(f"Warning: {warning.message}")
-error_can = report(f"Canonical, ranks {u_can.representation_rank()}", u_can)
+error_can = report("canonical", u_can)
+print(f"  ranks {u_can.representation_rank()}")
 
 # %% 2. Truncation in Tucker format with a TT core
 u_tt = tensap.TuckerTensorVector(tensap.TTTensor.from_diagonal_tensor(u.core), u.tensor_frame)
 u_tt_t = t.truncate(u_tt)
-error_tt = report(f"Tucker-TT, Tucker ranks {u_tt_t.representation_rank()}, "
-                  f"TT ranks {u_tt_t.core.ranks}", u_tt_t)
+error_tt = report("Tucker-TT", u_tt_t)
+print(f"  Tucker ranks {u_tt_t.representation_rank()}, TT ranks {u_tt_t.core.ranks}")
 
 # %% 3. Truncation in tree-based format
 tree = tensap.DimensionTree.balanced(d)
 u_tree = tensap.TuckerTensorVector(u.core.tree_based_tensor(tree), u.tensor_frame)
 u_tree_t = t.truncate(u_tree)
-error_tree = report("Tree-based, ranks "
-                    f"{u_tree_t.tree_based_tensor().ranks.tolist()}", u_tree_t)
+error_tree = report("tree-based", u_tree_t)
+print(f"  ranks {u_tree_t.tree_based_tensor().ranks.tolist()}")
 
 # %% Self-check
 # The Tucker-TT and tree-based truncations reach the requested precision; the
@@ -96,3 +108,10 @@ error_tree = report("Tree-based, ranks "
 assert error_tt <= t.tolerance, error_tt
 assert error_tree <= t.tolerance, error_tree
 assert error_can <= 10 * t.tolerance, error_can
+# The truncations approximate the greedy tensor u, not the solution of the
+# PDE: u itself (50 rank-one corrections in dimension 10) has a PDE residual of
+# about 7e-2, and the truncations must not degrade it (observed: equal to 3
+# digits). An excellent compression of a poor solution is still a poor solution.
+assert residuals["greedy"] < 0.1, residuals["greedy"]
+for name in ("canonical", "Tucker-TT", "tree-based"):
+    assert abs(residuals[name] - residuals["greedy"]) < 1e-2 * residuals["greedy"], name

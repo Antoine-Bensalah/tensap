@@ -149,6 +149,9 @@ print(f"\nStopped after {output['iter']} iterations (flag = {output['flag']}, "
       f"0 = tolerance reached, 1 = max iterations reached, 2 = stagnation).")
 print(f"Final relative error ||b - A@x|| / ||b|| = {output['error']:.3e}")
 print(f"Final Tucker representation ranks of x: {x.representation_rank()}")
+# acceptance: the true residual, recomputed (observed 1.0e-3, flag 0)
+true_residual = (b - A @ x).norm() / b.norm()
+assert output["flag"] == 0 and true_residual < 1.1e-3, (output["flag"], true_residual)
 
 # %% Plot of the convergence history
 plt.figure()
@@ -218,6 +221,9 @@ x_can, output_can = solver.solve()
 
 print(f"\nStopped after {output_can['iter']} iterations (flag = {output_can['flag']}).")
 print(f"Final relative error ||b - A@x|| / ||b|| = {output_can['error']:.3e}")
+# acceptance (observed 4.0e-2 after 30 corrections, flag 1: the pure greedy
+# solver is slow, the updates below are the remedy)
+assert output_can["error"] < 0.1, output_can["error"]
 print(f"Canonical rank of x: {x_can.representation_rank()[0]}")
 print(f"Storage of x: {x_can.storage()} numbers instead of n^d = {float(n)**d:.0e}")
 
@@ -267,6 +273,10 @@ solver = tensap.TuckerTensorALSLinearSolver(
 )
 x_als, output_als = solver.solve()
 print(f"ALS from the greedy solution: relative error {output_als['error']:.3e}")
+# acceptance (observed: core 2.1e-2, frames 3.1e-4, ALS 3.8e-3)
+for name, result, threshold in (("core", output_core, 0.05), ("frames", output_frames, 1e-3),
+                                ("ALS", output_als, 1e-2)):
+    assert result["error"] < min(threshold, output_can["error"]), (name, result["error"])
 
 # %% Comparison of the greedy variants
 plt.figure()
@@ -307,7 +317,8 @@ for algorithm, iterations in (("als", 5), ("dmrg", 8)):
     print(f"Greedy + TT core update by {algorithm.upper()}: relative error "
           f"{outputs_tt[algorithm]['error']:.3e} after {outputs_tt[algorithm]['iter']} "
           f"iterations, TT ranks of the core {x_tt.core.ranks}, storage {x_tt.storage()}")
-    assert outputs_tt[algorithm]["error"] < output_can["error"]
+    # acceptance (observed 1.4e-5 for ALS and DMRG)
+    assert outputs_tt[algorithm]["error"] < min(1e-4, output_can["error"])
 
 # %% Comparison with the updates of Part 3
 plt.figure()
