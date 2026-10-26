@@ -187,8 +187,9 @@ def test_tree_core_single_iteration_display(capsys):
     assert "update_tree_core" in capsys.readouterr().out
 
 
-@pytest.mark.parametrize("dense_max_size", [2000, 0])
-def test_tree_contraction_matches_the_explicit_local_problem(dense_max_size):
+@pytest.mark.parametrize("dense_max_size, preconditioner",
+                         [(2000, None), (0, None), (0, "kronecker_sum")])
+def test_tree_contraction_matches_the_explicit_local_problem(dense_max_size, preconditioner):
     """Local systems of the nodes: tree contraction (inactive leaves) against
     the explicit map from the node tensor to the full core."""
     A, b, _, _ = _tree_problem()
@@ -199,7 +200,8 @@ def test_tree_contraction_matches_the_explicit_local_problem(dense_max_size):
     core = tensap.TreeBasedTensor.randn(tree, ranks, [3, 3, 3, 3]).inactivate_nodes(tree.dim2ind)
     x = _random_tucker([3, 3, 3, 3], core, d=4, seed=6).orth()
     solver = tensap.TuckerTensorALSLinearSolver(A, b, dense_max_size=dense_max_size,
-                                                display=False)
+                                                local_preconditioner=preconditioner,
+                                                local_tolerance=1e-13, display=False)
     x_frames = x.tensor_frame
     xAx = x_frames.dot_with_metrics(x_frames, A.tensor_frame)
     metric_A = [m.transpose(0, 2, 1).reshape(-1, m.shape[1]) for m in xAx]
@@ -210,3 +212,32 @@ def test_tree_contraction_matches_the_explicit_local_problem(dense_max_size):
         contracted = solver._tree_node_problem(local, nod, metric_A, metric_b)
         explicit = solver._tree_node_problem_explicit(local, nod, apply, rhs)
         npt.assert_allclose(contracted, explicit, rtol=1e-8, atol=1e-10)
+
+
+def test_kronecker_terms_and_kronecker_sum_preconditioner():
+    from tensap.solvers.linear_solvers import (
+        _kronecker_sum_preconditioner, _kronecker_terms_apply)
+    rng = np.random.default_rng(7)
+    shape = (3, 4, 2)
+    # a Kronecker sum S_0 x I x I + I x S_1 x I + I x I x S_2, written with the
+    # node tensor of a Laplacian-like tree operator (index 1: identity)
+    spd = []
+    for n in shape:
+        q = rng.standard_normal((n, n))
+        spd.append(q @ q.T + n * np.eye(n))
+    interfaces = [np.stack([s_, np.eye(n)], axis=1) for s_, n in zip(spd, shape)]
+    node = np.zeros((2, 2, 2))
+    node[0, 1, 1] = node[1, 0, 1] = node[1, 1, 0] = 1.0
+    dense = (np.kron(np.kron(spd[0], np.eye(4)), np.eye(2))
+             + np.kron(np.kron(np.eye(3), spd[1]), np.eye(2))
+             + np.kron(np.kron(np.eye(3), np.eye(4)), spd[2]))
+    c = rng.standard_normal(shape)
+    npt.assert_allclose(_kronecker_terms_apply(node, interfaces, c).ravel(), dense @ c.ravel())
+    preconditioner = _kronecker_sum_preconditioner(node, interfaces, shape)
+    npt.assert_allclose(preconditioner.matvec(dense @ c.ravel()), c.ravel(), atol=1e-10)
+
+
+def test_wrong_local_preconditioner():
+    A, b, _, _ = _tree_problem()
+    with pytest.raises(ValueError):
+        tensap.TuckerTensorALSLinearSolver(A, b, local_preconditioner="ilu")

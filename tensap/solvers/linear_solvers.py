@@ -498,6 +498,71 @@ class GreedyLinearSolver(LinearSolver):
         return x, output
 
 
+def _kronecker_terms_apply(node, interfaces, c):
+    """y(i_0, ..., i_{n-1}) = sum_k node(k_0, ..., k_{n-1}) prod_t
+    L_t(i_t, k_t, j_t) c(j_0, ..., j_{n-1}): a sum of Kronecker products of
+    the matrices L_t(:, k_t, :), applied by one tensordot per axis (BLAS),
+    then contracted with the node tensor."""
+    n = c.ndim
+    labels = [("j", t) for t in range(n)]
+    for t, interface in enumerate(interfaces):
+        position = labels.index(("j", t))
+        c = np.tensordot(interface, c, axes=(2, position))
+        labels = [("i", t), ("k", t)] + labels[:position] + labels[position + 1:]
+    k_axes = [labels.index(("k", t)) for t in range(n)]
+    c = np.tensordot(c, node, axes=(k_axes, list(range(n))))
+    labels = [label for label in labels if label[0] != "k"]
+    return c.transpose([labels.index(("i", t)) for t in range(n)])
+
+
+def _kronecker_sum_preconditioner(node, interfaces, shape):
+    """Inverse of the Kronecker sum closest to the local operator
+    M = sum_k node(k) L_0^{k_0} x ... x L_{n-1}^{k_{n-1}}, applied by fast
+    diagonalization.
+
+    The orthogonal projection of M on the Kronecker sums
+    S_0 x I x ... x I + ... + I x ... x I x S_{n-1} (Frobenius inner product)
+    is given by the partial traces T_t = tr_{s != t}(M) / prod_{s != t} n_s and
+    the mean tau = tr(M) / prod_s n_s: S_t = T_t, with the identity counted
+    n - 1 times too many, removed from the eigenvalues. With the
+    eigendecompositions T_t = Q_t diag(lambda_t) Q_t^T, the inverse is
+    (Q_0 x ... x Q_{n-1}) diag(1 / (sum_t lambda_t - (n - 1) tau))
+    (Q_0 x ... x Q_{n-1})^T. It is exact when M is a Kronecker sum, which is
+    the case of the Laplacian with orthonormal interfaces (the interfaces of
+    the subtrees without the operator K are identities)."""
+    n = len(shape)
+    traces = [np.einsum("iki->k", interface) for interface in interfaces]
+    total = np.einsum(node, list(range(n)), *[x for t in range(n) for x in (traces[t], [t])], [])
+    size = int(np.prod(shape))
+    tau = total / size
+    eigenvalues, bases = [], []
+    for t, interface in enumerate(interfaces):
+        weights = np.einsum(node, list(range(n)),
+                            *[x for s in range(n) if s != t for x in (traces[s], [s])], [t])
+        partial = np.tensordot(interface, weights, axes=(1, 0)) * shape[t] / size
+        partial = 0.5 * (partial + partial.T)
+        values, vectors = np.linalg.eigh(partial)
+        eigenvalues.append(values)
+        bases.append(vectors)
+    denominator = -(n - 1) * tau
+    for t in range(n):
+        denominator = np.add.outer(denominator, eigenvalues[t]) if t else (
+            eigenvalues[0] + denominator)
+    denominator = np.where(np.abs(denominator) > 1e-14 * np.abs(denominator).max(),
+                           denominator, 1e-14 * np.abs(denominator).max())
+
+    def apply(vector):
+        v = vector.reshape(shape)
+        for t in range(n):
+            v = np.moveaxis(np.tensordot(bases[t].T, v, axes=(1, t)), 0, t)
+        v = v / denominator
+        for t in range(n):
+            v = np.moveaxis(np.tensordot(bases[t], v, axes=(1, t)), 0, t)
+        return v.ravel()
+
+    return spla.LinearOperator((size, size), matvec=apply, dtype=float)
+
+
 class AnisotropicGreedySpaceLinearSolver(LinearSolver):
     """
     Greedy construction of tensor subspaces U_1 x ... x U_d with anisotropic
@@ -696,9 +761,16 @@ class TuckerTensorALSLinearSolver(LinearSolver):
     core_truncator : tensap.Truncator, optional
         TT cores: truncator of DMRG and AMEn.
     dense_max_size : int
-        Full cores: Galerkin systems on the core up to this size are
-        assembled and solved directly, larger ones by conjugate gradient
-        without assembling the matrix.
+        Full and tree-based cores: Galerkin systems on the core (or on a node)
+        up to this size are assembled and solved directly, larger ones by
+        conjugate gradient without assembling the matrix.
+    local_preconditioner : str or None
+        Tree-based cores, matrix-free local systems: 'kronecker_sum'
+        (default; inverse of the Kronecker sum closest to the local operator,
+        by fast diagonalization) or None.
+    local_tolerance : float
+        Relative tolerance of the conjugate gradient of the matrix-free local
+        systems of the tree-based cores.
     """
 
     def __init__(
@@ -712,6 +784,8 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         core_algorithm="als",
         core_truncator=None,
         dense_max_size=2000,
+        local_preconditioner="kronecker_sum",
+        local_tolerance=1e-10,
         **kwargs,
     ):
         super().__init__(A, b, **kwargs)
@@ -724,6 +798,10 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         self.core_algorithm = core_algorithm
         self.core_truncator = core_truncator
         self.dense_max_size = dense_max_size
+        if local_preconditioner not in (None, "kronecker_sum"):
+            raise ValueError("local_preconditioner must be None or 'kronecker_sum'.")
+        self.local_preconditioner = local_preconditioner
+        self.local_tolerance = local_tolerance
 
     def solve(self, x=None):
         """Alternate core and frames updates, starting from x (or x0).
@@ -951,7 +1029,7 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         """Galerkin system of the node nod of a tree-based core with inactive
         leaves, built by the tree contraction and solved directly (up to
         dense_max_size unknowns) or by the conjugate gradient without
-        assembling its matrix.
+        assembling its matrix, preconditioned by local_preconditioner.
 
         The interfaces of the children and of the parent of the node,
         L_t(i, k, j) for the test index i, the index k of A and the trial
@@ -978,9 +1056,6 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         n = len(shape)
         test, trial, op = list(range(n)), list(range(n, 2 * n)), list(range(2 * n, 3 * n))
 
-        operands = [node_A, op]
-        for t, interface in enumerate(interfaces):
-            operands += [interface, [test[t], op[t], trial[t]]]
         rhs_operands = [node_b, op]
         for t, interface in enumerate(interfaces_b):
             rhs_operands += [interface, [test[t], op[t]]]
@@ -988,17 +1063,22 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         size = rhs.size
 
         if size <= self.dense_max_size:
+            operands = [node_A, op]
+            for t, interface in enumerate(interfaces):
+                operands += [interface, [test[t], op[t], trial[t]]]
             matrix = np.einsum(*operands, test + trial, optimize=True).reshape(size, size)
             return np.linalg.solve(matrix, rhs)
 
         def matvec(vector):
-            return np.einsum(*operands, vector.reshape(shape), trial, test,
-                             optimize=True).ravel()
+            return _kronecker_terms_apply(node_A, interfaces, vector.reshape(shape)).ravel()
 
         operator = spla.LinearOperator((size, size), matvec=matvec, dtype=float)
+        preconditioner = None
+        if self.local_preconditioner == "kronecker_sum":
+            preconditioner = _kronecker_sum_preconditioner(node_A, interfaces, shape)
         guess = core.tensors[nod - 1].numpy().ravel()
-        solution, _ = spla.cg(operator, rhs, x0=guess, rtol=1e-12, atol=0.0,
-                              maxiter=10 * size)
+        solution, _ = spla.cg(operator, rhs, x0=guess, rtol=self.local_tolerance, atol=0.0,
+                              maxiter=10 * size, M=preconditioner)
         return solution
 
     @staticmethod
