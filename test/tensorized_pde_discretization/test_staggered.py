@@ -297,3 +297,48 @@ def test_ranks_do_not_depend_on_the_resolution_and_errors():
     with pytest.raises(ValueError):
         StaggeredAxis(1.0, 0)
     assert "StaggeredGrid" in repr(_grid())
+
+
+# --- level 1: curl, regularization, Helmholtz-Hodge decomposition ------------------
+
+
+@pytest.mark.parametrize("periodic", [False, True])
+def test_helmholtz_hodge_decomposition(periodic):
+    L = 2 * np.pi if periodic else 1.0
+    grid = StaggeredGrid([StaggeredAxis(L, 4, periodic), StaggeredAxis(L, 3, periodic)])
+    rng = np.random.default_rng(3)
+    psi = rng.standard_normal(grid.shape)
+    if not periodic:
+        psi[0, :] = psi[:, 0] = 0.0  # the stream function vanishes on the boundary
+    phi = rng.standard_normal(grid.shape)
+    Psi, Phi = grid.quantize(psi), grid.quantize(phi)
+    u = [C @ Psi for C in grid.curl()]
+    rights = [None if periodic else Dirichlet()] * 2
+    divergence = grid.divergence(rights)
+    npt.assert_allclose(sum(grid.dequantize(D @ uk) for D, uk in zip(divergence, u)), 0.0,
+                        atol=1e-10)
+    w = [uk + G @ Phi for uk, G in zip(u, grid.gradient())]
+    u_rec, phi_rec = grid.project(w, rights)
+    for a, b in zip(u_rec, u):
+        npt.assert_allclose(grid.dequantize(a), grid.dequantize(b), atol=1e-8)
+    npt.assert_allclose(grid.dequantize(phi_rec), phi - phi.mean(), atol=1e-8)
+    # orthogonality: (u, G phi) = -(D u, phi) = 0
+    gradient = [G @ phi_rec for G in grid.gradient()]
+    assert abs(sum(a.dot(b) for a, b in zip(u_rec, gradient))) < 1e-8
+    if periodic:
+        u_default, _ = grid.project(w)
+        npt.assert_allclose(grid.dequantize(u_default[0]), grid.dequantize(u[0]), atol=1e-8)
+
+
+def test_curl_and_regularization_errors():
+    grid3 = StaggeredGrid([StaggeredAxis(1.0, 2)] * 3)
+    with pytest.raises(ValueError):
+        grid3.curl()
+    grid = _grid()
+    R = _matrix(grid.constant_mode_regularization(sigma=2.0))
+    npt.assert_allclose(R, np.full((32, 32), 2.0 / 32), atol=1e-12)
+    # sigma by default: the smallest non-zero eigenvalue of -L_p
+    eigenvalues = np.linalg.eigvalsh(-_matrix(grid.pressure_laplacian()))
+    sigma = np.sort(eigenvalues)[1]
+    npt.assert_allclose(_matrix(grid.constant_mode_regularization()),
+                        np.full((32, 32), sigma / 32), rtol=1e-8)

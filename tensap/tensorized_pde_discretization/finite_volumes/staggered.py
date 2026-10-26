@@ -275,6 +275,73 @@ class StaggeredGrid:
             terms.append(self.embed(block, k))
         return _sum(terms, tolerance)
 
+    def curl(self) -> list:
+        """Discrete curl in 2D, corners -> faces: u = d psi / dy, v = -d psi / dx
+        for a stream function psi at the corners, by the divergence blocks
+        (faces -> cells) along the other axis; psi vanishes at the ends of the
+        bounded axes. Then sum_k D_k (curl psi)_k = 0 exactly (the blocks of
+        different axes commute)."""
+        if self.dim != 2:
+            raise ValueError("The curl of a stream function is defined in 2D.")
+        dx, dy = (axis.divergence(None if axis.periodic else Dirichlet())
+                  for axis in self.axes)
+        return [self.embed(dy, 1), self.embed(dx, 0) * -1.0]
+
+    def constant_mode_regularization(self, sigma: float = None) -> "tensap.TTOperator":
+        """The rank-one term (sigma / N) 1 1^T that makes the pressure Laplacian
+        (singular: Neumann or periodic on every axis) definite, sigma being by
+        default its smallest non-zero eigenvalue (as for the cell-centred
+        grids, finite_volumes.Grid.constant_mode_regularization)."""
+        if sigma is None:
+            sigma = min(
+                Axis(axis.length, axis.levels, periodic=True).smallest_nonzero_eigenvalue()
+                if axis.periodic else
+                Axis(axis.length, axis.levels, Neumann(), Neumann()).smallest_nonzero_eigenvalue()
+                for axis in self.axes)
+        N = int(np.prod(self.shape))
+        return tensap.qtt_ones_matrix(int(self.tensorizer.levels.sum())) * (sigma / N)
+
+    def project(self, velocity, rights=None, truncator=None, **solver_options):
+        """Helmholtz--Hodge decomposition of a face velocity w = u + G phi with
+        D u = 0: solve L_p phi = D w (L_p = D G regularized by the rank-one
+        term, by TTTensorALSLinearSolver, AMEn by default), then u = w - G phi.
+
+        Parameters
+        ----------
+        velocity : list of tensap.TTTensor
+            The d components of w, at their faces.
+        rights : list, optional
+            The condition of each component at the end x_k = L_k (default:
+            homogeneous Dirichlet, walls; None on a periodic axis).
+        truncator : tensap.Truncator, optional
+            Truncation of the solver and of the results (default tolerance
+            1e-10, maximal rank 100).
+        solver_options
+            Passed to TTTensorALSLinearSolver (default algorithm 'amen',
+            tolerance 1e-12, stagnation 1e-10, 30 iterations, no display).
+
+        Returns
+        -------
+        u : list of tensap.TTTensor
+            The divergence-free part.
+        phi : tensap.TTTensor
+            The potential, of zero mean.
+        """
+        if rights is None:
+            rights = [None if axis.periodic else Dirichlet() for axis in self.axes]
+        if truncator is None:
+            truncator = tensap.Truncator(tolerance=1e-10, max_rank=100)
+        options = {"algorithm": "amen", "tolerance": 1e-12, "stagnation": 1e-10,
+                   "max_iterations": 30, "display": False}
+        options.update(solver_options)
+        divergence = self.divergence(rights)
+        rhs = truncator.truncate(_sum([D @ w for D, w in zip(divergence, velocity)], 1e-14))
+        operator = self.pressure_laplacian() + self.constant_mode_regularization()
+        phi, _ = tensap.TTTensorALSLinearSolver(
+            operator, rhs, truncator=truncator, **options).solve()
+        u = [truncator.truncate(w - G @ phi) for w, G in zip(velocity, self.gradient())]
+        return u, phi
+
     def __repr__(self):
         return f"StaggeredGrid(shape={self.shape}, ordering={self.ordering!r})"
 
