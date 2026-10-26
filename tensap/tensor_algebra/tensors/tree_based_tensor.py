@@ -1943,65 +1943,70 @@ class TreeBasedTensor:
             The result of the contraction.
 
         """
-        # The contraction through the tree (reduce_dot_with_rank_one_metric_at_node
-        # of Matlab) is not ported: the tensors are contracted in full format,
-        # which is exact and affordable for the cores of Tucker tensors.
+        tree = self.tree
+        leaves_inactive = isinstance(tensor2, TreeBasedTensor) and not (
+            np.any(self.is_active_node[tree.is_leaf])
+            or np.any(tensor2.is_active_node[tree.is_leaf])
+        )
+        if leaves_inactive:
+            # contraction through the trees, around the leaf of dimension dim
+            node = int(tree.dim2ind[dim])
+            return self.reduce_dot_with_rank_one_metric_at_node(tensor2, matrices, node)[-1]
+        # active leaves: contraction in full format (exact, for small tensors)
         other = tensor2.full() if isinstance(tensor2, TreeBasedTensor) else tensor2
         return self.full().tensordot_matrix_product_except_dim(other, matrices, dim)
 
-    # def reduce_dot_with_rank_one_metric_at_node(self, tensor2, matrices,
-    #                                             alpha):
-    #     raise NotImplementedError('Not implemented.')
-    #     if np.any(self.is_active_node[self.tree.is_leaf]):
-    #         raise NotImplementedError('Not implemented for active leaves.')
-    #     tree = self.tree
-    #     tensors1 = np.array(self.tensors)
-    #     tensors2 = np.array(tensor2.tensors)
-    #     nod_level = tree.level[alpha-1]
-    #     is_root = nod_level == 0
-    #     is_leaf = tree.is_leaf[alpha-1]
+    def reduce_dot_with_rank_one_metric_at_node(self, tensor2, matrices, node):
+        """
+        Contractions of two tree-based tensors with a rank-one metric, around
+        a node (port of Matlab reduceDotWithRankOneMetricAtNode).
 
-    #     tmp = np.empty(tree.nb_nodes, dtype=object)
-    #     tmp[tree.dim2ind-1] = matrices
-    #     if not is_leaf:
-    #         out = np.empty(tensors1[alpha-1].order, dtype=object)
-    #     else:
-    #         out = np.empty(1, dtype=object)
-    #     descendants = tree.descendants(alpha)
-    #     is_descendant = [bool(i in descendants) for
-    #                      i in np.arange(1, tree.nb_nodes + 1)]
-    #     is_not_leaf = np.logical_not(tree.is_leaf)
+        With the metric M = M_1 x ... x M_d (matrices[nu] of shape
+        (self.shape[nu], tensor2.shape[nu])), the inner product
+        (self, M tensor2) is a contraction of the two tree tensor networks
+        through the matrices at the leaves. This method returns the
+        contractions of the subtree of each child beta of the node,
+        N_beta(k, l) = sum over the subtree of self (rank index k at beta),
+        M and tensor2 (rank index l), and, if the node is not the root, the
+        contraction N_parent of everything outside the subtree of the node.
+        They are computed from the leaves to the root (bottom contractions),
+        then from the root to the node (top contractions), so that the full
+        tensors are never formed.
 
-    #     if not is_leaf:
-    #         # Contract under the node alpha
-    #         for level in np.arange(np.max(tree.level)-1, nod_level, -1):
-    #             nod_level = [tree.nodes_indices[nod]
-    #                          for nod in range(tree.nb_nodes)
-    #                          if tree.level[nod] == level and is_not_leaf[nod]
-    #                          and is_descendant[nod]]
-    #             for nod in nod_level:
-    #                 children = tree.children(nod)
-    #                 if tree.parent(nod) != 0:
-    #                     ind = range(tensors1[nod-1].order-1)
-    #                 else:
-    #                     ind = range(tensors1[nod-1].order)
-    #                 tmp[nod-1] = tensors1[nod-1].tensor_matrix_product(
-    #                     tensors2[nod-1].tensor_matrix_product(out[children-1],
-    #                                                           ind), ind, ind)
-    #                 # tmp[nod-1] = tmp[nod-1].reshape([tensors[nod-1].shape[]])
-    #                 tmp[nod-1] = tmp[nod-1].numpy()
+        Parameters
+        ----------
+        tensor2 : TreeBasedTensor
+            The second tensor, on the same tree.
+        matrices : list of numpy.ndarray
+            One matrix per dimension.
+        node : int
+            The node (1-based index).
 
-    #     if not is_root:
-    #         pass
+        Raises
+        ------
+        NotImplementedError
+            If a leaf of one of the tensors is active (as in Matlab).
 
-    #     # Fill the output
-    #     if not is_leaf:
-    #         children = tree.children(alpha)
-    #         out[:children.size] = tmp[children-1]
-    #     if not is_root:
-    #         out[-1] = tmp[tree.parent(alpha)-1]
-
-    #     return out
+        Returns
+        -------
+        list of numpy.ndarray
+            The matrices of the children of node (none for a leaf), then the
+            matrix of its parent if node is not the root. The matrix of a
+            child or of the parent has shape (rank of self, rank of tensor2)
+            at this node; at a leaf, the ranks are the sizes of the
+            dimension.
+        """
+        tree = self.tree
+        if np.any(self.is_active_node[tree.is_leaf]) or np.any(
+            tensor2.is_active_node[tree.is_leaf]
+        ):
+            raise NotImplementedError("Not implemented for active leaves.")
+        bottom, top = _tree_contractions(self, tensor2, matrices)
+        children = [int(c) for c in tree.children(node) if c != 0]
+        out = [bottom[c] for c in children]
+        if node != tree.root:
+            out.append(top[node])
+        return out
 
     def singular_values(self):
         """
@@ -2741,3 +2746,54 @@ class TreeBasedTensor:
             is_active_node = np.full(tree.nb_nodes, True)
             is_active_node[tree.dim2ind[perm] - 1] = False
         return is_active_node
+
+
+def _contract_node(x, y, matrices, keep):
+    """Contraction of the node tensors x and y (same number of axes) through
+    matrices[t] (shape (x.shape[t], y.shape[t])) on every axis t but keep:
+    returns the matrix of shape (x.shape[keep], y.shape[keep]). An axis
+    t with matrices[t] None must not exist (every axis but keep has one)."""
+    n = x.ndim
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    left, right = letters[:n], letters[n:2 * n]
+    operands, subscripts = [x, y], [left, right]
+    for t in range(n):
+        if t != keep:
+            operands.append(matrices[t])
+            subscripts.append(left[t] + right[t])
+    expression = ",".join(subscripts) + "->" + left[keep] + right[keep]
+    return np.einsum(expression, *operands, optimize=True)
+
+
+def _tree_contractions(x, y, matrices):
+    """Bottom and top contractions of two tree-based tensors with inactive
+    leaves and a rank-one metric (see reduce_dot_with_rank_one_metric_at_node).
+
+    bottom[nod]: contraction of the subtree of nod (shape (rank of x, rank of
+    y) at nod); top[nod]: contraction of everything outside the subtree of nod,
+    for nod != root. Leaves: bottom is the matrix of their dimension."""
+    tree = x.tree
+    bottom, top = {}, {}
+    for dim, leaf in enumerate(tree.dim2ind):
+        bottom[int(leaf)] = np.asarray(matrices[dim])
+    internal = [nod for nod in range(1, tree.nb_nodes + 1) if not tree.is_leaf[nod - 1]]
+    # from the leaves to the root
+    for nod in sorted(internal, key=lambda n: -tree.level[n - 1]):
+        if nod == tree.root:
+            continue
+        children = [int(c) for c in tree.children(nod) if c != 0]
+        xt, yt = x.tensors[nod - 1].numpy(), y.tensors[nod - 1].numpy()
+        mats = [bottom[c] for c in children] + [None]
+        bottom[nod] = _contract_node(xt, yt, mats, xt.ndim - 1)
+    # from the root to the leaves
+    for nod in sorted(internal, key=lambda n: tree.level[n - 1]):
+        children = [int(c) for c in tree.children(nod) if c != 0]
+        xt, yt = x.tensors[nod - 1].numpy(), y.tensors[nod - 1].numpy()
+        mats = [bottom[c] for c in children]
+        if nod != tree.root:
+            mats.append(top[nod])
+        for s, child in enumerate(children):
+            local = list(mats)
+            local[s] = None
+            top[child] = _contract_node(xt, yt, local, s)
+    return bottom, top

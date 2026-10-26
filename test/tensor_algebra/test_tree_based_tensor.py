@@ -330,6 +330,57 @@ def test_tensordot_matrix_product_except_dim(x, rng):
     npt.assert_allclose(np.asarray(out.numpy() if hasattr(out, "numpy") else out), expected)
 
 
+def _inactive_leaves(tree, rank):
+    """A random tree-based tensor with all its leaves inactive."""
+    x = tensap.TreeBasedTensor.randn(tree, _ranks(tree, rank), SHAPE)
+    return x.inactivate_nodes(tree.dim2ind)
+
+
+@pytest.mark.parametrize("name", ["linear", "balanced", "trivial"])
+def test_tensordot_matrix_product_except_dim_through_the_tree(name, rng):
+    tree = TREES[name]
+    x, y = _inactive_leaves(tree, 2), _inactive_leaves(tree, 3)
+    a, b = x.full().numpy(), y.full().numpy()
+    M = [rng.standard_normal((n, n)) for n in SHAPE]
+    for dim in range(4):
+        out = x.tensordot_matrix_product_except_dim(y, M, dim)
+        others = [k for k in range(4) if k != dim]
+        expected = np.einsum(a, [0, 1, 2, 3], M[others[0]], [others[0], others[0] + 4],
+                             M[others[1]], [others[1], others[1] + 4],
+                             M[others[2]], [others[2], others[2] + 4],
+                             b, [4, 5, 6, 7], [dim, dim + 4])
+        npt.assert_allclose(out, expected, atol=1e-10)
+
+
+@pytest.mark.parametrize("name", ["linear", "balanced", "trivial"])
+def test_reduce_dot_with_rank_one_metric_at_node(name, rng):
+    """The contractions around a node, put back together with the node
+    tensors, give the weighted inner product (x, M y)."""
+    tree = TREES[name]
+    x, y = _inactive_leaves(tree, 2), _inactive_leaves(tree, 3)
+    M = [rng.standard_normal((n, n)) for n in SHAPE]
+    expected = np.einsum("ijkl,ia,jb,kc,ld,abcd->", x.full().numpy(), *M, y.full().numpy())
+    for nod in range(1, tree.nb_nodes + 1):
+        if tree.is_leaf[nod - 1]:
+            out = x.reduce_dot_with_rank_one_metric_at_node(y, M, nod)
+            assert len(out) == 1  # the parent only
+            continue
+        out = x.reduce_dot_with_rank_one_metric_at_node(y, M, nod)
+        xt, yt = x.tensors[nod - 1].numpy(), y.tensors[nod - 1].numpy()
+        n = xt.ndim
+        operands = [xt, list(range(n)), yt, list(range(n, 2 * n))]
+        for t, matrix in enumerate(out):
+            operands += [matrix, [t, t + n]]
+        npt.assert_allclose(np.einsum(*operands, []), expected, rtol=1e-10)
+
+
+def test_reduce_dot_with_active_leaves_raises(x, rng):
+    if not np.any(x.is_active_node[x.tree.is_leaf]):
+        pytest.skip("no active leaf")
+    with pytest.raises(NotImplementedError):
+        x.reduce_dot_with_rank_one_metric_at_node(x, [np.eye(n) for n in SHAPE], x.tree.root)
+
+
 # --- evaluations ---------------------------------------------------------------
 
 

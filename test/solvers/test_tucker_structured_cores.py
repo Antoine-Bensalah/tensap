@@ -185,3 +185,28 @@ def test_tree_core_single_iteration_display(capsys):
     y = solver.update_core(x)
     assert isinstance(y.core, tensap.TreeBasedTensor)
     assert "update_tree_core" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("dense_max_size", [2000, 0])
+def test_tree_contraction_matches_the_explicit_local_problem(dense_max_size):
+    """Local systems of the nodes: tree contraction (inactive leaves) against
+    the explicit map from the node tensor to the full core."""
+    A, b, _, _ = _tree_problem()
+    tree = A.core.tree
+    np.random.seed(5)
+    ranks = np.full(tree.nb_nodes, 3)
+    ranks[tree.root - 1] = 1
+    core = tensap.TreeBasedTensor.randn(tree, ranks, [3, 3, 3, 3]).inactivate_nodes(tree.dim2ind)
+    x = _random_tucker([3, 3, 3, 3], core, d=4, seed=6).orth()
+    solver = tensap.TuckerTensorALSLinearSolver(A, b, dense_max_size=dense_max_size,
+                                                display=False)
+    x_frames = x.tensor_frame
+    xAx = x_frames.dot_with_metrics(x_frames, A.tensor_frame)
+    metric_A = [m.transpose(0, 2, 1).reshape(-1, m.shape[1]) for m in xAx]
+    metric_b = list(b.tensor_frame.dot(x_frames))
+    apply, rhs = solver._projected_problem(x)
+    for nod in tree.internal_nodes:
+        local = x.core.orth_at_node(nod)
+        contracted = solver._tree_node_problem(local, nod, metric_A, metric_b)
+        explicit = solver._tree_node_problem_explicit(local, nod, apply, rhs)
+        npt.assert_allclose(contracted, explicit, rtol=1e-8, atol=1e-10)

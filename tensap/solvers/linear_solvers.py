@@ -894,45 +894,130 @@ class TuckerTensorALSLinearSolver(LinearSolver):
     def _update_tree_core(self, x):
         """Tree-based core: Galerkin update of the active nodes one after the
         other, the representation being orthogonal with respect to the
-        updated node (Matlab updateTreeBasedCore). The core tensor depends
-        linearly on the tensor of the node: the columns of the matrix Psi of
-        this map are computed by the full core with the node tensor set to
-        each canonical vector, and the local system is
-        Psi^T A_c Psi c = Psi^T b_c, with A_c, b_c the projected problem
-        (_projected_problem). For cores of moderate size."""
+        updated node (Matlab updateTreeBasedCore and
+        updateInternalNodeTreeBasedCore).
+
+        With inactive leaves (as in Matlab), the local system of a node is
+        built by the tree contraction (TreeBasedTensor.
+        reduce_dot_with_rank_one_metric_at_node) of the projected problem
+        around the node, without forming the full core (_tree_node_problem).
+        With active leaves, the map from the node tensor to the full core is
+        formed explicitly (_tree_node_problem_explicit, moderate sizes
+        only)."""
         tree = self.A.core.tree
         if not isinstance(x.core, tensap.TreeBasedTensor):
             x = tensap.TuckerTensorVector(x.core.tree_based_tensor(tree), x.tensor_frame)
         x = x.orth()
-        apply, rhs = self._projected_problem(x)
         core = x.core
-        ranks = tuple(core.shape)
-        nodes = [nod for nod in range(1, tree.nb_nodes + 1) if core.is_active_node[nod - 1]]
+        leaves = tree.is_leaf
+        contracted = not any(
+            np.any(t.is_active_node[leaves]) for t in (core, self.A.core, self.b.core)
+        )
+        if contracted:
+            x_frames = x.tensor_frame
+            xAx = x_frames.dot_with_metrics(x_frames, self.A.tensor_frame)
+            # rows (k, trial i), columns test j: (A_k w_i, w_j), as Matlab
+            # dot(A.space * x.space, x.space), for the Kronecker product of the
+            # cores of A and x
+            metric_A = [m.transpose(0, 2, 1).reshape(-1, m.shape[1]) for m in xAx]
+            metric_b = list(self.b.tensor_frame.dot(x_frames))
 
+            def local_problem(core, nod):
+                return self._tree_node_problem(core, nod, metric_A, metric_b)
+
+        else:
+            apply, rhs = self._projected_problem(x)
+
+            def local_problem(core, nod):
+                return self._tree_node_problem_explicit(core, nod, apply, rhs)
+
+        nodes = [nod for nod in range(1, tree.nb_nodes + 1) if core.is_active_node[nod - 1]]
         for _ in range(self.max_iterations_core):
-            core_old = np.asarray(core.full().numpy())
+            core_old = tensap.TreeBasedTensor(list(core.tensors), tree)
             for nod in nodes:
                 core = core.orth_at_node(nod)
                 shape = core.tensors[nod - 1].shape
-                size = int(np.prod(shape))
-                psi = np.empty(ranks + (size,))
-                for n in range(size):
-                    unit = np.zeros(size)
-                    unit[n] = 1.0
-                    core.tensors[nod - 1] = tensap.FullTensor(unit.reshape(shape))
-                    psi[..., n] = core.full().numpy()
-                psi_matrix = psi.reshape(-1, size)
-                M = psi_matrix.T @ apply(psi).reshape(-1, size)
-                f = psi_matrix.T @ rhs.ravel()
-                core.tensors[nod - 1] = tensap.FullTensor(np.linalg.solve(M, f).reshape(shape))
+                solution = local_problem(core, nod)
+                core.tensors[nod - 1] = tensap.FullTensor(solution.reshape(shape))
                 core.is_orth = False
-            core_new = np.asarray(core.full().numpy())
-            stagnation = np.linalg.norm(core_new - core_old) / np.linalg.norm(core_new)
+            stagnation = (core - core_old).norm() / core.norm()
             if self.display:
                 print(f"update_tree_core: stagnation {stagnation:.2e}")
             if stagnation < self.stagnation_core:
                 break
         return tensap.TuckerTensorVector(core, x.tensor_frame)
+
+    def _tree_node_problem(self, core, nod, metric_A, metric_b):
+        """Galerkin system of the node nod of a tree-based core with inactive
+        leaves, built by the tree contraction and solved directly (up to
+        dense_max_size unknowns) or by the conjugate gradient without
+        assembling its matrix.
+
+        The interfaces of the children and of the parent of the node,
+        L_t(i, k, j) for the test index i, the index k of A and the trial
+        index j, come from the contraction of kron(C_A, C_x) with C_x; the
+        local operator is
+        (M c)(i_1, ..., i_p, i_0) = sum C_A^nod(k_1, ..., k_p, k_0)
+        prod_t L_t(i_t, k_t, j_t) c(j_1, ..., j_p, j_0) (t = 0: the parent,
+        absent at the root), and the right-hand side is built the same way
+        with C_b."""
+        A_core, b_core = self.A.core, self.b.core
+        interfaces = A_core.kron(core).reduce_dot_with_rank_one_metric_at_node(
+            core, metric_A, nod
+        )
+        # (k * r + trial, test) -> (test, k, trial)
+        interfaces = [
+            m.reshape(m.shape[0] // m.shape[1], m.shape[1], m.shape[1]).transpose(2, 0, 1)
+            for m in interfaces
+        ]
+        interfaces_b = [m.T for m in b_core.reduce_dot_with_rank_one_metric_at_node(
+            core, metric_b, nod)]
+        node_A = A_core.tensors[nod - 1].numpy()
+        node_b = b_core.tensors[nod - 1].numpy()
+        shape = core.tensors[nod - 1].shape
+        n = len(shape)
+        test, trial, op = list(range(n)), list(range(n, 2 * n)), list(range(2 * n, 3 * n))
+
+        operands = [node_A, op]
+        for t, interface in enumerate(interfaces):
+            operands += [interface, [test[t], op[t], trial[t]]]
+        rhs_operands = [node_b, op]
+        for t, interface in enumerate(interfaces_b):
+            rhs_operands += [interface, [test[t], op[t]]]
+        rhs = np.einsum(*rhs_operands, test, optimize=True).ravel()
+        size = rhs.size
+
+        if size <= self.dense_max_size:
+            matrix = np.einsum(*operands, test + trial, optimize=True).reshape(size, size)
+            return np.linalg.solve(matrix, rhs)
+
+        def matvec(vector):
+            return np.einsum(*operands, vector.reshape(shape), trial, test,
+                             optimize=True).ravel()
+
+        operator = spla.LinearOperator((size, size), matvec=matvec, dtype=float)
+        guess = core.tensors[nod - 1].numpy().ravel()
+        solution, _ = spla.cg(operator, rhs, x0=guess, rtol=1e-12, atol=0.0,
+                              maxiter=10 * size)
+        return solution
+
+    @staticmethod
+    def _tree_node_problem_explicit(core, nod, apply, rhs):
+        """Galerkin system of the node nod from the explicit map Psi from the
+        node tensor to the full core (its columns: the full core with the node
+        tensor set to each canonical vector): Psi^T A_c Psi c = Psi^T b_c."""
+        ranks = tuple(core.shape)
+        shape = core.tensors[nod - 1].shape
+        size = int(np.prod(shape))
+        psi = np.empty(ranks + (size,))
+        for n in range(size):
+            unit = np.zeros(size)
+            unit[n] = 1.0
+            core.tensors[nod - 1] = tensap.FullTensor(unit.reshape(shape))
+            psi[..., n] = core.full().numpy()
+        psi_matrix = psi.reshape(-1, size)
+        M = psi_matrix.T @ apply(psi).reshape(-1, size)
+        return np.linalg.solve(M, psi_matrix.T @ rhs.ravel())
 
     def _update_tt_core(self, x):
         """TT core: Galerkin problem on the core alone, A and b being projected
