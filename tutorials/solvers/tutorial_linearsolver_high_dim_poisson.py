@@ -58,6 +58,18 @@ x_m can be improved by a Galerkin update (tensap.TuckerTensorALSLinearSolver):
 of its coefficients (update_core), or of all its rank-one factors, one
 dimension at a time (update_frames_by_als). The same solver can also
 alternate both updates on its own, starting from the greedy solution.
+
+Part 4 - Updates with a TT core
+-------------------------------
+The iterate is now a Tucker tensor whose core is a tensor train
+(TuckerTensorVector with a TTTensor core): after each correction, A and b are
+projected on the frames of x, which gives a Galerkin problem on the core
+alone, a TTOperator of size R x R per dimension, solved by
+tensap.TTTensorALSLinearSolver from the current core: by ALS (the TT ranks of
+the core follow the number of corrections) or by DMRG (ranks adapted by
+truncated SVDs). The large local systems (R^3 unknowns for ALS) are solved
+without assembling their matrix, by the conjugate gradient with a block
+Jacobi preconditioner.
 """
 
 # %% Imports
@@ -257,6 +269,51 @@ for output, label in (
 plt.xlabel("Greedy iteration (rank of x)")
 plt.ylabel("Relative residual error ||b - A@x|| / ||b||")
 plt.title("Greedy rank-one corrections, with and without updates")
+plt.legend()
+plt.grid(True, which="both")
+plt.show()
+
+
+# %% Part 4 - Updates with a TT core
+# The operator in Tucker format with a TT core (frames {K, I}, TT core of
+# ranks 2) and the right-hand side with its rank-one core seen as a TT tensor.
+# The greedy corrections are computed with the canonical operator; the
+# updates use the TT one (same operator, other format).
+from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor  # noqa: E402
+
+A_tt = factory.make_tt_tucker_tensor()
+b_tt = tensap.TuckerTensorVector(as_tt_tensor(b.core), b.tensor_frame)
+outputs_tt = {}
+for algorithm, iterations in (("als", 5), ("dmrg", 8)):
+    updater = tensap.TuckerTensorALSLinearSolver(
+        A_tt, b_tt, max_iterations_core=iterations, core_algorithm=algorithm,
+        display=False
+    )
+    np.random.seed(0)
+    solver = tensap.GreedyLinearSolver(
+        A_can, b, max_iterations=30, update=updater.update_core, display=False
+    )
+    x_tt, outputs_tt[algorithm] = solver.solve()
+    print(f"Greedy + TT core update by {algorithm.upper()}: relative error "
+          f"{outputs_tt[algorithm]['error']:.3e} after {outputs_tt[algorithm]['iter']} "
+          f"iterations, TT ranks of the core {x_tt.core.ranks}, storage {x_tt.storage()}")
+    assert outputs_tt[algorithm]["error"] < output_can["error"]
+# The tree-based core block of the MATLAB tutorial needs the tree contraction
+# of the local problems (not ported yet): with d = 6 and up to 30 terms, the
+# explicit map from a node to the full core would have 30^6 entries.
+
+# %% Comparison with the updates of Part 3
+plt.figure()
+for output, label in (
+    (output_can, "pure greedy"),
+    (output_core, "greedy + core update (canonical)"),
+    (outputs_tt["als"], "greedy + TT core update (ALS)"),
+    (outputs_tt["dmrg"], "greedy + TT core update (DMRG)"),
+):
+    plt.semilogy(range(1, len(output["errvec"]) + 1), output["errvec"], label=label)
+plt.xlabel("Greedy iteration")
+plt.ylabel("Relative residual error ||b - A@x|| / ||b||")
+plt.title("Greedy corrections with updates of a canonical or TT core")
 plt.legend()
 plt.grid(True, which="both")
 plt.show()
