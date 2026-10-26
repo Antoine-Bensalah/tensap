@@ -70,6 +70,16 @@ the core follow the number of corrections) or by DMRG (ranks adapted by
 truncated SVDs). The large local systems (R^3 unknowns for ALS) are solved
 without assembling their matrix, by the conjugate gradient with a block
 Jacobi preconditioner.
+
+Part 5 - Updates with a tree-based core
+---------------------------------------
+The core is a tree-based tensor on a balanced dimension tree, updated node by
+node. The local problem of a node is built by the tree contraction (the
+subtrees of its children and the rest of the tree are contracted into small
+interfaces), never forming the full core (30^6 entries); the local systems
+of more than 2000 unknowns are solved by the conjugate gradient without
+assembling their matrix, preconditioned by the inverse of the closest
+Kronecker sum (exact here: the Laplacian is a Kronecker sum).
 """
 
 # %% Imports
@@ -298,9 +308,6 @@ for algorithm, iterations in (("als", 5), ("dmrg", 8)):
           f"{outputs_tt[algorithm]['error']:.3e} after {outputs_tt[algorithm]['iter']} "
           f"iterations, TT ranks of the core {x_tt.core.ranks}, storage {x_tt.storage()}")
     assert outputs_tt[algorithm]["error"] < output_can["error"]
-# The tree-based core block of the MATLAB tutorial needs the tree contraction
-# of the local problems (not ported yet): with d = 6 and up to 30 terms, the
-# explicit map from a node to the full core would have 30^6 entries.
 
 # %% Comparison with the updates of Part 3
 plt.figure()
@@ -314,6 +321,44 @@ for output, label in (
 plt.xlabel("Greedy iteration")
 plt.ylabel("Relative residual error ||b - A@x|| / ||b||")
 plt.title("Greedy corrections with updates of a canonical or TT core")
+plt.legend()
+plt.grid(True, which="both")
+plt.show()
+
+
+# %% Part 5 - Updates with a tree-based core
+# Operator with a tree-based core on the balanced tree (frames {K, I}),
+# right-hand side with its rank-one core as a tree-based tensor. As in
+# MATLAB, the greedy solver uses this operator for the corrections too, with
+# 30 iterations and tolerances of 1e-10.
+A_tree = factory.make_tree_based_tensor()
+b_tree = tensap.TuckerTensorVector(b.core.tree_based_tensor(A_tree.core.tree), b.tensor_frame)
+updater = tensap.TuckerTensorALSLinearSolver(A_tree, b_tree, max_iterations_core=5,
+                                             display=False)
+np.random.seed(0)
+solver = tensap.GreedyLinearSolver(
+    A_tree, b_tree, max_iterations=30, tolerance=1e-10, stagnation=1e-10,
+    update=updater.update_core, display=False
+)
+x_tree, output_tree = solver.solve()
+print(f"Greedy + tree-based core update: relative error {output_tree['error']:.3e} after "
+      f"{output_tree['iter']} iterations, tree ranks {x_tree.core.ranks[x_tree.core.ranks > 0]},"
+      f" storage {x_tree.storage()}")
+assert output_tree["error"] < 1e-6
+
+# %% Comparison of the core updates
+plt.figure()
+for output, label in (
+    (output_can, "pure greedy"),
+    (output_core, "canonical core update"),
+    (outputs_tt["als"], "TT core update (ALS)"),
+    (outputs_tt["dmrg"], "TT core update (DMRG)"),
+    (output_tree, "tree-based core update"),
+):
+    plt.semilogy(range(1, len(output["errvec"]) + 1), output["errvec"], label=label)
+plt.xlabel("Greedy iteration")
+plt.ylabel("Relative residual error ||b - A@x|| / ||b||")
+plt.title("Greedy corrections with updates of the core, d = 6")
 plt.legend()
 plt.grid(True, which="both")
 plt.show()
