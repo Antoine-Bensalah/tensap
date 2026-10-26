@@ -472,7 +472,7 @@ class TFrameVector(TFrame):
         return self.__class__(new_frames)
 
     def unvectorize(
-        self, dims1: List[int], dims2: List[int]
+        self, dims1: List[int], dims2: List[int], patterns=None
     ) -> "TFrameOperator":
         """Reshape the vector spaces into operator spaces.
 
@@ -482,7 +482,11 @@ class TFrameVector(TFrame):
             Output dimensions for each space.
         dims2 : list of int
             Input dimensions for each space.
-            Must satisfy dims1[i] * dims2[i] == self.frames[i].shape[0].
+            Must satisfy dims1[i] * dims2[i] == self.frames[i].shape[0]
+            (without patterns).
+        patterns : list of numpy.ndarray, optional
+            Sparsity patterns returned by TFrameOperator.vectorize(
+            sparsity=True), one per dimension.
 
         Returns
         -------
@@ -495,7 +499,8 @@ class TFrameVector(TFrame):
 
         new_frames = []
         for i, frame in enumerate(self.frames):
-            new_frames.append(frame.unvectorize(dims1[i], dims2[i]))
+            pattern = None if patterns is None else patterns[i]
+            new_frames.append(frame.unvectorize(dims1[i], dims2[i], pattern))
         return TFrameOperator(new_frames)
 
     def to_diagonal_operators(self) -> "TFrameOperator":
@@ -718,13 +723,24 @@ class TFrameOperator(TFrame):
         """Syntactic sugar for conjugate transpose (Hermitian)."""
         return self.transpose(conjugate=True)
 
-    def vectorize(self) -> TFrameVector:
+    def vectorize(self, sparsity: bool = False):
         """Flatten all operators into column vector spaces.
+
+        Parameters
+        ----------
+        sparsity : bool, optional
+            If True, keep in each dimension only the entries that are non-zero
+            in at least one matrix, and also return these positions (one array
+            per dimension), for unvectorize. The default is False.
 
         Returns
         -------
-        TFrameVector
+        TFrameVector, or (TFrameVector, list of numpy.ndarray) with
+        sparsity=True
         """
+        if sparsity:
+            results = [frame.vectorize(pattern=True) for frame in self.frames]
+            return TFrameVector([r[0] for r in results]), [r[1] for r in results]
         new_frames = [frame.vectorize() for frame in self.frames]
         return TFrameVector(new_frames)
 

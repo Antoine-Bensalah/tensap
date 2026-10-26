@@ -216,6 +216,10 @@ def test_kron(rng):
     y3, b3 = _tensor(rng, (3, 1, 2))
     expected = np.einsum("ijk,lmn->iljmkn", a3, b3).reshape(6, 2, 4)
     npt.assert_allclose(x3.kron(y3).numpy(), expected)
+    # different orders: the missing dimensions of the second tensor have size 1
+    z = x3.kron(x)
+    assert tuple(z.shape) == (4, 6, 2)
+    npt.assert_allclose(z.numpy(), np.einsum("ijk,lm->iljmk", a3, a).reshape(4, 6, 2))
 
 
 def test_tensordot(rng):

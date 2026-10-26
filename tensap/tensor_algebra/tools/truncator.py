@@ -182,9 +182,13 @@ class Truncator:
 
         """
         if isinstance(tensor, tensap.TuckerTensorOperator):
+            # truncation of the vectorization restricted to the union of the
+            # sparsity patterns: the zero entries of the frames stay exactly
+            # zero, and the SVDs act on shorter vectors
             shape = tensor.shape
-            vector = self._truncate_tucker(tensor.vectorize())
-            return vector.unvectorize([s[0] for s in shape], [s[1] for s in shape])
+            vector, patterns = tensor.vectorize(sparsity=True)
+            vector = self._truncate_tucker(vector)
+            return vector.unvectorize([s[0] for s in shape], [s[1] for s in shape], patterns)
 
         if tensor.order == 2:
             return self._truncate_tucker_svd(tensor)

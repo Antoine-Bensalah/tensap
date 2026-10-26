@@ -219,7 +219,6 @@ def test_full_and_diagonal_tensors_convert_to_sparse(rng):
         lambda x: x.squeeze([0]),
         lambda x: x.orth(0),
         lambda x: x.cat(x, [0]),
-        lambda x: x.kron(x),
         lambda x: x.sub_tensor([0], ":", ":"),
         lambda x: x.tensordot_matrix_product_except_dim(x, [None] * 3, 0),
         lambda x: x.eval_at_indices(np.array([[0, 0]]), [0, 1]),
@@ -229,6 +228,16 @@ def test_not_implemented_methods(rng, call):
     x, _ = _sparse(rng)
     with pytest.raises((NotImplementedError, AssertionError)):
         call(x)
+
+
+@pytest.mark.parametrize("shapes", [((3, 4, 2), (2, 3, 2)), ((3, 4, 2), (2, 3))])
+def test_kron(rng, shapes):
+    x, a = _sparse(rng, shapes[0])
+    y, b = _sparse(rng, shapes[1])
+    z = x.kron(y)
+    expected = tensap.FullTensor(a).kron(tensap.FullTensor(b)).numpy()
+    npt.assert_allclose(z.full().numpy(), expected)
+    assert z.storage() == x.storage() * y.storage()
 
 
 def test_tensor_diagonal_matrix_product_with_diagonals_as_columns(rng):

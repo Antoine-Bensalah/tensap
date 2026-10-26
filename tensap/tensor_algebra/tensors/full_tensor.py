@@ -680,7 +680,7 @@ class FullTensor:
             ),
             shape1 * shape2,
         )
-        return FullTensor(data, shape=self.shape * tensor2.shape)
+        return FullTensor(data, shape=shape1 * shape2)
 
     def orth(self, dim=None):
         """

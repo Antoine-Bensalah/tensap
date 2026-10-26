@@ -161,12 +161,8 @@ def test_normalize_basis_zero_element(rng):
 @pytest.mark.parametrize("kind_x, kind_y", [
     ("full", "full"), ("diagonal", "diagonal"), ("full", "diagonal"),
     ("full", "sparse"),
-    pytest.param("sparse", "sparse", marks=pytest.mark.xfail(
-        strict=True, raises=NotImplementedError,
-        reason="SparseTensor.kron is not implemented")),
-    pytest.param("diagonal", "sparse", marks=pytest.mark.xfail(
-        strict=True, raises=NotImplementedError,
-        reason="SparseTensor.kron is not implemented")),
+    ("sparse", "sparse"),
+    ("diagonal", "sparse"),
 ])
 @pytest.mark.parametrize("make", [_vector, _operator])
 def test_hadamard_product(rng, kind_x, kind_y, make):
@@ -321,3 +317,34 @@ def test_rank_one_constructors_have_a_diagonal_core():
     A = tensap.BaseTuckerTensor.rand([1, 1], [(2, 3), (4, 2)])
     assert isinstance(A.core, tensap.DiagonalTensor)
     assert isinstance(TuckerTensorVector.ones([2, 1], [3, 4]).core, tensap.FullTensor)
+
+
+# --- sparsity pattern of the vectorization ------------------------------------------
+
+
+def _laplacian_tucker(n=6, d=3):
+    K = 2 * np.eye(n) - np.eye(n, k=1) - np.eye(n, k=-1)
+    return tensap.LaplacianLikeOperatorFactory(K, np.eye(n), d).make_tucker_tensor()
+
+
+def test_vectorize_with_sparsity_pattern():
+    A = _laplacian_tucker()
+    v, patterns = A.vectorize(sparsity=True)
+    n = 6
+    assert all(len(p) == 3 * n - 2 for p in patterns)  # tridiagonal union
+    assert v.tensor_frame.frames[0].shape[0] == 3 * n - 2
+    B = v.unvectorize([n] * 3, [n] * 3, patterns)
+    npt.assert_allclose(B.full().numpy(), A.full().numpy())
+    # without sparsity: unchanged behaviour
+    w = A.vectorize()
+    assert w.tensor_frame.frames[0].shape[0] == n * n
+
+
+def test_truncation_of_an_operator_keeps_its_sparsity():
+    A = _laplacian_tucker()
+    A2 = A + A
+    truncated = tensap.Truncator(tolerance=1e-12).truncate(A2)
+    npt.assert_allclose(truncated.full().numpy(), 2 * A.full().numpy(), atol=1e-12)
+    for frame in truncated.tensor_frame.frames:
+        off_band = np.abs(np.triu(frame.data, k=2)).max(axis=(1, 2))
+        assert np.all(off_band == 0.0)

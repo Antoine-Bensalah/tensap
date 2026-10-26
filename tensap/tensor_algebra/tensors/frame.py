@@ -335,7 +335,7 @@ class FrameVector(Frame):
         new_data = self.data[:, dim1_idx, :]
         return self.__class__(new_data)
 
-    def unvectorize(self, dim1: int, dim2: int) -> 'FrameOperator':
+    def unvectorize(self, dim1: int, dim2: int, pattern=None) -> 'FrameOperator':
         """Reshape the vector frame into an operator frame.
 
         Parameters
@@ -344,12 +344,22 @@ class FrameVector(Frame):
             First dimension of the resulting operator.
         dim2 : int
             Second dimension of the resulting operator.
-            Must satisfy dim1 * dim2 == self.shape[0].
+            Must satisfy dim1 * dim2 == self.shape[0], or, with a pattern,
+            dim1 * dim2 == number of entries of the matrices.
+        pattern : numpy.ndarray, optional
+            Sparsity pattern returned by FrameOperator.vectorize(pattern=True):
+            the positions (in the C-order vectorization of the matrices) of
+            the stored entries; the other entries are zero (Matlab: P of
+            unvectorize).
 
         Returns
         -------
         FrameOperator
         """
+        if pattern is not None:
+            full = np.zeros((self.dim, dim1 * dim2, 1))
+            full[:, np.asarray(pattern), :] = self.data
+            return FrameVector(full).unvectorize(dim1, dim2)
         if dim1 * dim2 != self.shape[0]:
             raise ValueError(f"Cannot unvectorize dim1={self.shape[0]} into "
                              f"{dim1}x{dim2}.")
@@ -530,16 +540,27 @@ class FrameOperator(Frame):
         """Syntactic sugar for conjugate transpose (Hermitian)."""
         return self.transpose(conjugate=True)
 
-    def vectorize(self) -> 'FrameVector':
+    def vectorize(self, pattern: bool = False):
         """Flatten the operator into a column vector space.
 
         Reshapes from (R, N1, N2) to (R, N1 * N2, 1).
 
+        Parameters
+        ----------
+        pattern : bool, optional
+            If True, keep only the entries that are non-zero in at least one
+            matrix of the frame (the union of the sparsity patterns), and also
+            return their positions, for unvectorize (Matlab: vectorize with
+            two outputs). The default is False.
+
         Returns
         -------
-        FrameVector
+        FrameVector, or (FrameVector, numpy.ndarray) with pattern=True
         """
         new_dim = self.shape[0] * self.shape[1]
         new_data = self.data.reshape(self.dim, new_dim, 1)
+        if pattern:
+            positions = np.nonzero(np.any(new_data[:, :, 0] != 0, axis=0))[0]
+            return FrameVector(new_data[:, positions, :]), positions
 
         return FrameVector(new_data, is_orth=self.is_orth)

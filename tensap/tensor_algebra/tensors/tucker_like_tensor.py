@@ -5,6 +5,8 @@
 Module tucker_like_tensor.
 """
 
+import warnings
+
 import numpy as np
 import tensap
 from typing import Union, List, Tuple, Optional
@@ -694,6 +696,103 @@ class TuckerTensorVector(BaseTuckerTensor):
 
     tensor_frame: TFrameVector
 
+    def power(self, n, tolerance: float = 1e-4, max_iterations: int = 9) -> 'TuckerTensorVector':
+        """Entrywise n-th power, y(i) = x(i)^n (Matlab power).
+
+        n >= 1: Hadamard products (exact, the ranks are multiplied); n = 0: the
+        tensor of ones; n = -1: the solution of diag(x) y = 1 by the greedy
+        solver with Galerkin updates of the core (DMRG for a TT core), at
+        most max_iterations rank-one corrections, tolerance and stagnation
+        tolerance (x must be positive, so that diag(x) is SPD); n < -1:
+        (x^(-n))^(-1); n = 1/2: sqrt.
+
+        Matlab computes x = times(x, x) n - 1 times, which gives x^(2^(n-1))
+        for n >= 3; here x^n.
+
+        Parameters
+        ----------
+        n : int or 0.5
+        tolerance : float, optional
+            For n < 0 and n = 1/2. The default is 1e-4.
+        max_iterations : int, optional
+            Number of greedy corrections for n < 0. The default is 9, as in
+            Matlab.
+
+        Returns
+        -------
+        TuckerTensorVector
+        """
+        if n == 0.5:
+            return self.sqrt(tolerance=tolerance)
+        if int(n) != n:
+            raise ValueError("The power must be an integer or 1/2.")
+        n = int(n)
+        if n >= 1:
+            result = self
+            for _ in range(n - 1):
+                result = result.hadamard_product(self)
+            return result
+        if n == 0:
+            return self._ones_like()
+        if n < -1:
+            return self.power(-n).power(-1, tolerance, max_iterations)
+        operator = self.to_operator()
+        ones = self._ones_like()
+        core_A, core_b = tensap.convert_tensors(operator.core, ones.core)
+        operator = TuckerTensorOperator(core_A, operator.tensor_frame)
+        ones = TuckerTensorVector(core_b, ones.tensor_frame)
+        updater = tensap.TuckerTensorALSLinearSolver(
+            operator, ones, core_algorithm="dmrg", stagnation=tolerance, display=False
+        )
+        solver = tensap.GreedyLinearSolver(
+            operator,
+            ones,
+            max_iterations=max_iterations,
+            tolerance=tolerance,
+            stagnation=tolerance,
+            update=updater.update_core,
+            display=False,
+        )
+        inverse, _ = solver.solve()
+        return inverse
+
+    def sqrt(self, tolerance: float = 1e-5, max_iterations: int = 100, truncator=None,
+             inverse_tolerance: float = 1e-2, display: bool = False) -> 'TuckerTensorVector':
+        """Entrywise square root, y(i) = sqrt(x(i)), by truncated Newton
+        iterations y <- (y + x / y) / 2 from y = x (Matlab sqrt), the inverse
+        being computed by power(-1, inverse_tolerance) and the iterate
+        truncated by truncator (defaults as in Matlab: inverse tolerance 1e-2,
+        truncation tolerance 1e-5, maximal rank 100). Stops when the relative
+        change is below tolerance (a warning is issued if max_iterations is
+        reached). The accuracy of the result is limited by the one of the
+        inverse (the fixed point of the perturbed iteration). x must be
+        positive.
+
+        Returns
+        -------
+        TuckerTensorVector
+        """
+        if truncator is None:
+            truncator = tensap.Truncator(tolerance=1e-5, max_rank=100)
+        y_old = self
+        for k in range(1, max_iterations + 1):
+            y = 0.5 * (y_old + y_old.power(-1, inverse_tolerance).hadamard_product(self))
+            change = (y - y_old).norm() / y.norm()
+            if display:
+                print(f"sqrt: Newton iteration {k} - change {change:.2e}")
+            if change < tolerance:
+                return y
+            y_old = truncator.truncate(y)
+        warnings.warn("sqrt: the Newton iterations did not converge.")
+        return y
+
+    def _ones_like(self) -> 'TuckerTensorVector':
+        """The tensor of ones of the same shape, of rank one (diagonal core)."""
+        frames = TFrameVector([
+            FrameVector(np.ones((1, frame.shape[0], 1))) for frame in self.tensor_frame.frames
+        ])
+        return TuckerTensorVector(tensap.DiagonalTensor(np.array([1.0]), self.order), frames)
+
     def __init__(self, core, frames: 'TFrameVector'):
         super().__init__(core, frames)
         if not isinstance(frames, TFrameVector):
@@ -828,7 +927,8 @@ class TuckerTensorVector(BaseTuckerTensor):
         tmp = tensor_2.tensor_matrix_product(matrices)
         return self.dot(tmp)
 
-    def unvectorize(self, dims1: List[int], dims2: List[int]) -> 'TuckerTensorOperator':
+    def unvectorize(self, dims1: List[int], dims2: List[int],
+                    patterns=None) -> 'TuckerTensorOperator':
         """Reshape the vector Tucker tensor into an operator Tucker tensor.
 
         Parameters
@@ -837,12 +937,15 @@ class TuckerTensorVector(BaseTuckerTensor):
             Output dimensions for each space.
         dims2 : list of int
             Input dimensions for each space.
+        patterns : list of numpy.ndarray, optional
+            Sparsity patterns returned by TuckerTensorOperator.vectorize(
+            sparsity=True): the entries outside them are zero.
 
         Returns
         -------
         TuckerTensorOperator
         """
-        new_frames = self.tensor_frame.unvectorize(dims1, dims2)
+        new_frames = self.tensor_frame.unvectorize(dims1, dims2, patterns)
         return TuckerTensorOperator(self.core, new_frames)
 
     def tree_based_tensor(self):
@@ -1031,12 +1134,24 @@ class TuckerTensorOperator(BaseTuckerTensor):
         """Syntactic sugar for conjugate transpose."""
         return self.ctranspose()
 
-    def vectorize(self) -> TuckerTensorVector:
+    def vectorize(self, sparsity: bool = False):
         """Flatten the operator into a column vector space.
+
+        Parameters
+        ----------
+        sparsity : bool, optional
+            If True, the vector frames keep only the entries that are non-zero
+            in at least one matrix of the frame of each dimension (Matlab:
+            vectorize with two outputs), and the positions of these entries
+            are also returned, for unvectorize. The default is False.
 
         Returns
         -------
-        TuckerTensorVector
+        TuckerTensorVector, or (TuckerTensorVector, list of numpy.ndarray)
+        with sparsity=True
         """
+        if sparsity:
+            new_frames, patterns = self.tensor_frame.vectorize(sparsity=True)
+            return TuckerTensorVector(self.core, new_frames), patterns
         new_frames = self.tensor_frame.vectorize()
         return TuckerTensorVector(self.core, new_frames)

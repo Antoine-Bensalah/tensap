@@ -318,6 +318,10 @@ class TreeBasedTensor:
             tensor = copy.deepcopy(self)
             tensor.tensors[tensor.tree.root - 1] *= arg
         elif isinstance(arg, tensap.TreeBasedTensor):
+            if arg.ranks[arg.tree.root - 1] != self.ranks[self.tree.root - 1]:
+                # checked first: the Kronecker product of root tensors of
+                # different orders is defined (FullTensor.kron pads the shapes)
+                raise ValueError("root ranks should be equal.")
             tensor = self.kron(arg)
             I0 = [np.arange(0, n**2, n + 1) for n in self.shape]
             tensor = tensor.sub_tensor(*I0)
