@@ -19,6 +19,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import tensap
 from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor
+from tensap.solvers.local_diagnostics import LocalDiagnostics
 
 
 class LinearSolver(abc.ABC):
@@ -78,6 +79,40 @@ class LinearSolver(abc.ABC):
             Dictionary with keys 'flag', 'iter', 'error', 'errvec'.
         """
 
+    # --- shared conventions of the iterative solvers ---
+    # flag 0: tolerance reached (also at iteration 0, for an exact initial
+    # guess or b = 0); 1: maximal number of iterations; 2: stagnation
+    # (tested after the tolerance); 3: breakdown (non-positive curvature).
+
+    def _default_error_criterion(self):
+        """The relative residual ||b - A x|| / ||b||; the absolute residual
+        when b = 0."""
+        if self.error_criterion is not None:
+            return self.error_criterion
+        b_norm = self.b.norm()
+        scale = b_norm if b_norm > 0 else 1.0
+
+        def error_criterion(x):
+            return (self.b - self.A @ x).norm() / scale
+
+        return error_criterion
+
+    @staticmethod
+    def _stagnation(x, x_old):
+        """||x - x_old|| / ||x||, 0 when both vanish."""
+        difference = (x - x_old).norm()
+        norm = x.norm()
+        if norm > 0:
+            return difference / norm
+        return 0.0 if difference == 0 else np.inf
+
+    @staticmethod
+    def _output(flag, k, errvec, initial_error):
+        """errvec: the errors of the iterations (empty if none was needed);
+        'error' the last one, or the initial error."""
+        error = errvec[-1] if errvec else initial_error
+        return {"flag": flag, "iter": k, "error": error, "errvec": errvec}
+
 
 class TruncatedRichardsonIterations(LinearSolver):
     """
@@ -100,18 +135,13 @@ class TruncatedRichardsonIterations(LinearSolver):
 
     def solve(self):
         x = self.b * 0.0 if self.x0 is None else self.x0
-
-        if self.error_criterion is None:
-            b_norm = self.b.norm()
-
-            def error_criterion(x):
-                return (self.b - self.A @ x).norm() / b_norm
-
-        else:
-            error_criterion = self.error_criterion
+        error_criterion = self._default_error_criterion()
+        initial_error = error_criterion(x)
+        errvec = []
+        if initial_error < self.tolerance:
+            return x, self._output(0, 0, errvec, initial_error)
 
         flag = 1
-        errvec = []
         k = 0
         for k in range(1, self.max_iterations + 1):
             x_old = x
@@ -120,7 +150,7 @@ class TruncatedRichardsonIterations(LinearSolver):
 
             x = self.truncator.truncate(x + self.step_size * direction)
 
-            stagnation = (x - x_old).norm() / x.norm()
+            stagnation = self._stagnation(x, x_old)
             error = error_criterion(x)
             errvec.append(error)
 
@@ -130,20 +160,14 @@ class TruncatedRichardsonIterations(LinearSolver):
                     f"- Error {error:.2e}"
                 )
 
-            if stagnation < self.stagnation:
-                flag = 2
-                break
             if error < self.tolerance:
                 flag = 0
                 break
+            if stagnation < self.stagnation:
+                flag = 2
+                break
 
-        output = {
-            "flag": flag,
-            "iter": k,
-            "error": errvec[-1],
-            "errvec": errvec,
-        }
-        return x, output
+        return x, self._output(flag, k, errvec, initial_error)
 
 
 class TruncatedPCG(LinearSolver):
@@ -170,15 +194,11 @@ class TruncatedPCG(LinearSolver):
         truncate = self.truncator.truncate
         A, b, P = self.A, self.b, self.P
         x = b * 0.0 if self.x0 is None else self.x0
-
-        if self.error_criterion is None:
-            b_norm = b.norm()
-
-            def error_criterion(x):
-                return (b - A @ x).norm() / b_norm
-
-        else:
-            error_criterion = self.error_criterion
+        error_criterion = self._default_error_criterion()
+        initial_error = error_criterion(x)
+        errvec = []
+        if initial_error < self.tolerance:
+            return x, self._output(0, 0, errvec, initial_error)
 
         r = b - A @ x
         z = P @ r if P is not None else r
@@ -187,13 +207,17 @@ class TruncatedPCG(LinearSolver):
         pAp = p.dot(Ap)
 
         flag = 1
-        errvec = []
         k = 0
         for k in range(1, self.max_iterations + 1):
+            if not pAp > 0:
+                # A (or P) is not positive definite on the direction: the CG
+                # step is undefined
+                flag = 3
+                break
             x_old = x
             omega = r.dot(p) / pAp
             x = truncate(x + omega * p)
-            stagnation = (x - x_old).norm() / x.norm()
+            stagnation = self._stagnation(x, x_old)
             r = truncate(b - A @ x)
             errvec.append(error_criterion(x))
 
@@ -203,11 +227,11 @@ class TruncatedPCG(LinearSolver):
                     f"- Error {errvec[-1]:.2e}"
                 )
 
-            if stagnation < self.stagnation:
-                flag = 2
-                break
             if errvec[-1] < self.tolerance:
                 flag = 0
+                break
+            if stagnation < self.stagnation:
+                flag = 2
                 break
 
             z = P @ r if P is not None else r
@@ -216,13 +240,7 @@ class TruncatedPCG(LinearSolver):
             Ap = A @ p
             pAp = p.dot(Ap)
 
-        output = {
-            "flag": flag,
-            "iter": k,
-            "error": errvec[-1],
-            "errvec": errvec,
-        }
-        return x, output
+        return x, self._output(flag, k, errvec, initial_error)
 
 
 def _contract_except_dim(core, other, matrices, mu):
@@ -529,7 +547,12 @@ def _kronecker_sum_preconditioner(node, interfaces, shape):
     (Q_0 x ... x Q_{n-1}) diag(1 / (sum_t lambda_t - (n - 1) tau))
     (Q_0 x ... x Q_{n-1})^T. It is exact when M is a Kronecker sum, which is
     the case of the Laplacian with orthonormal interfaces (the interfaces of
-    the subtrees without the operator K are identities)."""
+    the subtrees without the operator K are identities).
+
+    The projection on the Kronecker sums is not a projection on the positive
+    definite ones: for an SPD M far from a sum (diag(1, 1, 1, 100) on 2 x 2),
+    sum_t lambda_t - (n - 1) tau can be negative. Then None is returned (no
+    preconditioner: CG needs an SPD one), and the caller reports it."""
     n = len(shape)
     traces = [np.einsum("iki->k", interface) for interface in interfaces]
     total = np.einsum(node, list(range(n)), *[x for t in range(n) for x in (traces[t], [t])], [])
@@ -548,8 +571,8 @@ def _kronecker_sum_preconditioner(node, interfaces, shape):
     for t in range(n):
         denominator = np.add.outer(denominator, eigenvalues[t]) if t else (
             eigenvalues[0] + denominator)
-    denominator = np.where(np.abs(denominator) > 1e-14 * np.abs(denominator).max(),
-                           denominator, 1e-14 * np.abs(denominator).max())
+    if denominator.min() <= 1e-12 * np.abs(denominator).max():
+        return None
 
     def apply(vector):
         v = vector.reshape(shape)
@@ -802,6 +825,9 @@ class TuckerTensorALSLinearSolver(LinearSolver):
             raise ValueError("local_preconditioner must be None or 'kronecker_sum'.")
         self.local_preconditioner = local_preconditioner
         self.local_tolerance = local_tolerance
+        # diagnostics of the local solves (reset by solve; also filled when
+        # update_core is called directly, e.g. by a greedy solver)
+        self._local = LocalDiagnostics()
 
     def solve(self, x=None):
         """Alternate core and frames updates, starting from x (or x0).
@@ -819,14 +845,8 @@ class TuckerTensorALSLinearSolver(LinearSolver):
             x = self.x0
 
         clock0 = time.perf_counter()
-        if self.error_criterion is None:
-            b_norm = self.b.norm()
-
-            def error_criterion(x):
-                return (self.b - self.A @ x).norm() / b_norm
-
-        else:
-            error_criterion = self.error_criterion
+        self._local = LocalDiagnostics()
+        error_criterion = self._default_error_criterion()
 
         flag = 1
         errvec, stagnations, times = [], [], []
@@ -838,7 +858,7 @@ class TuckerTensorALSLinearSolver(LinearSolver):
 
             times.append(time.perf_counter() - clock0)
             errvec.append(error_criterion(x))
-            stagnations.append((x - x_old).norm() / x.norm())
+            stagnations.append(self._stagnation(x, x_old))
 
             if self.display:
                 print(
@@ -846,20 +866,21 @@ class TuckerTensorALSLinearSolver(LinearSolver):
                     f"- Error {errvec[-1]:.2e}"
                 )
 
-            if stagnations[-1] < self.stagnation:
-                flag = 2
-                break
             if errvec[-1] < self.tolerance:
                 flag = 0
+                break
+            if stagnations[-1] < self.stagnation:
+                flag = 2
                 break
 
         output = {
             "flag": flag,
             "iter": k,
-            "error": errvec[-1],
+            "error": errvec[-1] if errvec else np.inf,
             "errvec": errvec,
             "stagnation": stagnations,
             "times": times,
+            "local": self._local.as_dict(),
         }
         return x, output
 
@@ -964,8 +985,9 @@ class TuckerTensorALSLinearSolver(LinearSolver):
             (size, size), matvec=lambda v: apply(v.reshape(ranks)).ravel(), dtype=float
         )
         guess = np.asarray(x.core.full().numpy()).ravel()
-        core, _ = spla.cg(operator, rhs.ravel(), x0=guess, rtol=1e-12, atol=0.0,
-                          maxiter=10 * size)
+        core, info = spla.cg(operator, rhs.ravel(), x0=guess, rtol=1e-12, atol=0.0,
+                             maxiter=10 * size)
+        self._local.iterative_solve(info, operator, rhs.ravel(), core)
         return tensap.TuckerTensorVector(tensap.FullTensor(core.reshape(ranks)),
                                          x.tensor_frame)
 
@@ -1067,6 +1089,7 @@ class TuckerTensorALSLinearSolver(LinearSolver):
             for t, interface in enumerate(interfaces):
                 operands += [interface, [test[t], op[t], trial[t]]]
             matrix = np.einsum(*operands, test + trial, optimize=True).reshape(size, size)
+            self._local.direct()
             return np.linalg.solve(matrix, rhs)
 
         def matvec(vector):
@@ -1076,9 +1099,12 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         preconditioner = None
         if self.local_preconditioner == "kronecker_sum":
             preconditioner = _kronecker_sum_preconditioner(node_A, interfaces, shape)
+            if preconditioner is None:
+                self._local.preconditioner_disabled += 1
         guess = core.tensors[nod - 1].numpy().ravel()
-        solution, _ = spla.cg(operator, rhs, x0=guess, rtol=self.local_tolerance, atol=0.0,
-                              maxiter=10 * size, M=preconditioner)
+        solution, info = spla.cg(operator, rhs, x0=guess, rtol=self.local_tolerance, atol=0.0,
+                                 maxiter=10 * size, M=preconditioner)
+        self._local.iterative_solve(info, operator, rhs, solution)
         return solution
 
     @staticmethod
@@ -1126,7 +1152,8 @@ class TuckerTensorALSLinearSolver(LinearSolver):
             tolerance=0.0,
             display=False,
         )
-        core, _ = solver.solve()
+        core, output = solver.solve()
+        self._local.inner_flags.append(output["flag"])
         return tensap.TuckerTensorVector(core, x_frames)
 
     # ---- update of the frames ----

@@ -26,7 +26,13 @@ import tensap
 
 
 def _read_only(array: np.ndarray) -> np.ndarray:
-    array = np.ascontiguousarray(array)
+    """A contiguous read-only core owned by the tensor. A writeable input is
+    copied: another reference to it (the caller's array, a view of it) could
+    otherwise change the core, and with it the norm certified by the
+    orthogonality center. A read-only input (the core of another TT tensor)
+    is shared."""
+    if array.flags.writeable or not array.flags.c_contiguous:
+        array = np.array(array, order="C", copy=True)
     array.flags.writeable = False
     return array
 
@@ -37,11 +43,14 @@ class BaseTTTensor:
 
     Attributes
     ----------
-    cores : list of numpy.ndarray
-        The d cores, of shape (r_{k-1}, *physical shape, r_k).
+    cores : tuple of numpy.ndarray
+        The d cores, of shape (r_{k-1}, *physical shape, r_k), read-only and
+        owned by the tensor (immutable object: a new tensor is built for any
+        change).
     orth_center : int or None
         Index of the orthogonality center, None if the representation is
-        not orthogonalized.
+        not orthogonalized. Read-only; given to the constructor, it is
+        trusted (internal use: the caller guarantees the orthogonality).
     """
 
     # number of physical axes of a core (1 for a vector, 2 for an operator)
@@ -61,8 +70,18 @@ class BaseTTTensor:
         for k in range(len(cores) - 1):
             if cores[k].shape[-1] != cores[k + 1].shape[0]:
                 raise ValueError(f"Ranks of the cores {k} and {k + 1} do not match.")
-        self.cores = cores
-        self.orth_center = orth_center
+        if orth_center is not None and not 0 <= orth_center < len(cores):
+            raise ValueError(f"orth_center {orth_center} out of range.")
+        self._cores = tuple(cores)
+        self._orth_center = orth_center
+
+    @property
+    def cores(self) -> tuple:
+        return self._cores
+
+    @property
+    def orth_center(self) -> Optional[int]:
+        return self._orth_center
 
     # --- properties ---
 

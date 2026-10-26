@@ -13,7 +13,7 @@ class TFrame:
     """
 
     def __init__(self, frames: List[Frame]):
-        self.frames = list(frames)
+        self.frames = tuple(frames)  # immutable: list(frames) to modify
 
     @property
     def order(self) -> int:

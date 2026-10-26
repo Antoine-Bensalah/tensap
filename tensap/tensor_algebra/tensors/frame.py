@@ -20,8 +20,12 @@ class Frame:
         self._rank = data.shape[0]
         self._dim1 = data.shape[1]
         self._dim2 = data.shape[2]
+        # immutable object: a writeable input is copied (the caller's array or
+        # an alias of it could change the frame), a read-only one shared
+        if data.flags.writeable:
+            data = np.array(data, copy=True)
         self.data = data
-        self.data.flags.writeable = False  # immutable object
+        self.data.flags.writeable = False
         self._is_orth = is_orth
 
     # --- geometric properties ---

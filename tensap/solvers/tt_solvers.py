@@ -22,6 +22,7 @@ import numpy as np
 import scipy.sparse.linalg as spla
 import tensap
 from tensap.solvers.linear_solvers import LinearSolver
+from tensap.solvers.local_diagnostics import LocalDiagnostics
 from tensap.tensor_algebra.tensors.tt_tensor import _truncated_svd
 
 
@@ -68,6 +69,15 @@ class TTTensorALSLinearSolver(LinearSolver):
         Preconditioner of the matrix-free local solver: 'block_jacobi'
         (default; inverse of the blocks of the physical indices for each pair
         of rank indices) or None.
+    local_method : str
+        Matrix-free local solver: 'auto' (default: CG if the operator is
+        symmetric, GMRES otherwise; CG assumes that a symmetric operator is
+        positive definite, as for the energy interpretation of the sweeps),
+        'cg' or 'gmres' (e.g. for a symmetric indefinite operator).
+
+    The output of solve has the key 'local' (LocalDiagnostics.as_dict): the
+    number of local solves, of iterative ones that stopped before their
+    tolerance, the worst local relative residual.
     """
 
     def __init__(
@@ -84,6 +94,7 @@ class TTTensorALSLinearSolver(LinearSolver):
         check_residual=1,
         kick_rank=4,
         local_preconditioner="block_jacobi",
+        local_method="auto",
         **kwargs,
     ):
         super().__init__(A, b, **kwargs)
@@ -105,6 +116,11 @@ class TTTensorALSLinearSolver(LinearSolver):
         if local_preconditioner not in (None, "block_jacobi"):
             raise ValueError("local_preconditioner must be None or 'block_jacobi'.")
         self.local_preconditioner = local_preconditioner
+        if local_method not in ("auto", "cg", "gmres"):
+            raise ValueError("local_method must be 'auto', 'cg' or 'gmres'.")
+        self.local_method = local_method
+        if check_residual < 1 or self.max_iterations < 0:
+            raise ValueError("check_residual must be >= 1 and max_iterations >= 0.")
 
     def is_symmetric(self, tolerance=1e-12):
         """True if the operator of the solved system is symmetric."""
@@ -130,7 +146,8 @@ class TTTensorALSLinearSolver(LinearSolver):
         if self.b.norm() == 0:
             # x = 0 is the solution; the sweeps would divide by its norm
             x = tensap.TTTensor.zeros(self.b.shape)
-            return x, {"flag": 0, "iter": 0, "error": 0.0, "errvec": [], "ranks": x.ranks}
+            return x, {"flag": 0, "iter": 0, "error": 0.0, "errvec": [], "ranks": x.ranks,
+                       "local": LocalDiagnostics().as_dict()}
         if self.minimize_residual:
             A, b = A.T @ A, A.T @ b
         if self.error_criterion is None:
@@ -180,12 +197,18 @@ class TTTensorALSLinearSolver(LinearSolver):
                 flag = 2
                 break
 
+        if self.max_iterations > 0 and not checked:
+            # stopped (stagnation) between two scheduled checks: the error
+            # reported is that of the returned iterate
+            error = error_criterion(x)
+            errvec.append(error)
         output = {
             "flag": flag,
             "iter": n,
             "error": error,
             "errvec": errvec,
             "ranks": x.ranks,
+            "local": sweep.diagnostics.as_dict(),
         }
         return x, output
 
@@ -207,6 +230,7 @@ class _Sweep:
         self.cores = [np.array(c) for c in x.orth(0).cores]
         self.symmetric = symmetric
         self.options = options
+        self.diagnostics = LocalDiagnostics()
         d = len(self.cores)
         self.left_a = [np.ones((1, 1, 1))] + [None] * (d - 1)
         self.right_a = [None] * (d - 1) + [np.ones((1, 1, 1))]
@@ -295,6 +319,7 @@ class _Sweep:
                     optimize=True,
                 )
             solution = np.linalg.solve(matrix.reshape(size, size), rhs.ravel())
+            self.diagnostics.direct()
             return solution.reshape(shape)
 
         def matvec(vector):
@@ -309,8 +334,8 @@ class _Sweep:
         preconditioner = None
         if options.local_preconditioner == "block_jacobi":
             preconditioner = self._block_jacobi(left, a_cores, right, shape)
-        method = spla.cg if self.symmetric else spla.gmres
-        solution, _ = method(
+        method = self._local_method()
+        solution, info = method(
             operator,
             rhs.ravel(),
             x0=guess.ravel(),
@@ -319,7 +344,16 @@ class _Sweep:
             maxiter=options.local_max_iterations,
             M=preconditioner,
         )
+        self.diagnostics.iterative_solve(info, operator, rhs.ravel(), solution)
         return solution.reshape(shape)
+
+    def _local_method(self):
+        """CG for an operator declared or detected symmetric (assumed positive
+        definite: symmetry alone does not make CG applicable), else GMRES."""
+        choice = self.options.local_method
+        if choice == "cg" or (choice == "auto" and self.symmetric):
+            return spla.cg
+        return spla.gmres
 
     @staticmethod
     def _block_jacobi(left, a_cores, right, shape):

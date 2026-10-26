@@ -475,10 +475,14 @@ class StaggeredGrid:
         return [self.embed(dy, 1), self.embed(dx, 0) * -1.0]
 
     def constant_mode_regularization(self, sigma: float = None) -> "tensap.TTOperator":
-        """The rank-one term (sigma / N) 1 1^T that makes the pressure Laplacian
-        (singular: Neumann or periodic on every axis) definite, sigma being by
-        default its smallest non-zero eigenvalue (as for the cell-centred
-        grids, finite_volumes.Grid.constant_mode_regularization)."""
+        """The rank-one term R = (sigma / N) 1 1^T that makes minus the pressure
+        Laplacian (singular: Neumann or periodic on every axis) symmetric
+        positive definite: -L_p + R has the eigenvalues of -L_p with 0 replaced
+        by sigma. sigma is by default the smallest non-zero eigenvalue of -L_p
+        (as for the cell-centred grids,
+        finite_volumes.Grid.constant_mode_regularization). To be added to
+        -1.0 * pressure_laplacian(), not to pressure_laplacian(): L_p + R is
+        invertible but indefinite."""
         if sigma is None:
             sigma = min(
                 Axis(axis.length, axis.levels, periodic=True).smallest_nonzero_eigenvalue()
@@ -488,11 +492,62 @@ class StaggeredGrid:
         N = int(np.prod(self.shape))
         return tensap.qtt_ones_matrix(int(self.tensorizer.levels.sum())) * (sigma / N)
 
+    def _ones(self) -> "tensap.TTTensor":
+        return tensap.TTTensor([np.ones((1, 2, 1))] * int(self.tensorizer.levels.sum()))
+
+    def _last_slice(self, axis: int) -> "tensap.TTOperator":
+        """Diagonal operator keeping the index N - 1 along axis."""
+        block = tensap.qtt_corner(np.array([[1.0]]), self.axes[axis].levels, "bottom-right")
+        return self.embed(block, axis)
+
+    def _check_projection_conditions(self, rights, pressure):
+        """The supported pairs (velocity component k at x_k = L_k, pressure
+        at x_k = 0 and x_k = L_k), all homogeneous: a wall or an inflow at
+        x_k = 0 (the face 0 is stored) with a Neumann pressure; at x_k = L_k,
+        a wall (Dirichlet velocity) with a Neumann pressure, or an outflow
+        (Neumann velocity) with a Dirichlet pressure (p = 0, an outlet)."""
+        for k, (axis, right, (p_left, p_right)) in enumerate(zip(self.axes, rights, pressure)):
+            if axis.periodic:
+                continue
+            for c in (right, p_left, p_right):
+                if c is None or not c.is_homogeneous:
+                    raise NotImplementedError(
+                        f"project: axis {k}: only homogeneous conditions are supported, "
+                        f"got {right!r}, ({p_left!r}, {p_right!r}).")
+            if not isinstance(p_left, Neumann):
+                raise NotImplementedError(
+                    f"project: axis {k}: the pressure at x = 0 must be Neumann (the "
+                    f"face 0 is stored, its velocity known), got {p_left!r}.")
+            outlet = isinstance(right, Neumann)
+            if outlet != isinstance(p_right, Dirichlet):
+                raise ValueError(
+                    f"project: axis {k}: an outflow velocity (Neumann) needs a Dirichlet "
+                    f"pressure and a wall (Dirichlet) a Neumann one, got {right!r} and "
+                    f"{p_right!r}.")
+
+    def divergence_with_outlet(self, velocity, rights, outlet=None) -> "tensap.TTTensor":
+        """The divergence of a face velocity whose face N is given on the
+        outlet axes: outlet[k] (a QTT on the grid, zero except at the index
+        N - 1 along k, where it holds the value of the face N) replaces the
+        closure of rights[k]. On the other axes, the closures of rights. This is
+        the divergence of the corrected velocity of project, outlet included."""
+        outlet = outlet or [None] * self.dim
+        total = None
+        for k, (axis, w, right, face) in enumerate(zip(self.axes, velocity, rights, outlet)):
+            if face is None:
+                term = self.embed(axis.divergence(right), k) @ w
+            else:
+                term = self.embed(axis.divergence(Dirichlet()), k) @ w + face * (1.0 / axis.h)
+            total = term if total is None else total + term
+        return tensap.Truncator(tolerance=1e-14).truncate(total)
+
     def project(self, velocity, rights=None, truncator=None, pressure=None,
+                compatibility_tolerance: float = 1e-8, return_info: bool = False,
                 **solver_options):
         """Helmholtz--Hodge decomposition of a face velocity w = u + G phi with
-        D u = 0: solve L_p phi = D w (L_p = D G regularized by the rank-one
-        term, by TTTensorALSLinearSolver, AMEn by default), then u = w - G phi.
+        D u = 0: solve -L_p phi = -D w (minus the pressure Laplacian, SPD;
+        regularized by the rank-one term R when singular), by
+        TTTensorALSLinearSolver (AMEn by default), then u = w - G phi.
 
         Parameters
         ----------
@@ -506,11 +561,23 @@ class StaggeredGrid:
             1e-10, maximal rank 100).
         pressure : list, optional
             Conditions of the pressure, (left, right) per axis
-            (pressure_laplacian); default: homogeneous Neumann (walls). With a
-            homogeneous Dirichlet condition at an outlet, the pressure problem
-            is not singular and is not regularized; the corrected velocity is
-            divergence-free with, at the outlet face, u_N = u*_N - (G phi)_N,
-            the gradient at that face using the ghost of the condition.
+            (pressure_laplacian); default: homogeneous Neumann (walls).
+            Supported pairs (_check_projection_conditions): homogeneous data,
+            Neumann pressure at x_k = 0 and at a wall, Dirichlet pressure (p =
+            0) at an outflow (Neumann velocity). Then the problem is not
+            singular and the face N of the outlet is corrected,
+            u_N = u*_N - (G phi)_N = w_{N-1} + 2 phi_{N-1} / h (returned in the
+            info).
+        compatibility_tolerance : float, optional
+            Singular problem (no outlet): the mean of D w, scaled by h / rms(w),
+            must not exceed it (the boundary fluxes of w must balance), else
+            ValueError. Below it, the mean is removed: phi has zero mean and the
+            divergence of u is the removed mean (reported).
+        return_info : bool, optional
+            Also return a dict: 'outlet' (per axis, None or the QTT of the face
+            N at the index N - 1, see divergence_with_outlet), 'divergence' (the
+            QTT of the divergence of u, outlet included), 'compatibility_defect',
+            'solver' (the output of the pressure solve).
         solver_options
             Passed to TTTensorALSLinearSolver (default algorithm 'amen',
             tolerance 1e-12, stagnation 1e-10, 30 iterations, no display).
@@ -520,10 +587,14 @@ class StaggeredGrid:
         u : list of tensap.TTTensor
             The divergence-free part.
         phi : tensap.TTTensor
-            The potential, of zero mean.
+            The potential (of zero mean when the problem is singular).
+        info : dict
+            If return_info.
         """
         if rights is None:
             rights = [None if axis.periodic else Dirichlet() for axis in self.axes]
+        pressure = self._pressure_conditions(pressure)
+        self._check_projection_conditions(rights, pressure)
         if truncator is None:
             truncator = tensap.Truncator(tolerance=1e-10, max_rank=100)
         options = {"algorithm": "amen", "tolerance": 1e-12, "stagnation": 1e-10,
@@ -531,13 +602,36 @@ class StaggeredGrid:
         options.update(solver_options)
         divergence = self.divergence(rights)
         rhs = truncator.truncate(_sum([D @ w for D, w in zip(divergence, velocity)], 1e-14))
-        operator = self.pressure_laplacian(pressure)
+        operator = self.pressure_laplacian(pressure) * -1.0
+        defect = 0.0
         if self.pressure_is_singular(pressure):
+            ones = self._ones()
+            N = int(np.prod(self.shape))
+            mean = rhs.dot(ones) / N
+            rms = np.sqrt(sum(w.dot(w) for w in velocity) / (self.dim * N))
+            scale = min(axis.h for axis in self.axes) / rms if rms > 0 else 0.0
+            defect = abs(mean) * scale
+            if defect > compatibility_tolerance:
+                raise ValueError(
+                    f"project: incompatible boundary fluxes, mean of D w = {mean:.3e} "
+                    f"(scaled defect {defect:.1e} > {compatibility_tolerance:.1e}).")
+            if mean != 0:
+                rhs = truncator.truncate(rhs - ones * mean)
             operator = operator + self.constant_mode_regularization()
-        phi, _ = tensap.TTTensorALSLinearSolver(
-            operator, rhs, truncator=truncator, **options).solve()
+        phi, output = tensap.TTTensorALSLinearSolver(
+            operator, rhs * -1.0, truncator=truncator, **options).solve()
         u = [truncator.truncate(w - G @ phi) for w, G in zip(velocity, self.gradient())]
-        return u, phi
+        if not return_info:
+            return u, phi
+        outlet = [None] * self.dim
+        for k, (axis, right) in enumerate(zip(self.axes, rights)):
+            if not axis.periodic and isinstance(right, Neumann):
+                outlet[k] = truncator.truncate(
+                    self._last_slice(k) @ (velocity[k] + phi * (2.0 / axis.h)))
+        info = {"outlet": outlet,
+                "divergence": self.divergence_with_outlet(u, rights, outlet),
+                "compatibility_defect": defect, "solver": output}
+        return u, phi, info
 
     def __repr__(self):
         return f"StaggeredGrid(shape={self.shape}, ordering={self.ordering!r})"

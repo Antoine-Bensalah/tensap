@@ -601,3 +601,69 @@ def test_laplacian_source_of_a_lid_and_of_neumann_data():
     npt.assert_allclose(line.dequantize(s)[0], 2 / line.axes[0].h ** 2)
     with pytest.raises(TypeError):
         line.laplacian_source("p", [(Dirichlet(lid), Dirichlet())])
+
+
+# --- review R0: definite pressure, compatibility, outlet state ------------------------
+
+
+def test_pressure_operator_of_project_is_positive_definite():
+    """-L_p + R is SPD (L_p + R, solved before, was indefinite: review M1)."""
+    grid = StaggeredGrid([StaggeredAxis(1.0, 2)])
+    A = -_matrix(grid.pressure_laplacian()) + _matrix(grid.constant_mode_regularization())
+    assert np.linalg.eigvalsh(A).min() > 0
+    wrong = _matrix(grid.pressure_laplacian()) + _matrix(grid.constant_mode_regularization())
+    assert np.linalg.eigvalsh(wrong).min() < 0 < np.linalg.eigvalsh(wrong).max()
+
+
+def test_project_rejects_incompatible_fluxes():
+    """A net flux through closed walls cannot be projected (review M3)."""
+    grid = StaggeredGrid([StaggeredAxis(1.0, 2)])
+    w = np.zeros(4)
+    w[0] = 1.0  # an inflow at x = 0, a wall at x = 1
+    with pytest.raises(ValueError, match="incompatible"):
+        grid.project([grid.quantize(w)])
+    # compatible up to round-off: accepted, reported, zero-mean potential
+    grid2 = StaggeredGrid([StaggeredAxis(1.0, 3), StaggeredAxis(1.0, 3)])
+    rng = np.random.default_rng(2)
+    w2 = [rng.standard_normal(grid2.shape) for _ in range(2)]
+    w2[0][0] = 0.0
+    w2[1][:, 0] = 0.0
+    u, phi, info = grid2.project([grid2.quantize(a) for a in w2], return_info=True)
+    assert info["compatibility_defect"] < 1e-10
+    assert abs(grid2.dequantize(phi).mean()) < 1e-10
+    npt.assert_allclose(grid2.dequantize(info["divergence"]), 0.0, atol=1e-8)
+    assert info["outlet"] == [None, None] and info["solver"]["flag"] in (0, 2)
+
+
+def test_project_returns_the_outlet_face():
+    """With p = 0 at an outlet, the returned outlet face and
+    divergence_with_outlet give a divergence-free field from the public result
+    alone (review M4: the stored faces with the outflow closure do not)."""
+    grid, rights, pressure = _channel()
+    rng = np.random.default_rng(11)
+    w = [rng.standard_normal(grid.shape) for _ in range(2)]
+    w[1][:, 0] = 0.0
+    u, phi, info = grid.project([grid.quantize(a) for a in w], rights=rights,
+                                pressure=pressure, return_info=True)
+    full = grid.divergence_with_outlet(u, rights, info["outlet"])
+    npt.assert_allclose(grid.dequantize(full), 0.0, atol=1e-6)
+    npt.assert_allclose(grid.dequantize(info["divergence"]), grid.dequantize(full), atol=1e-10)
+    ax = grid.axes[0]
+    outlet = grid.dequantize(info["outlet"][0])
+    npt.assert_allclose(outlet[-1], w[0][-1] + 2 * grid.dequantize(phi)[-1] / ax.h, atol=1e-8)
+    npt.assert_allclose(outlet[:-1], 0.0, atol=1e-12)
+    assert info["outlet"][1] is None
+    stored = sum(grid.dequantize(D @ a) for D, a in zip(grid.divergence(rights), u))
+    assert np.abs(stored).max() > 1e-3  # the closure alone misses the corrected face
+
+
+def test_project_rejects_unsupported_conditions():
+    grid, rights, pressure = _channel()
+    zero = [grid.quantize(np.zeros(grid.shape))] * 2
+    with pytest.raises(ValueError, match="outflow"):
+        grid.project(zero, rights=rights)  # Neumann pressure at an outflow
+    with pytest.raises(NotImplementedError, match="x = 0"):
+        grid.project(zero, rights=rights,
+                     pressure=[(Dirichlet(), Dirichlet()), (Neumann(), Neumann())])
+    with pytest.raises(NotImplementedError, match="homogeneous"):
+        grid.project(zero, rights=[Neumann(1.0), Dirichlet()], pressure=pressure)

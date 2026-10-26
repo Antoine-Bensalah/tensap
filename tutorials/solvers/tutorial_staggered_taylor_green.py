@@ -115,8 +115,9 @@ for levels in (5, 6, 7, 8):
     # pressure: L_p p = -D N(u), of zero mean
     N = grid.convection(velocity, truncator=TRUNCATOR)
     D = grid.divergence([None, None])
-    operator = grid.pressure_laplacian() + grid.constant_mode_regularization()
-    source = TRUNCATOR.truncate((D[0] @ N[0] + D[1] @ N[1]) * -1.0)
+    # -L_p + R is SPD (L_p + R would be indefinite): -L_p p = D N
+    operator = grid.pressure_laplacian() * -1.0 + grid.constant_mode_regularization()
+    source = TRUNCATOR.truncate(D[0] @ N[0] + D[1] @ N[1])
     p, _ = tensap.TTTensorALSLinearSolver(operator, source, truncator=TRUNCATOR, algorithm="amen",
                                           display=False, **SOLVER).solve()
     u_ex, v_ex, p_ex = exact(grid, T)
