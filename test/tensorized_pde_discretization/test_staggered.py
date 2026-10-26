@@ -531,3 +531,73 @@ def test_convection_rejects_data():
         grid.convection([zero, zero], conditions)
     outflow = [[(Dirichlet(), Neumann()), (Dirichlet(), Dirichlet())]] * 2
     assert all(n.norm() == 0 for n in grid.convection([zero, zero], outflow))
+
+
+# --- level 4: boundary sources ------------------------------------------------------
+
+
+def _second_difference_with_ghosts(f, h, axis, location, left, right, g_left, g_right):
+    """Second difference of f along axis, with the closures written as ghost
+    values (cells) or as the face N (faces)."""
+    f = np.moveaxis(f, axis, 0)
+    n = f.shape[0]
+    if location == "face":
+        last = g_right if isinstance(right, Dirichlet) else f[-1] + h * g_right
+        ext = np.concatenate([f[:1] * 0, f, last[None]])  # face 0: masked below
+        out = (ext[:-2] - 2 * ext[1:-1] + ext[2:]) / h**2
+        out[0] = 0.0
+    else:
+        lo = 2 * g_left - f[0] if isinstance(left, Dirichlet) else f[0] + h * g_left
+        hi = 2 * g_right - f[-1] if isinstance(right, Dirichlet) else f[-1] + h * g_right
+        ext = np.concatenate([lo[None], f, hi[None]])
+        out = (ext[:-2] - 2 * ext[1:-1] + ext[2:]) / h**2
+    assert out.shape[0] == n
+    return np.moveaxis(out, 0, axis)
+
+
+def test_laplacian_source_of_a_lid_and_of_neumann_data():
+    """u of a cavity: lid g(x) at y = 1 (Dirichlet on the cells along y),
+    Neumann data on the right end of the faces along x; v: Dirichlet data on
+    both cell ends along x."""
+    grid = StaggeredGrid([StaggeredAxis(1.0, 4), StaggeredAxis(2.0, 3)])
+    ax, ay = grid.axes
+    rng = np.random.default_rng(7)
+
+    def lid(points):
+        return np.sin(np.pi * points[:, 0])
+
+    for field, conditions in (
+            ("u", [(None, Neumann(0.5)), (Dirichlet(), Dirichlet(lid))]),
+            ("v", [(Dirichlet(-1.0), Dirichlet(lambda p: p[:, 0] ** 2)), (None, Dirichlet())])):
+        f = rng.standard_normal(grid.shape)
+        locations = grid.locations(field)
+        if locations[0] == "face":
+            f[0] = 0.0
+        else:
+            f[:, 0] = 0.0
+        total = grid.laplacian(field, conditions) @ grid.quantize(f) \
+            + grid.laplacian_source(field, conditions)
+        expected = np.zeros(grid.shape)
+        for k, (axis, location, (left, right)) in enumerate(zip(grid.axes, locations, conditions)):
+            other = grid.axes[1 - k].positions(locations[1 - k])
+
+            def data(c):
+                if c is None:
+                    return np.zeros(other.size)
+                if callable(c.value):
+                    return c.value(other[:, None])
+                return np.full(other.size, float(c.value))
+            expected += _second_difference_with_ghosts(f, axis.h, k, location, left, right,
+                                                       data(left), data(right))
+        if locations[0] == "face":
+            expected[0] = 0.0
+        else:
+            expected[:, 0] = 0.0
+        npt.assert_allclose(grid.dequantize(total), expected, atol=1e-8)
+    homogeneous = grid.laplacian_source("p", [(Dirichlet(), Neumann())] * 2)
+    assert homogeneous.norm() == 0
+    line = StaggeredGrid([StaggeredAxis(1.0, 3)])
+    s = line.laplacian_source("p", [(Dirichlet(1.0), Dirichlet())])
+    npt.assert_allclose(line.dequantize(s)[0], 2 / line.axes[0].h ** 2)
+    with pytest.raises(TypeError):
+        line.laplacian_source("p", [(Dirichlet(lid), Dirichlet())])

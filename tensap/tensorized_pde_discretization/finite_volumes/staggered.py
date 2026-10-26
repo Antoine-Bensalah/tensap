@@ -318,6 +318,65 @@ class StaggeredGrid:
                 self.interior_mask(field) @ operator)
         return operator
 
+    def laplacian_source(self, field: str, conditions,
+                         tolerance: float = 1e-12) -> "tensap.TTTensor":
+        """The source s of the boundary data of the Laplacian of a field:
+        Delta f ~ laplacian(field, conditions) f + s.
+
+        conditions[k] = (left, right) as in laplacian, with their data g: a
+        scalar, or a function of the points of the face (array of shape
+        (n, dim - 1), the coordinates of the other axes at the locations of the
+        field). Along an axis where the field is on the cells, the data of both
+        ends enter the first and last cells (weights 2 / h^2 Dirichlet, 1 / h
+        Neumann); along the axis where it is on the faces, only the right end
+        (face 0 is stored), on the last face (boundary_weight of
+        face_laplacian). Built in QTT, face by face: the data are sampled on
+        the faces only; the stored boundary faces are masked.
+        """
+        locations = self.locations(field)
+        result = None
+        for k, (axis, location, pair) in enumerate(zip(self.axes, locations, conditions)):
+            if axis.periodic:
+                continue
+            for side, condition in zip(("left", "right"), pair):
+                if condition is None or condition.is_homogeneous:
+                    continue
+                if location == "face":
+                    if side == "left":
+                        continue
+                    weight = axis.boundary_weight("face_laplacian", condition)
+                else:
+                    cells = Axis(axis.length, axis.levels, *(
+                        (condition, Neumann()) if side == "left" else (Neumann(), condition)))
+                    weight = cells.boundary_weight(side)
+                index = 0 if side == "left" else axis.size - 1
+                vector = tensap.qtt_elementary_vector(axis.levels, index) * weight
+                face = self._face_data(field, k, condition.value, tolerance)
+                term = tensap.qtt_insert_axis(face, k, vector, self.tensorizer)
+                result = term if result is None else result + term
+        if result is None:
+            return tensap.TTTensor([np.zeros((1, 2, 1))] * int(self.tensorizer.levels.sum()))
+        result = tensap.Truncator(tolerance=tolerance).truncate(result)
+        return tensap.Truncator(tolerance=tolerance).truncate(self.interior_mask(field) @ result)
+
+    def _face_data(self, field, axis, g, tolerance):
+        """The data g on the face normal to axis, at the locations of the field
+        along the other axes, as a QTT on the face (a float in 1D)."""
+        if self.dim == 1:
+            if callable(g):
+                raise TypeError("In dimension 1, the data of a face is a scalar.")
+            return float(g)
+        others = [j for j in range(self.dim) if j != axis]
+        layout = tensap.Tensorizer(2, [self.axes[j].levels for j in others], len(others))
+        layout.ordering_type = self.tensorizer.ordering_type
+        if not callable(g):
+            return tensap.TTTensor([np.ones((1, 2, 1))] * int(layout.levels.sum())) * float(g)
+        locations = self.locations(field)
+        coordinates = [self.axes[j].positions(locations[j]) for j in others]
+        points = np.stack(np.meshgrid(*coordinates, indexing="ij"), axis=-1)
+        values = np.asarray(g(points.reshape(-1, len(others))), dtype=float)
+        return tensap.quantize(values.reshape(points.shape[:-1]), layout, tolerance)
+
     def convection(self, velocity, conditions=None, truncator=None) -> list:
         """Convective term in conservative (divergence) form, N_j = sum_k
         d_k (u_j u_k) at the location of the component j (Harlow and Welch):
@@ -363,22 +422,23 @@ class StaggeredGrid:
         def condition(j, k, side):
             return None if self.axes[k].periodic else conditions[j][k][side]
 
+        block = self._embedded_block
+
         terms = [[] for _ in range(d)]
         for k, axis_k in enumerate(self.axes):
             uk = velocity[k]
             # k = j: d_k (u_k u_k), at the cells along k
-            mean = self.embed(axis_k.face_to_cell(condition(k, k, 1)), k) @ uk
+            mean = block("face_to_cell", k, condition(k, k, 1)) @ uk
             square = truncator.truncate(mean.hadamard_product(mean))
-            terms[k].append(self.embed(axis_k.gradient(), k) @ square)
-            for j, axis_j in enumerate(self.axes):
+            terms[k].append(block("gradient", k, None) @ square)
+            for j in range(d):
                 if j == k:
                     continue
                 # k != j: d_k (u_j u_k), at the corners of the plane (j, k)
-                uj_mean = self.embed(axis_k.cell_to_face(condition(j, k, 0)), k) @ velocity[j]
-                uk_mean = self.embed(axis_j.cell_to_face(condition(k, j, 0)), j) @ uk
+                uj_mean = block("cell_to_face", k, condition(j, k, 0)) @ velocity[j]
+                uk_mean = block("cell_to_face", j, condition(k, j, 0)) @ uk
                 product = truncator.truncate(uj_mean.hadamard_product(uk_mean))
-                terms[j].append(
-                    self.embed(axis_k.divergence(condition(j, k, 1)), k) @ product)
+                terms[j].append(block("divergence", k, condition(j, k, 1)) @ product)
         result = []
         for j, field in enumerate(self._COMPONENTS[:d]):
             total = terms[j][0]
@@ -390,6 +450,17 @@ class StaggeredGrid:
                 total = truncator.truncate(self.interior_mask(field) @ total)
             result.append(total)
         return result
+
+    def _embedded_block(self, name: str, axis: int, condition):
+        """A 1D block embedded on an axis, cached (the convective term is
+        evaluated at every time step; the blocks only depend on the kind of
+        the condition, the data being homogeneous)."""
+        key = (name, axis, type(condition).__name__)
+        cache = self.__dict__.setdefault("_blocks", {})
+        if key not in cache:
+            method = getattr(self.axes[axis], name)
+            cache[key] = self.embed(method() if name == "gradient" else method(condition), axis)
+        return cache[key]
 
     def curl(self) -> list:
         """Discrete curl in 2D, corners -> faces: u = d psi / dy, v = -d psi / dx
