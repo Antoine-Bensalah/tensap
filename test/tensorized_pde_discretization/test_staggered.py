@@ -421,3 +421,113 @@ def test_poiseuille_is_a_fixed_point_of_the_pressure_correction():
     npt.assert_allclose(grid.dequantize(u1), grid.dequantize(u), atol=1e-8)
     npt.assert_allclose(grid.dequantize(v1), 0.0, atol=1e-8)
     npt.assert_allclose(grid.dequantize(phi), 0.0, atol=1e-8)
+
+
+# --- level 3: convective term -------------------------------------------------------
+
+
+def _shift(a, axis, offset, periodic):
+    """a[i + offset] along axis, zero outside a bounded axis."""
+    if periodic:
+        return np.roll(a, -offset, axis=axis)
+    out = np.zeros_like(a)
+    n = a.shape[axis]
+    src = [slice(None)] * a.ndim
+    dst = [slice(None)] * a.ndim
+    if offset > 0:
+        src[axis], dst[axis] = slice(offset, n), slice(0, n - offset)
+    else:
+        src[axis], dst[axis] = slice(0, n + offset), slice(-offset, n)
+    out[tuple(dst)] = a[tuple(src)]
+    return out
+
+
+def _reference_convection(velocity, grid):
+    """N_j = sum_k d_k (u_j u_k) written with shifts, walls (zero velocity on
+    the boundary) or periodic."""
+    d = grid.dim
+    N = [np.zeros(grid.shape) for _ in range(d)]
+    for k, ak in enumerate(grid.axes):
+        per_k = ak.periodic
+        mean = (velocity[k] + _shift(velocity[k], k, 1, per_k)) / 2         # cells along k
+        N[k] += (mean**2 - _shift(mean**2, k, -1, per_k)) / ak.h            # faces along k
+        for j, aj in enumerate(grid.axes):
+            if j == k:
+                continue
+            uj = (velocity[j] + _shift(velocity[j], k, -1, per_k)) / 2      # faces along k
+            uk = (velocity[k] + _shift(velocity[k], j, -1, aj.periodic)) / 2  # faces along j
+            if not per_k:
+                uj = np.moveaxis(uj, k, 0).copy()
+                uj[0] = 0.0                                                  # wall at x_k = 0
+                uj = np.moveaxis(uj, 0, k)
+            if not aj.periodic:
+                uk = np.moveaxis(uk, j, 0).copy()
+                uk[0] = 0.0
+                uk = np.moveaxis(uk, 0, j)
+            q = uj * uk
+            N[j] += (_shift(q, k, 1, per_k) - q) / ak.h                      # cells along k
+    for j, aj in enumerate(grid.axes):
+        if not aj.periodic:
+            N[j] = np.moveaxis(N[j], j, 0).copy()
+            N[j][0] = 0.0
+            N[j] = np.moveaxis(N[j], 0, j)
+    return N
+
+
+@pytest.mark.parametrize("periodic", [False, True])
+@pytest.mark.parametrize("levels", [(4, 3), (2, 3, 2)])
+def test_convection_against_reference(periodic, levels):
+    grid = StaggeredGrid([StaggeredAxis(1.0 + k, l, periodic) for k, l in enumerate(levels)])
+    rng = np.random.default_rng(len(levels))
+    velocity = []
+    for j in range(grid.dim):
+        w = rng.standard_normal(grid.shape)
+        if not periodic:
+            w = np.moveaxis(w, j, 0).copy()
+            w[0] = 0.0  # walls
+            w = np.moveaxis(w, 0, j)
+        velocity.append(w)
+    N = grid.convection([grid.quantize(w) for w in velocity])
+    for a, b in zip(N, _reference_convection(velocity, grid)):
+        npt.assert_allclose(grid.dequantize(a), b, atol=1e-7)
+
+
+@pytest.mark.parametrize("periodic", [False, True])
+def test_convection_conserves_momentum_and_energy(periodic):
+    """Periodic: sum N_j = 0 (momentum). Divergence-free (curl of psi): (u, N(u))
+    = 0 (kinetic energy), also with walls."""
+    grid = StaggeredGrid([StaggeredAxis(1.0, 4, periodic), StaggeredAxis(1.0, 3, periodic)])
+    psi = np.random.default_rng(1).standard_normal(grid.shape)
+    if not periodic:
+        psi[0, :] = psi[:, 0] = 0.0
+    P = grid.quantize(psi)
+    velocity = [C @ P for C in grid.curl()]
+    N = grid.convection(velocity)
+    scale = np.sqrt(sum(a.dot(a) for a in N) * sum(a.dot(a) for a in velocity))
+    assert abs(sum(a.dot(b) for a, b in zip(velocity, N))) < 1e-10 * scale
+    if periodic:
+        for Nk in N:
+            assert abs(grid.dequantize(Nk).sum()) < 1e-9 * np.sqrt(Nk.dot(Nk))
+
+
+def test_convection_of_taylor_green_is_second_order():
+    errors = []
+    for levels in (4, 5, 6):
+        grid = StaggeredGrid([StaggeredAxis(2 * np.pi, levels, periodic=True)] * 2)
+        xu, yu = grid.positions("u")
+        xv, yv = grid.positions("v")
+        velocity = [grid.quantize(np.sin(xu) * np.cos(yu)),
+                    grid.quantize(-np.cos(xv) * np.sin(yv))]
+        N = grid.convection(velocity, truncator=tensap.Truncator(tolerance=1e-12))
+        errors.append(np.abs(grid.dequantize(N[0]) - np.sin(2 * xu) / 2).max())
+    assert np.all(np.log2(np.array(errors[:-1]) / np.array(errors[1:])) > 1.9)
+
+
+def test_convection_rejects_data():
+    grid = _grid()
+    zero = grid.quantize(np.zeros(grid.shape))
+    conditions = [[(Dirichlet(), Dirichlet(1.0)), (Dirichlet(), Dirichlet())]] * 2
+    with pytest.raises(NotImplementedError):
+        grid.convection([zero, zero], conditions)
+    outflow = [[(Dirichlet(), Neumann()), (Dirichlet(), Dirichlet())]] * 2
+    assert all(n.norm() == 0 for n in grid.convection([zero, zero], outflow))

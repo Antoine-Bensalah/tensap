@@ -318,6 +318,79 @@ class StaggeredGrid:
                 self.interior_mask(field) @ operator)
         return operator
 
+    def convection(self, velocity, conditions=None, truncator=None) -> list:
+        """Convective term in conservative (divergence) form, N_j = sum_k
+        d_k (u_j u_k) at the location of the component j (Harlow and Welch):
+
+        - k = j: the component averaged to the cells along k, squared, and
+          differenced back to the faces (the gradient block, cells -> faces);
+        - k != j: u_j averaged along k and u_k averaged along j to the corners
+          of the plane (j, k) (cell_to_face), their product, and the
+          divergence block along k (faces -> cells).
+
+        Parameters
+        ----------
+        velocity : list of tensap.TTTensor
+            The d components, at their faces.
+        conditions : list, optional
+            conditions[j][k] = (left, right), the conditions of the component j
+            at the ends of the axis k (as in laplacian; default homogeneous
+            Dirichlet, walls; ignored on the periodic axes). Only homogeneous
+            data are supported here (a wall, an outflow); the data of a moving
+            wall enter as a source (later).
+        truncator : tensap.Truncator, optional
+            Rounding of the products and of the result (default tolerance
+            1e-10, maximal rank 100).
+
+        Returns
+        -------
+        list of tensap.TTTensor
+            The d components of N, at the faces; zero on the stored boundary
+            faces (interior_mask).
+        """
+        d = self.dim
+        if conditions is None:
+            conditions = [[(Dirichlet(), Dirichlet())] * d for _ in range(d)]
+        for row, axis_k in zip(zip(*conditions), self.axes):
+            if axis_k.periodic:
+                continue
+            for pair in row:
+                if any(not c.is_homogeneous for c in pair if c is not None):
+                    raise NotImplementedError("convection: only homogeneous data.")
+        if truncator is None:
+            truncator = tensap.Truncator(tolerance=1e-10, max_rank=100)
+
+        def condition(j, k, side):
+            return None if self.axes[k].periodic else conditions[j][k][side]
+
+        terms = [[] for _ in range(d)]
+        for k, axis_k in enumerate(self.axes):
+            uk = velocity[k]
+            # k = j: d_k (u_k u_k), at the cells along k
+            mean = self.embed(axis_k.face_to_cell(condition(k, k, 1)), k) @ uk
+            square = truncator.truncate(mean.hadamard_product(mean))
+            terms[k].append(self.embed(axis_k.gradient(), k) @ square)
+            for j, axis_j in enumerate(self.axes):
+                if j == k:
+                    continue
+                # k != j: d_k (u_j u_k), at the corners of the plane (j, k)
+                uj_mean = self.embed(axis_k.cell_to_face(condition(j, k, 0)), k) @ velocity[j]
+                uk_mean = self.embed(axis_j.cell_to_face(condition(k, j, 0)), j) @ uk
+                product = truncator.truncate(uj_mean.hadamard_product(uk_mean))
+                terms[j].append(
+                    self.embed(axis_k.divergence(condition(j, k, 1)), k) @ product)
+        result = []
+        for j, field in enumerate(self._COMPONENTS[:d]):
+            total = terms[j][0]
+            for term in terms[j][1:]:
+                total = total + term
+            total = truncator.truncate(total)
+            if any(location == "face" and not axis.periodic
+                   for axis, location in zip(self.axes, self.locations(field))):
+                total = truncator.truncate(self.interior_mask(field) @ total)
+            result.append(total)
+        return result
+
     def curl(self) -> list:
         """Discrete curl in 2D, corners -> faces: u = d psi / dy, v = -d psi / dx
         for a stream function psi at the corners, by the divergence blocks
