@@ -31,7 +31,7 @@ jobs:
           pip install .
           make html -C doc
           # fast tests only (slow ones excluded by default, see pyproject.toml)
-          mv tensap tensap_code && pytest -n auto --cov-report=xml --cov=tensap test && codecov && mv tensap_code tensap
+          mv tensap tensap_code && .github/scripts/pytest_annotated.sh -n auto --cov-report=xml --cov=tensap test && codecov && mv tensap_code tensap
       - name: Upload
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
@@ -74,7 +74,7 @@ jobs:
         run: |
           conda install -y "numpy=${{ matrix.numpy }}" scipy networkx scikit-learn matplotlib-base pytest pytest-xdist pytest-timeout pip
           pip install .
-          mv tensap tensap_code && pytest -n auto test && mv tensap_code tensap
+          mv tensap tensap_code && .github/scripts/pytest_annotated.sh -n auto test && mv tensap_code tensap
 
   # Optional dependencies (PyTorch, pymanopt) in the pinned test environment,
   # with the coverage of the branches (threshold in pyproject.toml).
@@ -92,7 +92,7 @@ jobs:
         shell: bash -l {0}
         run: |
           pip install .
-          mv tensap tensap_code && pytest -n auto --cov=tensap test && mv tensap_code tensap
+          mv tensap tensap_code && .github/scripts/pytest_annotated.sh -n auto --cov=tensap test && mv tensap_code tensap
 
   conda-windows:
     runs-on: windows-latest
@@ -124,4 +124,4 @@ jobs:
         run: |
           conda install -y scikit-learn pytest pytest-xdist pytest-timeout networkx matplotlib-base pip tensorflow
           pip install .
-          mv tensap tensap_code && pytest -n auto -m "" test && mv tensap_code tensap
+          mv tensap tensap_code && .github/scripts/pytest_annotated.sh -n auto -m "" test && mv tensap_code tensap
