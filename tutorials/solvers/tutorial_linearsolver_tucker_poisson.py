@@ -90,6 +90,7 @@ def accept(name, x, output):
     print(f"  {name}: error {error:.2e}, true residual {residual:.2e}, flag {output.get('flag')}")
     assert np.all(np.isfinite(values))
 
+
 # %% Preconditioner
 # P = sum_k W_k, each W_k = a v^(1) x v^(2) x v^(3) minimizing
 # 1/2 <P A, P> - <I, P> with the previous terms fixed (alternating least

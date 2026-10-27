@@ -429,7 +429,7 @@ class StaggeredGrid:
             uk = velocity[k]
             # k = j: d_k (u_k u_k), at the cells along k
             mean = block("face_to_cell", k, condition(k, k, 1)) @ uk
-            square = truncator.truncate(mean.hadamard_product(mean))
+            square = truncator.hadamard_product(mean, mean)
             terms[k].append(block("gradient", k, None) @ square)
             for j in range(d):
                 if j == k:
@@ -437,7 +437,7 @@ class StaggeredGrid:
                 # k != j: d_k (u_j u_k), at the corners of the plane (j, k)
                 uj_mean = block("cell_to_face", k, condition(j, k, 0)) @ velocity[j]
                 uk_mean = block("cell_to_face", j, condition(k, j, 0)) @ uk
-                product = truncator.truncate(uj_mean.hadamard_product(uk_mean))
+                product = truncator.hadamard_product(uj_mean, uk_mean)
                 terms[j].append(block("divergence", k, condition(j, k, 1)) @ product)
         result = []
         for j, field in enumerate(self._COMPONENTS[:d]):
@@ -542,7 +542,7 @@ class StaggeredGrid:
         return tensap.Truncator(tolerance=1e-14).truncate(total)
 
     def project(self, velocity, rights=None, truncator=None, pressure=None,
-                compatibility_tolerance: float = 1e-8, return_info: bool = False,
+                compatibility_tolerance: float = None, return_info: bool = False,
                 **solver_options):
         """Helmholtz--Hodge decomposition of a face velocity w = u + G phi with
         D u = 0: solve -L_p phi = -D w (minus the pressure Laplacian, SPD;
@@ -572,7 +572,10 @@ class StaggeredGrid:
             Singular problem (no outlet): the mean of D w, scaled by h / rms(w),
             must not exceed it (the boundary fluxes of w must balance), else
             ValueError. Below it, the mean is removed: phi has zero mean and the
-            divergence of u is the removed mean (reported).
+            divergence of u is the removed mean (reported). The default,
+            max(1e-8, 10 * truncator.tolerance), accepts the defect left by the
+            rounding of w (a truncation at 1e-2 leaves about 5e-6), and rejects
+            a physical imbalance of the fluxes.
         return_info : bool, optional
             Also return a dict: 'outlet' (per axis, None or the QTT of the face
             N at the index N - 1, see divergence_with_outlet), 'divergence' (the
@@ -597,6 +600,8 @@ class StaggeredGrid:
         self._check_projection_conditions(rights, pressure)
         if truncator is None:
             truncator = tensap.Truncator(tolerance=1e-10, max_rank=100)
+        if compatibility_tolerance is None:
+            compatibility_tolerance = max(1e-8, 10 * truncator.tolerance)
         options = {"algorithm": "amen", "tolerance": 1e-12, "stagnation": 1e-10,
                    "max_iterations": 30, "display": False}
         options.update(solver_options)
