@@ -359,7 +359,14 @@ def test_regularized_solution_of_singular_problems(rng):
                                         tolerance=1e-11, max_iterations=300, stagnation=1e-15,
                                         display=False).solve()
         u = grid.dequantize(u)
-        zero_mean = np.linalg.pinv(M) @ (data - data.mean()).ravel()  # minimum norm
+        # minimum norm solution, by the eigenvectors of M without its zero
+        # eigenvalue (about 1e-13 in floating point: np.linalg.pinv with its
+        # default cut-off inverted it on the Linux and macOS arm64 runners of
+        # the CI, and the reference was wrong by 1e-2)
+        w, V = np.linalg.eigh(M)
+        keep = w > 1e-8 * w.max()
+        rhs = V.T @ (data - data.mean()).ravel()
+        zero_mean = V[:, keep] @ (rhs[keep] / w[keep])
         info = (f"case {case}: flag {output['flag']}, iter {output['iter']}, "
                 f"error {output['error']:.2e}, sigma {sigma:.6e}, mean {f_mean:.3e}")
         npt.assert_allclose(u.ravel(), zero_mean + shift, atol=1e-7, err_msg=info)
