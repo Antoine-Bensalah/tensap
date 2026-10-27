@@ -129,7 +129,7 @@ class NormalRandomVariable(tensap.RandomVariable):
 
         The shifted random variable is bias + scaling * X, as for the other
         random variables: the mean mu becomes bias + scaling * mu, and the
-        standard deviation sigma becomes |scaling| * sigma.
+        standard deviation sigma becomes abs(scaling) * sigma.
 
         Parameters
         ----------
