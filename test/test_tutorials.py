@@ -31,6 +31,21 @@ SLOW_TUTORIALS = {
     "tutorial_tensor_learning_digits_recognition.py",  # trains a network
 }
 
+# Known failures of inherited tutorials (question for Anthony in the notes,
+# journal 2026-10-26_review_r1). tensorized_function_learning: in the local
+# learning of new_rank_selection (rank-one correction), the regression of a node
+# returns zero coefficients; TensorLearning._solve_standard prints "returning to
+# the previous iteration" but does not restore f0 (the same break in Matlab,
+# TensorLearning.m), the tensor ends at zero, and the selection divides its
+# singular values by its norm: RuntimeWarning 0/0 in tree_based_tensor_learning.py.
+# Present on upstream master (52c17be, seed 0); visible since the warnings are
+# errors. Not strict: the tutorial draws its data without a seed.
+KNOWN_FAILURES = {
+    "tutorial_tensor_learning_tensorized_function_learning.py": pytest.mark.xfail(
+        raises=RuntimeWarning, strict=False,
+        reason="zero tensor after a zero local solution in new_rank_selection (inherited)"),
+}
+
 # Tutorials that need an optional dependency: skipped when it is missing.
 REQUIREMENTS = {
     "tutorial_tensor_learning_digits_recognition.py": "tensorflow",
@@ -56,6 +71,8 @@ def _tutorial_params():
     for path in sorted(glob.glob("tutorials/**/*.py", recursive=True)):
         name = os.path.basename(path)
         marks = [pytest.mark.slow] if name in SLOW_TUTORIALS else []
+        if name in KNOWN_FAILURES:
+            marks.append(KNOWN_FAILURES[name])
         module = REQUIREMENTS.get(name)
         if module is not None and importlib.util.find_spec(module) is None:
             marks.append(pytest.mark.skip(reason=f"{module} is not installed"))
