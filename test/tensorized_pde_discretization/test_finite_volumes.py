@@ -354,10 +354,12 @@ def test_regularized_solution_of_singular_problems(rng):
     sigma = grid.axes[0].smallest_nonzero_eigenvalue()
     f = rng.standard_normal(grid.shape)
     f_mean = f.mean()
-    for data, shift in [(f - f_mean, 0.0), (f, f_mean / sigma)]:
-        u, _ = tensap.TruncatedPCG(A, grid.quantize(data), tensap.Truncator(tolerance=1e-13),
-                                   tolerance=1e-11, max_iterations=300, stagnation=1e-15,
-                                   display=False).solve()
+    for case, (data, shift) in enumerate([(f - f_mean, 0.0), (f, f_mean / sigma)]):
+        u, output = tensap.TruncatedPCG(A, grid.quantize(data), tensap.Truncator(tolerance=1e-13),
+                                        tolerance=1e-11, max_iterations=300, stagnation=1e-15,
+                                        display=False).solve()
         u = grid.dequantize(u)
         zero_mean = np.linalg.pinv(M) @ (data - data.mean()).ravel()  # minimum norm
-        npt.assert_allclose(u.ravel(), zero_mean + shift, atol=1e-7)
+        info = (f"case {case}: flag {output['flag']}, iter {output['iter']}, "
+                f"error {output['error']:.2e}, sigma {sigma:.6e}, mean {f_mean:.3e}")
+        npt.assert_allclose(u.ravel(), zero_mean + shift, atol=1e-7, err_msg=info)

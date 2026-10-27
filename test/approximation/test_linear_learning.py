@@ -195,7 +195,11 @@ def test_basis_adaptation(basis, x):
     y = basis.eval(x) @ np.array([1.0, 0.5, 0.0, 0.0, 0.0, 0.0])
     f, output = _model(basis, x, y, basis_adaptation=True).solve()
     npt.assert_allclose(f.data.ravel(), [1.0, 0.5, 0, 0, 0, 0], atol=1e-12)
-    assert output["ind"] == 1  # the second set of the adaptation path
+    # the data are exact on the second set of the adaptation path: it and the
+    # larger sets have errors of the order of the round-off, so that the set
+    # selected among them depends on the platform (1 on macOS x86, 2 on the
+    # Linux and macOS arm64 runners of the CI); its coefficients are exact
+    assert output["ind"] >= 1
     assert output["error_path"].size == 6
 
 

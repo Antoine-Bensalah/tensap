@@ -7,7 +7,7 @@ pytest -rfE "$@" 2>&1 | tee pytest.log
 status=${PIPESTATUS[0]}
 grep -E "^(FAILED|ERROR) " pytest.log | head -30 | sed 's/^/::error title=pytest::/'
 # the assertion messages (lines "E   ...") of the failures
-grep -E "^E   " pytest.log | head -40 | sed 's/^/::error title=pytest detail::/'
+grep -E "^E  " pytest.log | head -60 | sed 's/^/::error title=pytest detail::/'
 if [ "$status" -ne 0 ] && ! grep -qE "^(FAILED|ERROR) " pytest.log; then
   # collection or internal error: report the end of the log
   tail -15 pytest.log | sed 's/^/::error title=pytest (end of log)::/'
