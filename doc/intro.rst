@@ -43,7 +43,7 @@ and several possible operations with such an object. For an introduction
 to tensor calculus, we refer to the monograph [Hackbusch2019]_.
 
 For examples of use, see the tutorial file
-``tutorials\tensor_algebra\tutorial_FullTensor.py``.
+``test\non_regression_scripts\tensor_algebra\tutorial_FullTensor.py``.
 
 Creating a **FullTensor**
 -------------------------
@@ -597,8 +597,8 @@ the evaluation of the diagonal of a contraction with matrices with
 
 We present in this section the **DimensionTree** and **TreeBasedTensor**
 objects. For examples of use, see the tutorial file
-``tutorials\tensor_algebra\tutorial_DimensionTree.py`` and
-``tutorials\tensor_algebra\tutorial_TreeBasedTensor.py``.
+``test\non_regression_scripts\tensor_algebra\tutorial_DimensionTree.py`` and
+``test\non_regression_scripts\tensor_algebra\tutorial_TreeBasedTensor.py``.
 
 **DimensionTree**
 ^^^^^^^^^^^^^^^^^
@@ -947,7 +947,7 @@ tensap.Truncator(tol, r)**. The thresholding type (**’hard’** or
 **’soft’**) can also be specified as a third argument.
 
 For examples of use, see the tutorial file
-``tutorials\tensor_algebra\tutorial_tensor_truncation.py``.
+``test\non_regression_scripts\tensor_algebra\tutorial_tensor_truncation.py``.
 
 Truncation.
 ^^^^^^^^^^^
@@ -1301,7 +1301,7 @@ with **t = tensap.Tensorizer(b, d, D)**.
   :math:`d+1` variables that can be evaluated with **f.eval(x)**, with
   **x** a list or **numpy.ndarray** with :math:`d+1` columns.
 
-See the tutorial file ``tutorials\functions\tutorial_TensorizedFunction.py``.
+See the tutorial file ``test\non_regression_scripts\functions\tutorial_TensorizedFunction.py``.
 
 Tools
 =====
@@ -1337,7 +1337,7 @@ can be obtained with **tensap.MultiIndices.bounded\_by(d, p, m)**. If
 
 For obtaining the margin or reduced margin of an multi-index set
 :math:`I`, we can use For other operations of **MultiIndices**, see the
-tutorial file ``tutorials\tools\tutorial_MultiIndices.py``.
+tutorial file ``test\non_regression_scripts\tools\tutorial_MultiIndices.py``.
 
 **TensorGrid**, **FullTensorGrid** and **SparseTensorGrid**
 -----------------------------------------------------------
@@ -1346,7 +1346,7 @@ tutorial file ``tutorials\tools\tutorial_MultiIndices.py``.
   **FullTensorGrid** and **SparseTensorGrid**, that inherit from
   **TensorGrid**.
 | See the tutorial file
-  ``tutorials\functions\tutorial_functions_bases_grids.py``.
+  ``test\non_regression_scripts\functions\tutorial_functions_bases_grids.py``.
 
 Learning
 ========
@@ -1363,8 +1363,8 @@ methods for algebraic (resp. functional) tensors based on principal
 component analysis, using an adaptive sampling of the entries of the
 tensor (or the function). See [Nouy2017hopca]_ for a
 description of the algorithms, and for examples of use, see the tutorial
-files ``tutorials\approximation\tutorial_TensorPrincipalComponentAnalysis.py``
-and ``tutorials\approximation\tutorial_FunctionalTensorPrincipalComponentAnalysis.py``.
+files ``test\non_regression_scripts\approximation\tutorial_TensorPrincipalComponentAnalysis.py``
+and ``test\non_regression_scripts\approximation\tutorial_FunctionalTensorPrincipalComponentAnalysis.py``.
 
 | The difference between the two objects if that
   **TensorPrincipalComponentAnalysis**\ ’ methods take as first input a
@@ -1594,10 +1594,10 @@ with canonical and tree-based tensor formats. See [Grelier2018]_,
 of algorithms and related theory.
 
 For examples, see the tutorial files
-``tutorials\approximation\tutorial_tensor_learning_CanonicalTensorLearning.py``,
-``tutorials\approximation\tutorial_tensor_learning_TreeBasedTensorLearning.py``,
-``tutorials\approximation\tutorial_tensor_learning_TreeBasedTensorDensityLearning.py``,
-``tutorials\approximation\tutorial_tensor_learning_tensorized_function_learning.py``.
+``test\non_regression_scripts\approximation\tutorial_tensor_learning_CanonicalTensorLearning.py``,
+``test\non_regression_scripts\approximation\tutorial_tensor_learning_TreeBasedTensorLearning.py``,
+``test\non_regression_scripts\approximation\tutorial_tensor_learning_TreeBasedTensorDensityLearning.py``,
+``test\non_regression_scripts\approximation\tutorial_tensor_learning_tensorized_function_learning.py``.
 
 These algorithms are implemented in the core object **TensorLearning**,
 common to all the tensor formats, so that implementing such a learning

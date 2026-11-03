@@ -3,4 +3,4 @@ include COPYING
 include COPYING.LESSER
 include LICENSE
 include README.md
-recursive-include tutorials *
+recursive-include test/non_regression_scripts *
