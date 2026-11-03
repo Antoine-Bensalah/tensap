@@ -1,0 +1,775 @@
+diff --git a/tensap/approximation/bases/delta_functional_basis.py b/tensap/approximation/bases/delta_functional_basis.py
+index cd13e90..9af4a6c 100755
+--- a/tensap/approximation/bases/delta_functional_basis.py
++++ b/tensap/approximation/bases/delta_functional_basis.py
+@@ -26,8 +26,6 @@ import tensap
+ 
+ class DeltaFunctionalBasis(tensap.FunctionalBasis):
+     """
+-    Class DeltaFunctionalBasis.
+-
+     Basis of univariate functions defined on a finite set of values in R^d.
+ 
+     The is_orthonormal attribute remains at its default value of False.
+diff --git a/tensap/approximation/bases/full_tensor_product_functional_basis.py b/tensap/approximation/bases/full_tensor_product_functional_basis.py
+index 8df2009..e57c1df 100644
+--- a/tensap/approximation/bases/full_tensor_product_functional_basis.py
++++ b/tensap/approximation/bases/full_tensor_product_functional_basis.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class FullTensorProductFunctionalBasis(tensap.FunctionalBasis):
+     """
+-    Class FullTensorProductFunctionalBasis.
++    Full tensor product of functional bases.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/bases/functional_bases.py b/tensap/approximation/bases/functional_bases.py
+index 0ae4598..a787b38 100644
+--- a/tensap/approximation/bases/functional_bases.py
++++ b/tensap/approximation/bases/functional_bases.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class FunctionalBases:
+     """
+-    Class FunctionalBases.
++    Collection of functional bases, one for each variable.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/bases/functional_basis.py b/tensap/approximation/bases/functional_basis.py
+index 3d42ed1..0436cd4 100644
+--- a/tensap/approximation/bases/functional_basis.py
++++ b/tensap/approximation/bases/functional_basis.py
+@@ -28,7 +28,7 @@ import tensap
+ 
+ class FunctionalBasis:
+     """
+-    Class FunctionalBasis.
++    Base class for bases of functions.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/bases/functional_basis_array.py b/tensap/approximation/bases/functional_basis_array.py
+index bbc4228..6962fd1 100644
+--- a/tensap/approximation/bases/functional_basis_array.py
++++ b/tensap/approximation/bases/functional_basis_array.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class FunctionalBasisArray(tensap.Function):
+     """
+-    Class FunctionalBasisArray.
++    Function, or array of functions, given by its coefficients on a functional basis.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/bases/polynomial_functional_basis.py b/tensap/approximation/bases/polynomial_functional_basis.py
+index 97f81fc..0046877 100644
+--- a/tensap/approximation/bases/polynomial_functional_basis.py
++++ b/tensap/approximation/bases/polynomial_functional_basis.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class PolynomialFunctionalBasis(tensap.FunctionalBasis):
+     """
+-    Class PolynomialFunctionalBasis.
++    Functional basis of univariate polynomials.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/bases/sparse_tensor_product_functional_basis.py b/tensap/approximation/bases/sparse_tensor_product_functional_basis.py
+index 66bfa28..c442b84 100644
+--- a/tensap/approximation/bases/sparse_tensor_product_functional_basis.py
++++ b/tensap/approximation/bases/sparse_tensor_product_functional_basis.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class SparseTensorProductFunctionalBasis(tensap.FunctionalBasis):
+     """
+-    Class SparseTensorProductFunctionalBasis.
++    Sparse tensor product of functional bases, indexed by multi-indices.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/bases/sub_functional_basis.py b/tensap/approximation/bases/sub_functional_basis.py
+index 54894ca..f71100f 100644
+--- a/tensap/approximation/bases/sub_functional_basis.py
++++ b/tensap/approximation/bases/sub_functional_basis.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class SubFunctionalBasis(tensap.FunctionalBasis):
+     """
+-    Class SubFunctionalBasis.
++    Basis of linear combinations of the functions of an underlying basis.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/bases/user_defined_functional_basis.py b/tensap/approximation/bases/user_defined_functional_basis.py
+index 475d69c..f6738a8 100644
+--- a/tensap/approximation/bases/user_defined_functional_basis.py
++++ b/tensap/approximation/bases/user_defined_functional_basis.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class UserDefinedFunctionalBasis(tensap.FunctionalBasis):
+     """
+-    Class UserDefinedFunctionalBasis.
++    Functional basis defined by user functions.
+ 
+     The basis is not L2-orthonormal a priori, hence the is_orthonormal
+     attribute remains at its default value of False.
+diff --git a/tensap/approximation/integration/integration_rules.py b/tensap/approximation/integration/integration_rules.py
+index 22acae2..f019c2e 100644
+--- a/tensap/approximation/integration/integration_rules.py
++++ b/tensap/approximation/integration/integration_rules.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class IntegrationRule:
+     """
+-    Class IntegrationRule.
++    Integration rule, defined by points and weights.
+ 
+     Attributes
+     ----------
+@@ -168,7 +168,7 @@ class IntegrationRule:
+ 
+ class FullTensorProductIntegrationRule(IntegrationRule):
+     """
+-    Class FullTensorProductIntegrationRule.
++    Tensor product of integration rules.
+ 
+     """
+ 
+diff --git a/tensap/approximation/learning/linear_model_learning_custom_loss.py b/tensap/approximation/learning/linear_model_learning_custom_loss.py
+index c4e6b4c..ef008c2 100644
+--- a/tensap/approximation/learning/linear_model_learning_custom_loss.py
++++ b/tensap/approximation/learning/linear_model_learning_custom_loss.py
+@@ -34,7 +34,7 @@ except ImportError:
+ 
+ class LinearModelLearningCustomLoss(tensap.LinearModelLearning):
+     """
+-    Class LinearModelLearningCustomLoss.
++    Learning of a linear model with a custom loss function.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/learning/linear_model_learning_density_l2.py b/tensap/approximation/learning/linear_model_learning_density_l2.py
+index a882068..584ac7d 100644
+--- a/tensap/approximation/learning/linear_model_learning_density_l2.py
++++ b/tensap/approximation/learning/linear_model_learning_density_l2.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class LinearModelLearningDensityL2(tensap.LinearModelLearning):
+     """
+-    Class LinearModelLearningDensityL2.
++    Learning of a linear model of a density with the L2 contrast.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/learning/linear_model_learning_square_loss.py b/tensap/approximation/learning/linear_model_learning_square_loss.py
+index e9e9145..dfb0cd2 100644
+--- a/tensap/approximation/learning/linear_model_learning_square_loss.py
++++ b/tensap/approximation/learning/linear_model_learning_square_loss.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
+     """
+-    Class LinearModelLearningSquareLoss.
++    Learning of a linear model by least squares.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/learning/loss_functions.py b/tensap/approximation/learning/loss_functions.py
+index d1f1105..7f93c23 100644
+--- a/tensap/approximation/learning/loss_functions.py
++++ b/tensap/approximation/learning/loss_functions.py
+@@ -25,7 +25,7 @@ import numpy as np
+ 
+ class LossFunction(ABC):
+     """
+-    Class LossFunction.
++    Base class for loss functions.
+ 
+     """
+ 
+@@ -134,7 +134,7 @@ class LossFunction(ABC):
+ 
+ class SquareLossFunction(LossFunction):
+     """
+-    Class SquareLossFunction.
++    Square loss function, used for least-squares regression.
+ 
+     Attributes
+     ----------
+@@ -190,7 +190,7 @@ class SquareLossFunction(LossFunction):
+ 
+ class DensityL2LossFunction(LossFunction):
+     """
+-    Class DensityL2LossFunction.
++    L2 contrast function, used for density estimation.
+ 
+     Attributes
+     ----------
+@@ -250,7 +250,7 @@ class DensityL2LossFunction(LossFunction):
+ 
+ class CustomLossFunction(LossFunction):
+     """
+-    Class CustomLossFunction.
++    Loss function defined by the user with tensorflow operations.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/tensor_approximation/principal_component_analysis/functional_tensor_principal_component_analysis.py b/tensap/approximation/tensor_approximation/principal_component_analysis/functional_tensor_principal_component_analysis.py
+index 70d07e2..5b3284b 100644
+--- a/tensap/approximation/tensor_approximation/principal_component_analysis/functional_tensor_principal_component_analysis.py
++++ b/tensap/approximation/tensor_approximation/principal_component_analysis/functional_tensor_principal_component_analysis.py
+@@ -26,9 +26,9 @@ import tensap
+ 
+ class FunctionalTensorPrincipalComponentAnalysis:
+     """
+-    Class FunctionalTensorPrincipalComponentAnalysis: principal component
+-    analysis of multivariate functions based on
+-    TensorPrincipalComponentAnalysis for algebraic tensors.
++    Principal component analysis of multivariate functions.
++
++    It is based on the TensorPrincipalComponentAnalysis of algebraic tensors.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/approximation/tensor_approximation/principal_component_analysis/tensor_principal_component_analysis.py b/tensap/approximation/tensor_approximation/principal_component_analysis/tensor_principal_component_analysis.py
+index 8393e4f..637c609 100644
+--- a/tensap/approximation/tensor_approximation/principal_component_analysis/tensor_principal_component_analysis.py
++++ b/tensap/approximation/tensor_approximation/principal_component_analysis/tensor_principal_component_analysis.py
+@@ -28,7 +28,8 @@ import tensap
+ 
+ class TensorPrincipalComponentAnalysis:
+     """
+-    Class TensorPrincipalComponentAnalysis: principal component analysis of an
++    Principal component analysis of an algebraic tensor.
++
+     algebraic tensor.
+ 
+     Attributes
+diff --git a/tensap/approximation/tensor_approximation/tensor_learning/canonical_tensor_learning.py b/tensap/approximation/tensor_approximation/tensor_learning/canonical_tensor_learning.py
+index da8472a..326fa04 100644
+--- a/tensap/approximation/tensor_approximation/tensor_learning/canonical_tensor_learning.py
++++ b/tensap/approximation/tensor_approximation/tensor_learning/canonical_tensor_learning.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class CanonicalTensorLearning(tensap.TensorLearning):
+     """
+-    Class CanonicalTensorLearning.
++    Learning of a tensor in canonical format.
+ 
+     See also tensap.TensorLearning.
+ 
+diff --git a/tensap/approximation/tensor_approximation/tensor_learning/tensor_learning.py b/tensap/approximation/tensor_approximation/tensor_learning/tensor_learning.py
+index bd6fbb0..3ea3c4f 100644
+--- a/tensap/approximation/tensor_approximation/tensor_learning/tensor_learning.py
++++ b/tensap/approximation/tensor_approximation/tensor_learning/tensor_learning.py
+@@ -28,7 +28,7 @@ import tensap
+ 
+ class TensorLearning(tensap.Learning):
+     """
+-    Class TensorLearning.
++    Base class for the learning of tensors.
+ 
+     See also tensap.Learning.
+ 
+diff --git a/tensap/approximation/tensor_approximation/tensor_learning/tree_based_tensor_learning.py b/tensap/approximation/tensor_approximation/tensor_learning/tree_based_tensor_learning.py
+index 36a9778..329abfa 100644
+--- a/tensap/approximation/tensor_approximation/tensor_learning/tree_based_tensor_learning.py
++++ b/tensap/approximation/tensor_approximation/tensor_learning/tree_based_tensor_learning.py
+@@ -28,7 +28,7 @@ import tensap
+ 
+ class TreeBasedTensorLearning(tensap.TensorLearning):
+     """
+-    Class TreeBasedTensorLearning.
++    Learning of a tensor in tree-based tensor format.
+ 
+     See also tensap.TensorLearning.
+ 
+diff --git a/tensap/approximation/tools/model_selection.py b/tensap/approximation/tools/model_selection.py
+index 9c05a7b..caaa976 100644
+--- a/tensap/approximation/tools/model_selection.py
++++ b/tensap/approximation/tools/model_selection.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class ModelSelection:
+     """
+-    Class ModelSelection.
++    Model selection by penalization of the empirical risk (slope heuristic).
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/compositional_model_function.py b/tensap/functions/compositional_model_function.py
+index 93bd3c8..6f1ae03 100644
+--- a/tensap/functions/compositional_model_function.py
++++ b/tensap/functions/compositional_model_function.py
+@@ -28,7 +28,7 @@ import tensap  # noqa: E402
+ 
+ class CompositionalModelFunction(tensap.Function):
+     """
+-    Class CompositionalModelFunction.
++    Function defined by compositions of functions along a dimension tree.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/function.py b/tensap/functions/function.py
+index cd7bcda..b140b68 100644
+--- a/tensap/functions/function.py
++++ b/tensap/functions/function.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class Function:
+     """
+-    Class Function.
++    Base class for functions of several variables.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/functional_tensor.py b/tensap/functions/functional_tensor.py
+index 6202887..2a090a7 100644
+--- a/tensap/functions/functional_tensor.py
++++ b/tensap/functions/functional_tensor.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class FunctionalTensor(tensap.Function):
+     """
+-    Class FunctionalTensor.
++    Function defined by a tensor and functional bases.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/discrete_measure.py b/tensap/functions/measures/discrete_measure.py
+index 852ffd3..d38f4d6 100644
+--- a/tensap/functions/measures/discrete_measure.py
++++ b/tensap/functions/measures/discrete_measure.py
+@@ -25,8 +25,7 @@ import tensap
+ 
+ class DiscreteMeasure(tensap.Measure):
+     """
+-    Class DiscreteMeasure: discrete measure in R^d
+-    sum_{i=1}^n w_i delta_{x_i}.
++    Discrete measure on R^d, sum_{i=1}^n w_i delta_{x_i}.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/discrete_random_variable.py b/tensap/functions/measures/discrete_random_variable.py
+index bc7a4a5..fd8274c 100644
+--- a/tensap/functions/measures/discrete_random_variable.py
++++ b/tensap/functions/measures/discrete_random_variable.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class DiscreteRandomVariable(tensap.RandomVariable):
+     """
+-    Class DiscreteRandomVariable.
++    Random variable taking a finite number of values.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/empirical_random_variable.py b/tensap/functions/measures/empirical_random_variable.py
+index 941f106..0a7be60 100644
+--- a/tensap/functions/measures/empirical_random_variable.py
++++ b/tensap/functions/measures/empirical_random_variable.py
+@@ -26,9 +26,9 @@ import tensap
+ 
+ class EmpiricalRandomVariable(tensap.RandomVariable):
+     """
+-    Class EmpiricalRandomVariable. A random variable fitted using gaussian
+-    kernel smoothing, this class gives best results in the case of normal
+-    distributions.
++    Random variable fitted to a sample by gaussian kernel smoothing.
++
++    It gives the best results for normal distributions.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/lebesgue_measure.py b/tensap/functions/measures/lebesgue_measure.py
+index 68f7819..163518b 100644
+--- a/tensap/functions/measures/lebesgue_measure.py
++++ b/tensap/functions/measures/lebesgue_measure.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class LebesgueMeasure(tensap.Measure):
+     """
+-    Class LebesgueMeasure.
++    Lebesgue measure on an interval.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/measure.py b/tensap/functions/measures/measure.py
+index c5ac188..d7b2817 100644
+--- a/tensap/functions/measures/measure.py
++++ b/tensap/functions/measures/measure.py
+@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
+ 
+ class Measure(ABC):
+     """
+-    Class Measure.
++    Base class for measures.
+ 
+     """
+ 
+diff --git a/tensap/functions/measures/normal_random_variable.py b/tensap/functions/measures/normal_random_variable.py
+index 5f4b2fa..b0b112c 100644
+--- a/tensap/functions/measures/normal_random_variable.py
++++ b/tensap/functions/measures/normal_random_variable.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class NormalRandomVariable(tensap.RandomVariable):
+     """
+-    Class NormalRandomVariable.
++    Normal (gaussian) random variable.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/probability_measure.py b/tensap/functions/measures/probability_measure.py
+index 6ee2600..440fa77 100644
+--- a/tensap/functions/measures/probability_measure.py
++++ b/tensap/functions/measures/probability_measure.py
+@@ -8,7 +8,7 @@ import tensap
+ 
+ class ProbabilityMeasure(tensap.Measure):
+     """
+-    Class ProbabilityMeasure.
++    Base class for probability measures.
+ 
+     """
+ 
+diff --git a/tensap/functions/measures/product_measure.py b/tensap/functions/measures/product_measure.py
+index f3630ba..1fc0d1f 100644
+--- a/tensap/functions/measures/product_measure.py
++++ b/tensap/functions/measures/product_measure.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class ProductMeasure(tensap.Measure):
+     """
+-    Class ProductMeasure.
++    Product of measures.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/random_variable.py b/tensap/functions/measures/random_variable.py
+index 5ecd530..a5076b0 100644
+--- a/tensap/functions/measures/random_variable.py
++++ b/tensap/functions/measures/random_variable.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class RandomVariable(tensap.ProbabilityMeasure):
+     """
+-    Class RandomVariable.
++    Base class for random variables.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/random_vector.py b/tensap/functions/measures/random_vector.py
+index a090604..d041445 100644
+--- a/tensap/functions/measures/random_vector.py
++++ b/tensap/functions/measures/random_vector.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class RandomVector(tensap.ProbabilityMeasure):
+     """
+-    Class RandomVector.
++    Random vector with independent components and a copula.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/measures/uniform_random_variable.py b/tensap/functions/measures/uniform_random_variable.py
+index 01e816a..1ce5300 100644
+--- a/tensap/functions/measures/uniform_random_variable.py
++++ b/tensap/functions/measures/uniform_random_variable.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class UniformRandomVariable(tensap.RandomVariable):
+     """
+-    Class UniformRandomVariable.
++    Random variable with a uniform distribution on an interval.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/polynomials/orthonormal_polynomials.py b/tensap/functions/polynomials/orthonormal_polynomials.py
+index e97d9b4..956926f 100644
+--- a/tensap/functions/polynomials/orthonormal_polynomials.py
++++ b/tensap/functions/polynomials/orthonormal_polynomials.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class OrthonormalPolynomials(tensap.UnivariatePolynomials):
+     """
+-    Class OrthonormalPolynomials.
++    Base class for polynomials orthonormal with respect to a measure.
+ 
+     Attributes
+     ----------
+@@ -264,7 +264,7 @@ class OrthonormalPolynomials(tensap.UnivariatePolynomials):
+ 
+ class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
+     """
+-    Class ShiftedOrthonormalPolynomials.
++    Orthonormal polynomials after a shift and a scaling of the variable.
+ 
+     Attributes
+     ----------
+@@ -431,7 +431,7 @@ class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
+ 
+ class HermitePolynomials(OrthonormalPolynomials):
+     """
+-    Class HermitePolynomials.
++    Hermite polynomials, orthonormal with respect to the standard gaussian measure.
+ 
+     Polynomials defined on R and orthonormal with respect to the standard
+     gaussian measure 1/sqrt(2*pi)*exp(-x^2/2).
+@@ -482,7 +482,7 @@ class HermitePolynomials(OrthonormalPolynomials):
+ 
+ class LegendrePolynomials(OrthonormalPolynomials):
+     """
+-    Class LegendrePolynomials.
++    Legendre polynomials, orthonormal for the uniform probability measure on [-1, 1].
+ 
+     Polynomials defined on [-1,1], orthonormal with respect to the standard
+     uniform measure 1/2.
+@@ -541,7 +541,7 @@ class LegendrePolynomials(OrthonormalPolynomials):
+ 
+ class LegendrePolynomialsLebesgue(OrthonormalPolynomials):
+     """
+-    Class LegendrePolynomialsLebesgue.
++    Legendre polynomials, orthonormal for the Lebesgue measure on [-1, 1].
+ 
+     Polynomials defined on [-1,1], orthonormal with respect to the Lebesgue
+       measure.
+@@ -602,7 +602,7 @@ class LegendrePolynomialsLebesgue(OrthonormalPolynomials):
+ 
+ class EmpiricalPolynomials(OrthonormalPolynomials):
+     """
+-    Class EmpiricalPolynomials.
++    Polynomials orthonormal with respect to a smoothed empirical distribution.
+ 
+     Polynomials defined on R and orthonormal with respect to the gaussian
+     kernel smoothed distribution based on a sample x, which was centered and
+@@ -791,8 +791,6 @@ class EmpiricalPolynomials(OrthonormalPolynomials):
+ 
+ class DiscretePolynomials(OrthonormalPolynomials):
+     """
+-    Class DiscretePolynomials.
+-
+     Polynomials orthonormal with respect to a discrete measure.
+ 
+     """
+diff --git a/tensap/functions/polynomials/polynomials.py b/tensap/functions/polynomials/polynomials.py
+index db54d37..8544cf8 100644
+--- a/tensap/functions/polynomials/polynomials.py
++++ b/tensap/functions/polynomials/polynomials.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class UnivariatePolynomials(ABC):
+     """
+-    Class UnivariatePolynomials.
++    Base class for univariate polynomials.
+ 
+     """
+ 
+@@ -284,7 +284,7 @@ class UnivariatePolynomials(ABC):
+ 
+ class CanonicalPolynomials(UnivariatePolynomials):
+     """
+-    Class CanonicalPolynomials.
++    Canonical polynomials, the monomials x^n.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/tensorized_function.py b/tensap/functions/tensorized_function.py
+index 56e9c84..fc41b53 100644
+--- a/tensap/functions/tensorized_function.py
++++ b/tensap/functions/tensorized_function.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class TensorizedFunction(tensap.Function):
+     """
+-    Class TensorizedFunction.
++    Function of (d+1)*dim variables obtained by tensorization of a function.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/tensorizer.py b/tensap/functions/tensorizer.py
+index 60319eb..92b3479 100644
+--- a/tensap/functions/tensorizer.py
++++ b/tensap/functions/tensorizer.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class Tensorizer:
+     """
+-    Class Tensorizer.
++    Map that identifies a variable in [0, 1]^dim with b-adic digits and a remainder.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/functions/user_defined_function.py b/tensap/functions/user_defined_function.py
+index c1d5956..552175f 100644
+--- a/tensap/functions/user_defined_function.py
++++ b/tensap/functions/user_defined_function.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class UserDefinedFunction(tensap.Function):
+     """
+-    Class UserDefinedFunction.
++    Function defined by the user, from a Python function or an expression.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/poincare_learning/poincare_loss_vector_space.py b/tensap/poincare_learning/poincare_loss_vector_space.py
+index 4e16aa9..3b9b167 100644
+--- a/tensap/poincare_learning/poincare_loss_vector_space.py
++++ b/tensap/poincare_learning/poincare_loss_vector_space.py
+@@ -13,7 +13,8 @@ from copy import deepcopy
+ 
+ class PoincareLossVectorSpace:
+     """
+-    Class PoincareLossVectorSpace.
++    Poincare-based loss for feature maps in a finite-dimensional vector space.
++
+     Class implementing the Poincare based loss from Bigoni et al. 2022
+     for the specific case of nonlinear features from a finite dimensional
+     vector space of nonlinear functions spanned by some basis.
+@@ -148,7 +149,8 @@ class PoincareLossVectorSpace:
+ 
+ class PoincareLossVectorSpaceTruncated(PoincareLossVectorSpace):
+     """
+-    Class PoincareLossVectorSpaceTruncated.
++    Poincare-based loss with jacobians projected onto their dominant singular modes.
++
+     This subclass of PoincareLossVectorSpace, which just includes
+     an additional projection step of jac_u[k,:,:] onto its dominant singular modes.
+     The existing methods of PoincareLossVectorSpace are then applied on these projected jacobians.
+diff --git a/tensap/tensor_algebra/tensors/canonical_tensor.py b/tensap/tensor_algebra/tensors/canonical_tensor.py
+index 8d9f6cd..50909e8 100644
+--- a/tensap/tensor_algebra/tensors/canonical_tensor.py
++++ b/tensap/tensor_algebra/tensors/canonical_tensor.py
+@@ -25,7 +25,7 @@ import tensap
+ 
+ class CanonicalTensor:
+     """
+-    Class CanonicalTensor.
++    Tensor in canonical format, a sum of rank-one tensors.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/tensor_algebra/tensors/diagonal_tensor.py b/tensap/tensor_algebra/tensors/diagonal_tensor.py
+index 5b2cb11..b1018b1 100644
+--- a/tensap/tensor_algebra/tensors/diagonal_tensor.py
++++ b/tensap/tensor_algebra/tensors/diagonal_tensor.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class DiagonalTensor:
+     """
+-    Class DiagonalTensor.
++    Diagonal tensor, whose entries are zero outside its diagonal.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/tensor_algebra/tensors/dimension_tree.py b/tensap/tensor_algebra/tensors/dimension_tree.py
+index 15fc3ad..b3e7d21 100644
+--- a/tensap/tensor_algebra/tensors/dimension_tree.py
++++ b/tensap/tensor_algebra/tensors/dimension_tree.py
+@@ -24,7 +24,7 @@ import numpy as np
+ 
+ class DimensionTree:
+     """
+-    Class DimensionTree.
++    Dimension tree, a tree whose nodes are subsets of the dimensions.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/tensor_algebra/tensors/full_tensor.py b/tensap/tensor_algebra/tensors/full_tensor.py
+index d4a117f..22f28e2 100644
+--- a/tensap/tensor_algebra/tensors/full_tensor.py
++++ b/tensap/tensor_algebra/tensors/full_tensor.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class FullTensor:
+     """
+-    Class FullTensor.
++    Tensor stored as a full multidimensional array.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/tensor_algebra/tensors/sparse_tensor.py b/tensap/tensor_algebra/tensors/sparse_tensor.py
+index 28c880b..0b16b51 100644
+--- a/tensap/tensor_algebra/tensors/sparse_tensor.py
++++ b/tensap/tensor_algebra/tensors/sparse_tensor.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class SparseTensor:
+     """
+-    Class SparseTensor.
++    Sparse tensor, given by its nonzero entries.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/tensor_algebra/tensors/tree_based_tensor.py b/tensap/tensor_algebra/tensors/tree_based_tensor.py
+index a6682ad..383a8a0 100644
+--- a/tensap/tensor_algebra/tensors/tree_based_tensor.py
++++ b/tensap/tensor_algebra/tensors/tree_based_tensor.py
+@@ -27,7 +27,7 @@ import tensap
+ 
+ class TreeBasedTensor:
+     """
+-    Class TreeBasedTensor: algebraic tensors in tree-based tensor format.
++    Tensor in tree-based tensor format (tree tensor network).
+ 
+     References:
+     - Nouy, A. (2017). Low-rank methods for high-dimensional approximation
+diff --git a/tensap/tensor_algebra/tools/truncator.py b/tensap/tensor_algebra/tools/truncator.py
+index 207a7d7..c4f6843 100644
+--- a/tensap/tensor_algebra/tools/truncator.py
++++ b/tensap/tensor_algebra/tools/truncator.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class Truncator:
+     """
+-    Class Truncator.
++    Truncation of tensors in low-rank formats.
+ 
+     Attributes
+     ----------
+diff --git a/tensap/tools/grids.py b/tensap/tools/grids.py
+index 37950ad..d806de2 100644
+--- a/tensap/tools/grids.py
++++ b/tensap/tools/grids.py
+@@ -26,7 +26,7 @@ import tensap
+ 
+ class TensorGrid(ABC):
+     """
+-    Class TensorGrid: grids in product sets.
++    Base class for grids in product sets.
+ 
+     Attributes
+     ----------
+@@ -149,7 +149,7 @@ class TensorGrid(ABC):
+ 
+ class FullTensorGrid(TensorGrid):
+     """
+-    Class FullTensorGrid: tensor product grid.
++    Tensor product grid.
+ 
+     """
+ 
+@@ -280,7 +280,7 @@ class FullTensorGrid(TensorGrid):
+ 
+ class SparseTensorGrid(TensorGrid):
+     """
+-    Class SparseTensorGrid: sparse tensor product grid.
++    Sparse tensor product grid.
+ 
+     """
+ 
+diff --git a/tensap/tools/multi_indices.py b/tensap/tools/multi_indices.py
+index 5138081..7c11eb9 100644
+--- a/tensap/tools/multi_indices.py
++++ b/tensap/tools/multi_indices.py
+@@ -27,7 +27,7 @@ import numpy as np
+ 
+ class MultiIndices:
+     """
+-    Class MultiIndices.
++    Set of multi-indices in N^d.
+ 
+     Attributes
+     ----------
