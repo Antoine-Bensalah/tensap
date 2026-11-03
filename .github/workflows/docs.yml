@@ -1,0 +1,45 @@
+name: Documentation
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install ".[doc]"
+      - name: Build (warnings are errors)
+        run: make html -C doc
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc/_build/html
+
+  # Publication on the GitHub Pages of the fork only, from the branch
+  # ab/documentation for now. Anthony's site is not touched.
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.repository == 'Antoine-Bensalah/tensap' && github.ref == 'refs/heads/ab/documentation'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,76 +1,78 @@
-# Configuration file for the Sphinx documentation builder.
+# Configuration file for the Sphinx documentation of tensap.
 #
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
+# Full list of options: https://www.sphinx-doc.org/en/master/usage/configuration.html
+# Editorial rules: see the Contributing section of the documentation.
 
-# -- Path setup --------------------------------------------------------------
+import os
+import sys
 
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-# import os
-# import sys
-# import subprocess
-# sys.path.insert(0, os.path.abspath('.'))
+# Document the tensap of this repository, not an installed one.
+sys.path.insert(0, os.path.abspath(".."))
 
+import tensap  # noqa: E402
 
 # -- Project information -----------------------------------------------------
 
 project = "tensap"
-copyright = "2023, A. Nouy, E. Grelier"
 author = "A. Nouy, E. Grelier"
-
-# The full version, including alpha/beta/rc tags
-release = "1.2"
-
+copyright = "2020-2026, A. Nouy, E. Grelier and contributors"
+# Read from the package, so that it cannot drift from pyproject.toml.
+release = tensap.__version__
+version = release
 
 # -- General configuration ---------------------------------------------------
 
-# Add any Sphinx extension module names here, as strings. They can be
-# extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
-# ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
     "numpydoc",
+    "myst_parser",
 ]
 
-autodoc_default_flags = ["members", "inherited-members"]
-autosummary_generate = True
+# Narrative pages are written in MyST Markdown (.md); the API pages and the
+# docstrings stay in reStructuredText (.rst), as numpydoc expects.
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
+
+# MyST: write mathematics as in LaTeX ($...$, $$...$$, amsmath environments).
+myst_enable_extensions = [
+    "dollarmath",
+    "amsmath",
+    "colon_fence",
+    "deflist",
+]
+myst_heading_anchors = 3
+
+autodoc_default_options = {"members": True, "inherited-members": True}
 numpydoc_show_class_members = True
 numpydoc_class_members_toctree = False
 
-# Add any paths that contain templates here, relative to this directory.
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+}
+
 templates_path = ["_templates"]
-
-# List of patterns, relative to source directory, that match files and
-# directories to ignore when looking for source files.
-# This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
-
 
 # -- Options for HTML output -------------------------------------------------
 
-# The theme to use for HTML and HTML Help pages.  See the documentation for
-# a list of builtin themes.
-#
-html_theme = "alabaster"
+html_theme = "pydata_sphinx_theme"
+html_title = f"tensap {release}"
+html_theme_options = {
+    "github_url": "https://github.com/anthony-nouy/tensap",
+    "header_links_before_dropdown": 6,
+    "navigation_with_keys": False,
+    "show_toc_level": 2,
+}
+html_context = {"default_mode": "light"}
 
-# Add any paths that contain custom static files (such as style sheets) here,
-# relative to this directory. They are copied after the builtin static files,
-# so a file named "default.css" will overwrite the builtin "default.css".
-# html_static_path = ['_static']
-
-# -- Options for LATEX -------------------------------------------------
+# -- Options for LaTeX output ------------------------------------------------
 
 latex_elements = {
-    # The paper size ('letterpaper' or 'a4paper').
     "papersize": "a4paper",
-    # The font size ('10pt', '11pt' or '12pt').
     "pointsize": "10pt",
-    # Additional stuff for the LaTeX preamble.
     "preamble": r"\usepackage{math_notations}",
 }
-
 latex_additional_files = ["math_notations.sty"]

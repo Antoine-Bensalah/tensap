@@ -1,9 +1,8 @@
-API documentation
-=================
+API Reference
+=============
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    tensap.approximation
    tensap.functions
@@ -11,9 +10,5 @@ API documentation
    tensap.tensor_algebra
    tensap.tools
 
-Indices and tables
-==================
-
 * :ref:`genindex`
 * :ref:`modindex`
-* :ref:`search`
