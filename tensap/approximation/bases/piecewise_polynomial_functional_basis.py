@@ -27,6 +27,12 @@ import tensap
 
 
 class PiecewisePolynomialFunctionalBasis(tensap.FunctionalBasis):
+    """
+    Functional basis of piecewise polynomials on an interval.
+
+    The basis is orthonormal with respect to the uniform probability measure
+    on the interval. See the constructor for the parameters.
+    """
 
     def __init__(self, points, p):
         """

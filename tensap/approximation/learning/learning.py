@@ -23,6 +23,15 @@ import tensap
 
 
 class Learning:
+    """
+    Base class for learning methods, defined by a loss function.
+
+    Parameters
+    ----------
+    loss : tensap.LossFunction
+        The loss function.
+    """
+
     def __init__(self, loss):
         assert isinstance(
             loss, tensap.LossFunction

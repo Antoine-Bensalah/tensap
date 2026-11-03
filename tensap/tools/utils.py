@@ -23,6 +23,22 @@ import numpy as np
 
 
 def fast_intersect(a, b):
+    """
+    Return the elements common to two arrays without repeated elements.
+
+    Parameters
+    ----------
+    a : numpy.ndarray
+        A one-dimensional array without repeated elements.
+    b : numpy.ndarray
+        A one-dimensional array without repeated elements.
+
+    Returns
+    -------
+    numpy.ndarray
+        The sorted elements common to a and b.
+
+    """
     aux = np.concatenate((a, b))
     aux.sort()
     mask = aux[1:] == aux[:-1]
@@ -30,6 +46,22 @@ def fast_intersect(a, b):
 
 
 def fast_setdiff(a, b):
+    """
+    Return the elements of an array that are not in another array.
+
+    Parameters
+    ----------
+    a : numpy.ndarray
+        A one-dimensional array without repeated elements.
+    b : numpy.ndarray
+        A one-dimensional array without repeated elements.
+
+    Returns
+    -------
+    numpy.ndarray
+        The elements of a that are not in b, in the order of a.
+
+    """
     return a[np.logical_not(np.isin(a, b, assume_unique=True))]
 
 

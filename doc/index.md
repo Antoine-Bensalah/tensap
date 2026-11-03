@@ -14,7 +14,7 @@ The documentation has five sections, each answering one question:
 | [Theory & Methods](theory/index) | What are the mathematical concepts, and how do the algorithms work? |
 | [Examples Gallery](examples/index) | How do I use this particular method or feature? |
 | [Use cases](use_cases/index) | How can tensap solve a complete scientific problem? |
-| [API Reference](api) | What exactly does this software interface do? |
+| [API Reference](api/index) | What exactly does this software interface do? |
 
 ```{toctree}
 :hidden:
@@ -24,7 +24,7 @@ getting_started/index
 theory/index
 examples/index
 use_cases/index
-api
+api/index
 contributing/index
 bibliography
 ```
