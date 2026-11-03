@@ -31,6 +31,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "numpydoc",
     "myst_parser",
+    "sphinx_gallery.gen_gallery",
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
 ]
@@ -72,7 +73,45 @@ intersphinx_mapping = {
 
 templates_path = ["_templates"]
 # api_notes/ holds fragments included by _ext/api_notes.py, not pages.
-exclude_patterns = ["_build", "api_notes", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "api_notes", "Thumbs.db", ".DS_Store", "**/*.ipynb"]
+
+# -- Examples Gallery and Use cases (sphinx-gallery) -----------------------
+
+# Examples that are not executed when the documentation is built: too long,
+# or requiring tensorflow. Their code is shown without its output.
+NOT_EXECUTED = [
+    "tree_based_tensor_density_learning",
+    "tensorized_function_learning",
+    "tensor_completion",
+    "digits_recognition",
+]
+
+sphinx_gallery_conf = {
+    # Sources at the root of the repository, pages generated in doc/.
+    "examples_dirs": ["../examples", "../use_cases"],
+    "gallery_dirs": ["examples", "use_cases"],
+    # Execute every example, except those of NOT_EXECUTED.
+    "filename_pattern": r"/(?!(%s)\.py$)[^/]+\.py$" % "|".join(NOT_EXECUTED),
+    "ignore_pattern": r"__init__\.py",
+    # Sections and examples in the order of _ext/gallery_order.py.
+    "subsection_order": [
+        "../examples/tensors",
+        "../examples/functions",
+        "../examples/interpolation",
+        "../examples/pca",
+        "../examples/learning",
+        "../examples/poincare",
+    ],
+    "within_subsection_order": "gallery_order.ExampleOrder",
+    # Links from the code of the examples to the API reference, and lists
+    # of examples at the bottom of each API page (see the class template).
+    "doc_module": ("tensap",),
+    "reference_url": {"tensap": None},
+    "backreferences_dir": "api/backreferences",
+    "remove_config_comments": True,
+    "show_memory": False,
+    "matplotlib_animations": False,
+}
 
 # -- Options for HTML output -------------------------------------------------
 

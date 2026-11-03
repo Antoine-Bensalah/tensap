@@ -12,7 +12,7 @@ Loss on a vector space of feature maps
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    PoincareLossVectorSpace
    PoincareLossVectorSpaceTruncated
@@ -24,7 +24,7 @@ Benchmarks
 
 .. autosummary::
    :toctree: generated/
-   :template: function.rst
+   :template: function
 
    build_benchmark
 

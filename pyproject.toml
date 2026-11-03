@@ -48,7 +48,11 @@ packages = ["tensap",
            ]
 
 [project.optional-dependencies]
-doc = ["sphinx", "numpydoc", "sphinx-gallery", "myst-parser", "pydata-sphinx-theme"]
+doc = [
+  "sphinx", "numpydoc", "sphinx-gallery", "myst-parser", "pydata-sphinx-theme",
+  # Executed examples of the gallery.
+  "matplotlib", "scikit-learn",
+]
 
 [project.urls]
 Homepage = "https://github.com/anthony-nouy/tensap"

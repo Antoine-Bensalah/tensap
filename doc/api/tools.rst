@@ -12,7 +12,7 @@ Multi-indices and grids
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    MultiIndices
    TensorGrid
@@ -24,7 +24,7 @@ Functions
 
 .. autosummary::
    :toctree: generated/
-   :template: function.rst
+   :template: function
 
    chebyshev_points
    baseb2integer

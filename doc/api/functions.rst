@@ -12,7 +12,7 @@ Functions
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    Function
    UserDefinedFunction
@@ -23,7 +23,7 @@ Functions
 
 .. autosummary::
    :toctree: generated/
-   :template: function.rst
+   :template: function
 
    multivariate_functions_benchmark
 
@@ -32,7 +32,7 @@ Measures and random variables
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    Measure
    LebesgueMeasure
@@ -50,7 +50,7 @@ Measures and random variables
 
 .. autosummary::
    :toctree: generated/
-   :template: function.rst
+   :template: function
 
    random_multi_indices
 
@@ -59,7 +59,7 @@ Polynomials
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    UnivariatePolynomials
    CanonicalPolynomials
@@ -76,7 +76,7 @@ Sets
 
 .. autosummary::
    :toctree: generated/
-   :template: function.rst
+   :template: function
 
    is_in
 

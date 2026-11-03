@@ -12,7 +12,7 @@ Functional bases
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    FunctionalBasis
    FunctionalBases
@@ -33,7 +33,7 @@ Integration
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    IntegrationRule
    FullTensorProductIntegrationRule
@@ -43,7 +43,7 @@ Learning
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    Learning
    LinearModelLearning
@@ -60,7 +60,7 @@ Tensor learning
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    TensorLearning
    CanonicalTensorLearning
@@ -71,7 +71,7 @@ Principal component analysis
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    TensorPrincipalComponentAnalysis
    FunctionalTensorPrincipalComponentAnalysis
@@ -81,7 +81,7 @@ Model selection
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    ModelSelection
 

@@ -13,3 +13,7 @@ numerics/*
 prototype/*
 .vscode
 doc/api/generated/
+doc/examples/
+doc/use_cases/
+doc/sg_execution_times.rst
+doc/api/backreferences/

@@ -9,7 +9,7 @@ Sub-package: ``tensap.linear_algebra``.
 
 .. autosummary::
    :toctree: generated/
-   :template: function.rst
+   :template: function
 
    magic_indices
 

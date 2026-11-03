@@ -12,7 +12,7 @@ Tensors
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    FullTensor
    SparseTensor
@@ -26,7 +26,7 @@ Truncation
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
+   :template: class
 
    Truncator
 
