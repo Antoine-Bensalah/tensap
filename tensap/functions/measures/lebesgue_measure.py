@@ -27,7 +27,7 @@ import tensap
 
 class LebesgueMeasure(tensap.Measure):
     """
-    Class LebesgueMeasure.
+    Lebesgue measure on an interval.
 
     Attributes
     ----------

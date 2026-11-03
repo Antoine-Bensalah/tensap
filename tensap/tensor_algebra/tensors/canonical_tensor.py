@@ -25,7 +25,7 @@ import tensap
 
 class CanonicalTensor:
     """
-    Class CanonicalTensor.
+    Tensor in canonical format, a sum of rank-one tensors.
 
     Attributes
     ----------

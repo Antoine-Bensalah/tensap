@@ -25,7 +25,7 @@ import tensap
 
 class ModelSelection:
     """
-    Class ModelSelection.
+    Model selection by penalization of the empirical risk (slope heuristic).
 
     Attributes
     ----------

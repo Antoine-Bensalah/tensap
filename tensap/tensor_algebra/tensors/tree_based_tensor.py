@@ -27,7 +27,7 @@ import tensap
 
 class TreeBasedTensor:
     """
-    Class TreeBasedTensor: algebraic tensors in tree-based tensor format.
+    Tensor in tree-based tensor format (tree tensor network).
 
     References:
     - Nouy, A. (2017). Low-rank methods for high-dimensional approximation

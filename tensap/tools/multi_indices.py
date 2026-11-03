@@ -27,7 +27,7 @@ import numpy as np
 
 class MultiIndices:
     """
-    Class MultiIndices.
+    Set of multi-indices in N^d.
 
     Attributes
     ----------

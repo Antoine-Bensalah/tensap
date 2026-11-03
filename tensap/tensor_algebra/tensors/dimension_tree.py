@@ -24,7 +24,7 @@ import numpy as np
 
 class DimensionTree:
     """
-    Class DimensionTree.
+    Dimension tree, a tree whose nodes are subsets of the dimensions.
 
     Attributes
     ----------

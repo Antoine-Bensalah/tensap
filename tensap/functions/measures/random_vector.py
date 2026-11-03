@@ -26,7 +26,7 @@ import tensap
 
 class RandomVector(tensap.ProbabilityMeasure):
     """
-    Class RandomVector.
+    Random vector with independent components and a copula.
 
     Attributes
     ----------

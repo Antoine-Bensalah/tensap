@@ -26,7 +26,7 @@ import tensap
 
 class TensorGrid(ABC):
     """
-    Class TensorGrid: grids in product sets.
+    Base class for grids in product sets.
 
     Attributes
     ----------
@@ -149,7 +149,7 @@ class TensorGrid(ABC):
 
 class FullTensorGrid(TensorGrid):
     """
-    Class FullTensorGrid: tensor product grid.
+    Tensor product grid.
 
     """
 
@@ -280,7 +280,7 @@ class FullTensorGrid(TensorGrid):
 
 class SparseTensorGrid(TensorGrid):
     """
-    Class SparseTensorGrid: sparse tensor product grid.
+    Sparse tensor product grid.
 
     """
 

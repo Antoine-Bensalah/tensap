@@ -28,7 +28,7 @@ import tensap
 
 class TreeBasedTensorLearning(tensap.TensorLearning):
     """
-    Class TreeBasedTensorLearning.
+    Learning of a tensor in tree-based tensor format.
 
     See also tensap.TensorLearning.
 

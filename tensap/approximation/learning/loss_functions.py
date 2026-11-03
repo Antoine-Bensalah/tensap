@@ -25,7 +25,7 @@ import numpy as np
 
 class LossFunction(ABC):
     """
-    Class LossFunction.
+    Base class for loss functions.
 
     """
 
@@ -134,7 +134,7 @@ class LossFunction(ABC):
 
 class SquareLossFunction(LossFunction):
     """
-    Class SquareLossFunction.
+    Square loss function, used for least-squares regression.
 
     Attributes
     ----------
@@ -190,7 +190,7 @@ class SquareLossFunction(LossFunction):
 
 class DensityL2LossFunction(LossFunction):
     """
-    Class DensityL2LossFunction.
+    L2 contrast function, used for density estimation.
 
     Attributes
     ----------
@@ -250,7 +250,7 @@ class DensityL2LossFunction(LossFunction):
 
 class CustomLossFunction(LossFunction):
     """
-    Class CustomLossFunction.
+    Loss function defined by the user with tensorflow operations.
 
     Attributes
     ----------

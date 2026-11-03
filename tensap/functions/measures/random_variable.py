@@ -26,7 +26,7 @@ import tensap
 
 class RandomVariable(tensap.ProbabilityMeasure):
     """
-    Class RandomVariable.
+    Base class for random variables.
 
     Attributes
     ----------

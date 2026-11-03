@@ -26,7 +26,7 @@ import tensap
 
 class UserDefinedFunctionalBasis(tensap.FunctionalBasis):
     """
-    Class UserDefinedFunctionalBasis.
+    Functional basis defined by user functions.
 
     The basis is not L2-orthonormal a priori, hence the is_orthonormal
     attribute remains at its default value of False.

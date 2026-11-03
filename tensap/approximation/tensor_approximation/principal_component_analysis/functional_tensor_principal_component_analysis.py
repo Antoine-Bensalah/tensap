@@ -26,9 +26,9 @@ import tensap
 
 class FunctionalTensorPrincipalComponentAnalysis:
     """
-    Class FunctionalTensorPrincipalComponentAnalysis: principal component
-    analysis of multivariate functions based on
-    TensorPrincipalComponentAnalysis for algebraic tensors.
+    Principal component analysis of multivariate functions.
+
+    It is based on the TensorPrincipalComponentAnalysis of algebraic tensors.
 
     Attributes
     ----------

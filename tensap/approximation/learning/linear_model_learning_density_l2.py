@@ -25,7 +25,7 @@ import tensap
 
 class LinearModelLearningDensityL2(tensap.LinearModelLearning):
     """
-    Class LinearModelLearningDensityL2.
+    Learning of a linear model of a density with the L2 contrast.
 
     Attributes
     ----------

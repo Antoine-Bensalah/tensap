@@ -26,7 +26,7 @@ import tensap
 
 class DiagonalTensor:
     """
-    Class DiagonalTensor.
+    Diagonal tensor, whose entries are zero outside its diagonal.
 
     Attributes
     ----------

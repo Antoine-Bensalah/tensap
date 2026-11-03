@@ -27,7 +27,7 @@ import tensap
 
 class FunctionalBases:
     """
-    Class FunctionalBases.
+    Collection of functional bases, one for each variable.
 
     Attributes
     ----------

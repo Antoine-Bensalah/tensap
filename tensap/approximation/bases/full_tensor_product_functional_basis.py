@@ -27,7 +27,7 @@ import tensap
 
 class FullTensorProductFunctionalBasis(tensap.FunctionalBasis):
     """
-    Class FullTensorProductFunctionalBasis.
+    Full tensor product of functional bases.
 
     Attributes
     ----------

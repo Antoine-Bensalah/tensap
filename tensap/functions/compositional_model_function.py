@@ -28,7 +28,7 @@ import tensap  # noqa: E402
 
 class CompositionalModelFunction(tensap.Function):
     """
-    Class CompositionalModelFunction.
+    Function defined by compositions of functions along a dimension tree.
 
     Attributes
     ----------

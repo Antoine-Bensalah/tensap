@@ -13,7 +13,8 @@ from copy import deepcopy
 
 class PoincareLossVectorSpace:
     """
-    Class PoincareLossVectorSpace.
+    Poincare-based loss for feature maps in a finite-dimensional vector space.
+
     Class implementing the Poincare based loss from Bigoni et al. 2022
     for the specific case of nonlinear features from a finite dimensional
     vector space of nonlinear functions spanned by some basis.
@@ -148,7 +149,8 @@ class PoincareLossVectorSpace:
 
 class PoincareLossVectorSpaceTruncated(PoincareLossVectorSpace):
     """
-    Class PoincareLossVectorSpaceTruncated.
+    Poincare-based loss with jacobians projected onto their dominant singular modes.
+
     This subclass of PoincareLossVectorSpace, which just includes
     an additional projection step of jac_u[k,:,:] onto its dominant singular modes.
     The existing methods of PoincareLossVectorSpace are then applied on these projected jacobians.

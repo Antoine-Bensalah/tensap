@@ -26,7 +26,7 @@ import tensap
 
 class FunctionalTensor(tensap.Function):
     """
-    Class FunctionalTensor.
+    Function defined by a tensor and functional bases.
 
     Attributes
     ----------

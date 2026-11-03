@@ -26,7 +26,7 @@ import tensap
 
 class Truncator:
     """
-    Class Truncator.
+    Truncation of tensors in low-rank formats.
 
     Attributes
     ----------

@@ -25,7 +25,7 @@ import tensap
 
 class TensorizedFunction(tensap.Function):
     """
-    Class TensorizedFunction.
+    Function of (d+1)*dim variables obtained by tensorization of a function.
 
     Attributes
     ----------
