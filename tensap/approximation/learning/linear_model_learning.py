@@ -23,6 +23,16 @@ import tensap
 
 
 class LinearModelLearning(tensap.Learning):
+    """
+    Base class for the learning of linear models, i.e. of functions in the
+    span of a functional basis.
+
+    Parameters
+    ----------
+    loss : tensap.LossFunction
+        The loss function.
+    """
+
     def __init__(self, loss):
         super().__init__(loss)
         self.basis = None
