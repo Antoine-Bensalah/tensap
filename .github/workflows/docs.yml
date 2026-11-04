@@ -22,6 +22,18 @@ jobs:
           cache: pip
       - name: Install
         run: pip install ".[doc]"
+      # Outputs of the gallery examples. sphinx-gallery does not run again an
+      # example whose script has not changed since the cached run. The key
+      # holds the package sources first: when tensap changes, every example
+      # runs again; when only examples change, only those run again.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            doc/examples
+            doc/use_cases
+          key: gallery-${{ hashFiles('tensap/**', 'pyproject.toml') }}-${{ hashFiles('examples/**', 'use_cases/**') }}
+          restore-keys: |
+            gallery-${{ hashFiles('tensap/**', 'pyproject.toml') }}-
       - name: Build (warnings are errors)
         run: make html -C doc
       - uses: actions/upload-pages-artifact@v3

@@ -50,6 +50,7 @@ packages = ["tensap",
 [project.optional-dependencies]
 doc = [
   "sphinx", "numpydoc", "sphinx-gallery", "myst-parser", "pydata-sphinx-theme",
+  "sphinxcontrib-bibtex",
   # Executed examples of the gallery.
   "matplotlib", "scikit-learn",
 ]

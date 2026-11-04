@@ -31,6 +31,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "numpydoc",
     "myst_parser",
+    "sphinxcontrib.bibtex",
     "sphinx_gallery.gen_gallery",
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
@@ -48,6 +49,35 @@ myst_enable_extensions = [
     "deflist",
 ]
 myst_heading_anchors = 3
+
+# Figures, tables and code blocks are numbered, so that {numref} can cite them.
+numfig = True
+
+# -- Mathematics -------------------------------------------------------------
+
+# The macros of math_notations.sty (used by the LaTeX manual and the PDF
+# build), declared for MathJax so that the HTML pages use the same notations.
+mathjax3_config = {
+    "tex": {
+        "macros": {
+            **{c + "c": r"\mathcal{%s}" % c for c in "BHLMNPRTUYX"},
+            **{c + "bb": r"\mathbb{%s}" % c for c in "RENP"},
+            "argmax": r"\operatorname*{argmax}",
+            "bigtimes": r"\mathop{\vcenter{\Large\times}}",
+            "rank": r"\mathrm{rank}",
+            "depth": r"\operatorname{depth}",
+            "level": r"\operatorname{level}",
+        }
+    }
+}
+
+# -- Bibliography ------------------------------------------------------------
+
+# One BibTeX file for the whole documentation, cited with {cite:p}`key` and
+# listed on the bibliography page.
+bibtex_bibfiles = ["references.bib"]
+bibtex_default_style = "plain"
+bibtex_reference_style = "author_year"
 
 # -- API reference -------------------------------------------------------------
 

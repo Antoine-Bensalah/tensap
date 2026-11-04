@@ -1,3 +1,4 @@
+(contributing)=
 # Contributing
 
 ```{note}
@@ -45,3 +46,21 @@ built, unless its name is in `NOT_EXECUTED` in `doc/conf.py`; its position
 in its section is set in `doc/_ext/gallery_order.py`.
 
 Use cases follow the same format, in `use_cases/`.
+
+## Writing a theory page
+
+The pages of Theory & Methods are MyST Markdown files in `doc/theory/`.
+Write mathematics as in LaTeX, between `$...$` or `$$...$$`. The macros of
+`doc/math_notations.sty` (such as `\Rbb`, `\Ebb` or `\Tc`) are also defined
+for MathJax in `doc/conf.py`, so that the HTML pages and the LaTeX manual use
+the same notations. Link a class or a function to its API page with
+`` {py:class}`~tensap.FullTensor` `` (or `{py:func}` for a function), and an
+example of the gallery with `` {ref}`sphx_glr_examples_tensors_full_tensor.py` ``.
+
+## Citing a reference
+
+The references are BibTeX entries of `doc/references.bib`, listed on the
+{ref}`bibliography` page. Cite one with `` {cite:p}`Grelier2018` ``
+(in Markdown) or `` :cite:p:`Grelier2018` `` (in reStructuredText). Add a new
+entry to `references.bib` before citing it: a citation to an unknown key
+fails the build.
