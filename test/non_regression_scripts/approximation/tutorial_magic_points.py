@@ -23,22 +23,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensap
 
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
+
 # %% Magic points associated with a Functional Basis (1D)
-P1 = tensap.PolynomialFunctionalBasis(tensap.LegendrePolynomials(), range(21))
+P1 = tensap.PolynomialFunctionalBasis(
+    tensap.LegendrePolynomials(), range(21)
+)
 DOM = P1.domain()
 G1 = np.linspace(DOM[0], DOM[1], 200)
 MAGIC_POINTS, IND, OUTPUT = P1.magic_points(G1)
 
 plt.figure()
 plt.plot(G1, np.zeros(G1.shape), "k.", markersize=1)
-plt.plot(MAGIC_POINTS, np.zeros(MAGIC_POINTS.shape), "ro", fillstyle="none")
+plt.plot(
+    MAGIC_POINTS, np.zeros(MAGIC_POINTS.shape), "ro", fillstyle="none"
+)
 plt.show()
 
 # %% Magic points associated with a FullTensorProductFunctionalBasis
 # Tensorization of 1D uniform grids for the selection of magic points in
 # dimension d
 D = 2
-P1 = tensap.PolynomialFunctionalBasis(tensap.LegendrePolynomials(), range(21))
+P1 = tensap.PolynomialFunctionalBasis(
+    tensap.LegendrePolynomials(), range(21)
+)
 BASES = tensap.FunctionalBases.duplicate(P1, D)
 P = tensap.FullTensorProductFunctionalBasis(BASES)
 G1 = np.linspace(DOM[0], DOM[1], 30)
@@ -48,7 +57,9 @@ MAGIC_POINTS, IND, OUTPUT = P.magic_points(G)
 if D == 2:
     plt.figure()
     plt.plot(G[:, 0], G[:, 1], "k.", markersize=1)
-    plt.plot(MAGIC_POINTS[:, 0], MAGIC_POINTS[:, 1], "ro", fillstyle="none")
+    plt.plot(
+        MAGIC_POINTS[:, 0], MAGIC_POINTS[:, 1], "ro", fillstyle="none"
+    )
     plt.show()
 
 # %% Magic points associated with a SparseTensorProductFunctionalBasis
@@ -57,10 +68,14 @@ if D == 2:
 # - or a tensorization of 1D magic points
 TENSORIZATION_OF_MAGIC_POINTS = True
 D = 2
-P1 = tensap.PolynomialFunctionalBasis(tensap.LegendrePolynomials(), range(21))
+P1 = tensap.PolynomialFunctionalBasis(
+    tensap.LegendrePolynomials(), range(21)
+)
 BASES = tensap.FunctionalBases.duplicate(P1, D)
 W = [1, 2]  # Weights for the anisotropic sparsity
-IND = tensap.MultiIndices.with_bounded_weighted_norm(2, 1, P1.cardinal() - 1, W)
+IND = tensap.MultiIndices.with_bounded_weighted_norm(
+    2, 1, P1.cardinal() - 1, W
+)
 P = tensap.SparseTensorProductFunctionalBasis(BASES, IND)
 
 if not TENSORIZATION_OF_MAGIC_POINTS:
@@ -76,7 +91,9 @@ MAGIC_POINTS, IND, OUTPUT = P.magic_points(G)
 if D == 2:
     plt.figure()
     plt.plot(G[:, 0], G[:, 1], "k.", markersize=1)
-    plt.plot(MAGIC_POINTS[:, 0], MAGIC_POINTS[:, 1], "ro", fillstyle="none")
+    plt.plot(
+        MAGIC_POINTS[:, 0], MAGIC_POINTS[:, 1], "ro", fillstyle="none"
+    )
     plt.show()
 
 # %% Interpolation of a function using magic points

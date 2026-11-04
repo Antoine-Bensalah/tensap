@@ -22,6 +22,9 @@ Tutorial on Tensorizer, TensorizedFunction and FunctionalTensorPrincipalComponen
 import numpy as np
 import tensap
 
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
+
 
 # %% Identification of a multivariate function f(x1, ..., xd) on (0,1)^d with a function
 # g(i_1^1,...,i_1^d, ..., i_L^1,...,i_L^d, y1, ...,yd)

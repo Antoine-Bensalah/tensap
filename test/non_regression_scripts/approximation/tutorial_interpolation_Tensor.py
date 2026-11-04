@@ -22,6 +22,9 @@ Tutorial on tensor interpolation.
 import numpy as np
 import tensap
 
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
+
 # %% Definitions
 D = 3
 P = 10
@@ -30,7 +33,9 @@ F = tensap.UserDefinedFunction("1+x0+(2+x0)/(2+x1)+0.04*(x2-x2**3)", D)
 F.evaluation_at_multiple_points = True
 V = tensap.UniformRandomVariable(-1, 1)
 X = tensap.RandomVector(V, D)
-BASIS = tensap.PolynomialFunctionalBasis(tensap.LegendrePolynomials(), range(P + 1))
+BASIS = tensap.PolynomialFunctionalBasis(
+    tensap.LegendrePolynomials(), range(P + 1)
+)
 BASES = tensap.FunctionalBases.duplicate(BASIS, D)
 
 # %% Sparse tensor product functional basis

@@ -9,6 +9,9 @@ import tensap as tp
 import numpy as np
 import matplotlib.pyplot as plt
 
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
+
 
 def plot_poly(phi, s):
     x = np.linspace(s[0], s[1], 100)
@@ -123,7 +126,9 @@ check_orthonormality(phi, g)
 
 # %% Orthonormal polynomials with respect to a discrete measure
 
-X = tp.DiscreteMeasure(np.random.random(10), np.random.randint(1, 10, 10))
+X = tp.DiscreteMeasure(
+    np.random.random(10), np.random.randint(1, 10, 10)
+)
 p = X.orthonormal_polynomials()
 deg = 5
 phi = tp.PolynomialFunctionalBasis(p, range(deg + 1))

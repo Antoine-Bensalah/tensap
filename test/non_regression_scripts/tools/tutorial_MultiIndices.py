@@ -18,7 +18,12 @@
 Tutorial on MultiIndices.
 
 """
+
 import tensap
+import numpy as np
+
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
 
 # %% Product set
 I0 = tensap.MultiIndices.product_set([[1, 2, 3], [1, 2]])
@@ -93,4 +98,7 @@ I1 = tensap.MultiIndices.bounded_by([3, 5, 7, 4, 3])
 I2 = tensap.MultiIndices.bounded_by([7, 5, 3, 4, 2])
 I0 = I1.add_indices(I2)
 I_marg = I0.get_reduced_margin()
-print("I1.add_indices(I2).get_reduced_margin().array = \n%s\n" % I_marg.array)
+print(
+    "I1.add_indices(I2).get_reduced_margin().array = \n%s\n"
+    % I_marg.array
+)

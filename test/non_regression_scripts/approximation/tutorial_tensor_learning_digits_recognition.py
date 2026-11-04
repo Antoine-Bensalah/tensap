@@ -27,6 +27,10 @@ import time
 import matplotlib.pyplot as plt
 import tensap
 
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
+random.seed(0)
+
 # %% Data import and preparation
 DIGITS = datasets.load_digits()
 DATA = DIGITS.images.reshape((len(DIGITS.images), -1))
@@ -40,7 +44,8 @@ DATA = np.array(
             [
                 np.ravel(
                     np.reshape(DATA[k, :], [8] * 2)[
-                        PS[0] * i:PS[0] * i + PS[0], PS[1] * j:PS[1] * j + PS[1]
+                        PS[0] * i : PS[0] * i + PS[0],
+                        PS[1] * j : PS[1] * j + PS[1],
                     ]
                 )
                 for i in range(int(8 / PS[0]))
@@ -54,7 +59,9 @@ DIM = int(int(DATA.shape[1] / np.prod(PS)))
 
 # %% Probability measure
 print("Dimension %i" % DIM)
-X = tensap.RandomVector(tensap.DiscreteRandomVariable(np.unique(DATA)), DIM)
+X = tensap.RandomVector(
+    tensap.DiscreteRandomVariable(np.unique(DATA)), DIM
+)
 
 # %% Training and test samples
 P_TRAIN = 0.9  # Proportion of the sample used for the training
@@ -78,7 +85,9 @@ for i in range(np.prod(PS)):
     FUN.append(lambda x, j=i: np.sin(np.pi / 2 * x[:, j]))
 
 BASES = [
-    tensap.UserDefinedFunctionalBasis(FUN, X.random_variables[0], np.prod(PS))
+    tensap.UserDefinedFunctionalBasis(
+        FUN, X.random_variables[0], np.prod(PS)
+    )
     for _ in range(DIM)
 ]
 BASES = tensap.FunctionalBases(BASES)
@@ -93,16 +102,17 @@ LOSS = tensap.CustomLossFunction(
 
 def error_function(y_pred, sample):
     """
-    Return the error associated with a set of predictions using a sample, equal
-    to the number of misclassifications divided by the number of samples.
+    Return the error associated with a set of predictions using a
+    sample, equal to the number of misclassifications divided by the
+    number of samples.
 
     Parameters
     ----------
     y_pred : numpy.ndarray
         The predictions.
     sample : list
-        The sample used to compute the error. sample[0] contains the inputs,
-        and sample[1] the corresponding outputs.
+        The sample used to compute the error. sample[0] contains the
+        inputs, and sample[1] the corresponding outputs.
 
     Returns
     -------
@@ -169,7 +179,9 @@ IMAGES_AND_PREDICTIONS = list(zip(DIGITS.images[TEST], F_X_TEST))
 for i in np.arange(1, 19):
     plt.subplot(3, 6, i)
     plt.imshow(
-        IMAGES_AND_PREDICTIONS[i][0], cmap=plt.cm.gray_r, interpolation="nearest"
+        IMAGES_AND_PREDICTIONS[i][0],
+        cmap=plt.cm.gray_r,
+        interpolation="nearest",
     )
     plt.axis("off")
     plt.title("Pred.: %i" % IMAGES_AND_PREDICTIONS[i][1])

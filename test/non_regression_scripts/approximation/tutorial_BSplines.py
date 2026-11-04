@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tensap
 
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
+
 # %% Cardinal BSplines
 plt.figure(1)
 mmax = 5

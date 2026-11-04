@@ -22,6 +22,9 @@ Tutorial on Tensorizer and TensorizedFunction.
 import numpy as np
 import tensap
 
+# Fixed seed, so that the script is reproducible (non-regression test).
+np.random.seed(0)
+
 # %% Identification of a function f(x) on (0,1) with a function g(i1, ...,id , y)
 # x is identified with (i_1, ..., i_d, y) through a Tensorizer
 # First interpolate and then truncate
@@ -63,7 +66,8 @@ for k in range(1, 9):
     TENSORIZED_FUN_TT = TENSORIZED_FUN_INTERP
     TENSORIZED_FUN_TT.fun.tensor = TR.ttsvd(tens)
     print(
-        "Representation ranks = %s" % TENSORIZED_FUN_TT.fun.tensor.representation_rank
+        "Representation ranks = %s"
+        % TENSORIZED_FUN_TT.fun.tensor.representation_rank
     )
     print("Complexity = %s" % TENSORIZED_FUN_TT.fun.tensor.storage())
     X_TEST = T.X.random(1000)
@@ -110,7 +114,8 @@ for k in range(1, 9):
     TENSORIZED_FUN_TT = TENSORIZED_FUN_INTERP
     TENSORIZED_FUN_TT.fun.tensor = TR.ttsvd(tens)
     print(
-        "Representation ranks = %s" % TENSORIZED_FUN_TT.fun.tensor.representation_rank
+        "Representation ranks = %s"
+        % TENSORIZED_FUN_TT.fun.tensor.representation_rank
     )
     print("Complexity = %s" % TENSORIZED_FUN_TT.fun.tensor.storage())
     X_TEST = T.X.random(1000)

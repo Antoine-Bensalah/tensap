@@ -1,10 +1,23 @@
+"""Run the non-regression scripts.
+
+The scripts of ``test/non_regression_scripts/`` are the former tutorials of
+tensap, kept as they were, with a fixed random seed. Each one must run
+without error. They are also the raw material of the Examples Gallery and
+of the Use cases of the documentation.
+"""
+
 import glob
-import pytest
+import os
 import time
+
 import matplotlib
 import matplotlib.pyplot as plt
+import pytest
 
 matplotlib.use("Agg")
+
+SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "non_regression_scripts")
+SCRIPTS = sorted(glob.glob(os.path.join(SCRIPTS_DIR, "**", "*.py"), recursive=True))
 
 
 def execfile(filepath, globals=None, locals=None):
@@ -21,8 +34,8 @@ def execfile(filepath, globals=None, locals=None):
         exec(compile(file.read(), filepath, "exec"), globals, locals)
 
 
-@pytest.mark.parametrize("f", glob.glob("tutorials/**/*.py", recursive=True))
-def test_tutorial(f):
+@pytest.mark.parametrize("f", SCRIPTS, ids=lambda f: os.path.relpath(f, SCRIPTS_DIR))
+def test_non_regression_script(f):
     print(f"-- running {f}", flush=True)
     t0 = time.time()
     execfile(f)
