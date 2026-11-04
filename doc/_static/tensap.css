@@ -219,27 +219,15 @@ html[data-theme="dark"] {
 
 /* -- Home page ------------------------------------------------------------ */
 
-/* The title is shown by the logo of the banner. */
+/* The title is shown by the logo at the top of the page. */
 section#tensap > h1 {
   display: none;
 }
 
 .tensap-hero {
-  position: relative;
-  overflow: hidden;
   text-align: center;
   margin: 0.5rem 0 1.5rem;
   padding: 1.5rem 1rem 1rem;
-  border-radius: 0.75rem;
-  background: linear-gradient(135deg, #eaf1f7 0%, #eef6f6 55%, #fbf1e6 100%);
-}
-
-.tensap-hero > * {
-  position: relative;
-}
-
-html[data-theme="dark"] .tensap-hero {
-  background: linear-gradient(135deg, #18263a 0%, #15292e 55%, #2b2219 100%);
 }
 
 .tensap-hero__logo {
