@@ -38,6 +38,7 @@ will be reorganised by concept and by method.
 ```{toctree}
 :hidden:
 :maxdepth: 2
+:numbered: 3
 
 full_tensors
 tensor_formats
