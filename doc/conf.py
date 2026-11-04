@@ -32,6 +32,7 @@ extensions = [
     "numpydoc",
     "myst_parser",
     "sphinxcontrib.bibtex",
+    "sphinx_design",  # cards and buttons of the home page
     "sphinx_gallery.gen_gallery",
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
@@ -170,7 +171,14 @@ html_theme_options = {
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
     "navigation_with_keys": False,
     "show_toc_level": 2,
+    # Right column: the table of contents of the page only ("Show Source"
+    # removed).
+    "secondary_sidebar_items": ["page-toc"],
 }
+html_show_sourcelink = False
+# Left column: the navigation of the section only (no "Collapse Sidebar"
+# button).
+html_sidebars = {"**": ["sidebar-nav-bs"]}
 html_context = {"default_mode": "light"}
 
 # -- Options for LaTeX output ------------------------------------------------

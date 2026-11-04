@@ -112,3 +112,139 @@ html[data-theme="dark"] {
   --pst-color-secondary-bg: #4a2e12;
   --pst-color-target: #4a2e12;
 }
+
+/* Inline formulas slightly smaller, to blend into the text. */
+mjx-container:not([display="true"]) {
+  font-size: 95%;
+}
+
+/* Admonitions in the colours of the logo: a pale background and a coloured
+   rule on the left, no shadow. Notes in teal, warnings in orange. */
+html[data-theme="light"] {
+  --pst-color-info: #0e5f6b;
+  --pst-color-info-bg: #e6f2f4;
+  --pst-color-warning: #c2620f;
+  --pst-color-warning-bg: #fbeee0;
+}
+
+html[data-theme="dark"] {
+  --pst-color-info: #5cc0cc;
+  --pst-color-info-bg: #15343a;
+  --pst-color-warning: #f0a050;
+  --pst-color-warning-bg: #3d2a16;
+}
+
+.bd-content .admonition {
+  box-shadow: none;
+  border-left-width: 0.25rem;
+}
+
+/* Left column: no "Section Navigation" title. */
+.bd-sidebar-primary .bd-links__title {
+  display: none;
+}
+
+/* Right column: class names as plain text, slightly smaller. */
+.bd-sidebar-secondary nav.page-toc code,
+.bd-sidebar-secondary nav.page-toc code.literal {
+  color: inherit;
+  background: none;
+  padding: 0;
+  font-size: 0.95em;
+}
+
+/* Footer: previous and next pages as two framed links. */
+.prev-next-area a.left-prev,
+.prev-next-area a.right-next {
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.4rem;
+  padding: 0.6rem 1rem;
+}
+
+.prev-next-area a.left-prev:hover,
+.prev-next-area a.right-next:hover {
+  border-color: var(--pst-color-secondary);
+}
+
+/* -- Home page ------------------------------------------------------------ */
+
+/* The title is shown by the logo of the banner. */
+section#tensap > h1 {
+  display: none;
+}
+
+.tensap-hero {
+  text-align: center;
+  padding: 1.5rem 1rem 0;
+}
+
+.tensap-hero__logo {
+  height: 7rem;
+  width: auto;
+}
+
+.tensap-hero__tagline {
+  margin: 0.5rem 0 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--pst-color-heading);
+}
+
+.tensap-hero__text {
+  max-width: 42rem;
+  margin: 0 auto;
+  color: var(--pst-color-text-muted);
+}
+
+.tensap-hero__buttons {
+  margin: 1.5rem 0 2rem;
+}
+
+.bd-content a.tensap-button {
+  display: inline-block;
+  margin: 0.25rem;
+  padding: 0.55em 1.2em;
+  border: 1px solid var(--pst-color-primary);
+  border-radius: 0.4rem;
+  color: var(--pst-color-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.bd-content a.tensap-button--primary {
+  background-color: var(--pst-color-primary);
+  color: var(--pst-color-background);
+}
+
+.bd-content a.tensap-button:hover {
+  border-color: var(--pst-color-secondary);
+  background-color: var(--pst-color-secondary);
+  color: var(--pst-color-background);
+}
+
+.tensap-cards .sd-card {
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.5rem;
+  box-shadow: none;
+  transition: border-color 0.15s;
+}
+
+.tensap-cards .sd-card:hover {
+  border-color: var(--pst-color-secondary);
+}
+
+.tensap-cards .sd-card-title {
+  color: var(--pst-color-heading);
+  font-weight: 600;
+}
+
+.tensap-cards .sd-card-title .sd-octicon {
+  color: var(--pst-color-secondary);
+  margin-right: 0.4em;
+  vertical-align: -0.25em;
+}
+
+.tensap-cards .sd-card-text {
+  color: var(--pst-color-text-muted);
+  font-size: 0.95rem;
+}
