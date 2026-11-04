@@ -53,6 +53,8 @@ myst_heading_anchors = 3
 
 # Figures, tables and code blocks are numbered, so that {numref} can cite them.
 numfig = True
+# Section numbers as in a book: "2.1 Title", without a final dot.
+html_secnumber_suffix = " "
 
 # -- Mathematics -------------------------------------------------------------
 
