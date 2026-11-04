@@ -8,3 +8,6 @@ study: context, model, strategy, analysis of the results and discussion.
 
 More use cases will follow; the longest examples of the gallery, such as
 :doc:`/examples/learning/digits_recognition`, will be rewritten here.
+
+The original tutorials of tensap, word for word, are gathered in
+:ref:`tensap-tutorials`.

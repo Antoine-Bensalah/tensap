@@ -36,6 +36,7 @@ extensions = [
     "sphinx_gallery.gen_gallery",
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
+    "tutorial_pages",  # _ext/: the original tutorials, in doc/tutorials/
 ]
 
 # Narrative pages are written in MyST Markdown (.md); the API pages and the
