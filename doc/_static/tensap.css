@@ -320,3 +320,20 @@ p.rubric.tutorial-folder {
   font-weight: 600;
   margin: 2.5rem 0 1rem;
 }
+
+/* In the code of the galleries, the names of tensap are links to the API
+   reference: shown in the primary colour, underlined only on hover. */
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"],
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"] span {
+  color: var(--pst-color-primary);
+  text-decoration: none;
+}
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"]:hover,
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"]:hover span {
+  text-decoration: underline;
+}
+
+/* "native" underlines the names of modules: not in this site. */
+.bd-content div.highlight .nn {
+  text-decoration: none;
+}

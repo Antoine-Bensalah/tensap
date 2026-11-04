@@ -172,6 +172,10 @@ html_css_files = ["tensap.css"]
 html_favicon = "_static/tensap_favicon.png"
 
 html_theme_options = {
+    # Syntax highlighting: "friendly" (italic comments, bold keywords,
+    # coloured built-ins and numbers), and "native", its dark counterpart.
+    "pygments_light_style": "friendly",
+    "pygments_dark_style": "native",
     "logo": {
         "image_light": "_static/tensap_logo.svg",
         "image_dark": "_static/tensap_logo_dark.svg",
