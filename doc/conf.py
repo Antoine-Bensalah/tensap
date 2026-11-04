@@ -108,7 +108,15 @@ intersphinx_mapping = {
 
 templates_path = ["_templates"]
 # api_notes/ holds fragments included by _ext/api_notes.py, not pages.
-exclude_patterns = ["_build", "api_notes", "_tutorials_src", "_thumbnails", "Thumbs.db", ".DS_Store", "**/*.ipynb"]
+exclude_patterns = [
+    "_build",
+    "api_notes",
+    "_tutorials_src",
+    "_thumbnails",
+    "Thumbs.db",
+    ".DS_Store",
+    "**/*.ipynb",
+]
 
 # -- Examples Gallery and Use Cases (sphinx-gallery) -----------------------
 
