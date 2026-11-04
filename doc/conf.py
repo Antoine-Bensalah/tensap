@@ -111,19 +111,12 @@ exclude_patterns = ["_build", "api_notes", "_tutorials_src", "Thumbs.db", ".DS_S
 
 # -- Examples Gallery and Use Cases (sphinx-gallery) -----------------------
 
-# Examples that are not executed when the documentation is built: too long,
-# or requiring tensorflow. Their code is shown without its output.
-NOT_EXECUTED = [
-    "tree_based_tensor_density_learning",
-    "tensorized_function_learning",
-    "tensor_completion",
-    "digits_recognition",
-    # The same four, among the original tutorials.
-    "tutorial_tensor_learning_TreeBasedTensorDensityLearning",
-    "tutorial_tensor_learning_tensorized_function_learning",
-    "tutorial_tensor_learning_tensor_completion",
-    "tutorial_tensor_learning_digits_recognition",
-]
+# Examples that are not executed when the documentation is built: their code
+# is shown without its output. Empty: every example is executed, and its
+# results are kept in the gallery cache of the CI, so that an example runs
+# again only when its script changes. The longest one, digits_recognition,
+# takes about 8 minutes.
+NOT_EXECUTED = []
 
 sphinx_gallery_conf = {
     # Sources at the root of the repository, pages generated in doc/.
@@ -132,7 +125,11 @@ sphinx_gallery_conf = {
     "examples_dirs": ["../examples", "../use_cases", "_tutorials_src"],
     "gallery_dirs": ["examples", "use_cases", "tutorials"],
     # Execute every example, except those of NOT_EXECUTED.
-    "filename_pattern": r"/(?!(%s)\.py$)[^/]+\.py$" % "|".join(NOT_EXECUTED),
+    "filename_pattern": (
+        r"/(?!(%s)\.py$)[^/]+\.py$" % "|".join(NOT_EXECUTED)
+        if NOT_EXECUTED
+        else r"/[^/]+\.py$"
+    ),
     "ignore_pattern": r"__init__\.py",
     # Sections and examples in the order of _ext/gallery_order.py.
     "subsection_order": [
