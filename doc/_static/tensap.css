@@ -337,3 +337,17 @@ p.rubric.tutorial-folder {
 .bd-content div.highlight .nn {
   text-decoration: none;
 }
+
+/* Outputs of the galleries: on the page background, in a thin frame with a
+   bar in the primary colour on the left, instead of the yellow box of
+   sphinx-gallery. The code above them keeps its grey background. */
+.bd-content div.sphx-glr-script-out .highlight {
+  background: transparent;
+  border: none;
+}
+.bd-content div.sphx-glr-script-out .highlight pre {
+  background: transparent;
+  color: var(--pst-color-text-base);
+  border: 1px solid var(--pst-color-border);
+  border-left: 4px solid var(--pst-color-primary);
+}
