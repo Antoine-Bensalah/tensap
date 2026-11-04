@@ -36,7 +36,7 @@ extensions = [
     "sphinx_gallery.gen_gallery",
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
-    "tutorial_pages",  # _ext/: the original tutorials, in doc/tutorials/
+    "tutorial_pages",  # _ext/: the original tutorials as a gallery; numbering
 ]
 
 # Narrative pages are written in MyST Markdown (.md); the API pages and the
@@ -107,7 +107,7 @@ intersphinx_mapping = {
 
 templates_path = ["_templates"]
 # api_notes/ holds fragments included by _ext/api_notes.py, not pages.
-exclude_patterns = ["_build", "api_notes", "Thumbs.db", ".DS_Store", "**/*.ipynb"]
+exclude_patterns = ["_build", "api_notes", "_tutorials_src", "Thumbs.db", ".DS_Store", "**/*.ipynb"]
 
 # -- Examples Gallery and Use cases (sphinx-gallery) -----------------------
 
@@ -118,12 +118,19 @@ NOT_EXECUTED = [
     "tensorized_function_learning",
     "tensor_completion",
     "digits_recognition",
+    # The same four, among the original tutorials.
+    "tutorial_tensor_learning_TreeBasedTensorDensityLearning",
+    "tutorial_tensor_learning_tensorized_function_learning",
+    "tutorial_tensor_learning_tensor_completion",
+    "tutorial_tensor_learning_digits_recognition",
 ]
 
 sphinx_gallery_conf = {
     # Sources at the root of the repository, pages generated in doc/.
-    "examples_dirs": ["../examples", "../use_cases"],
-    "gallery_dirs": ["examples", "use_cases"],
+    # _tutorials_src/ is written by _ext/tutorial_pages.py from the scripts
+    # of test/non_regression_scripts/.
+    "examples_dirs": ["../examples", "../use_cases", "_tutorials_src"],
+    "gallery_dirs": ["examples", "use_cases", "tutorials"],
     # Execute every example, except those of NOT_EXECUTED.
     "filename_pattern": r"/(?!(%s)\.py$)[^/]+\.py$" % "|".join(NOT_EXECUTED),
     "ignore_pattern": r"__init__\.py",
@@ -135,6 +142,11 @@ sphinx_gallery_conf = {
         "../examples/pca",
         "../examples/learning",
         "../examples/poincare",
+        "_tutorials_src/tensor_algebra",
+        "_tutorials_src/functions",
+        "_tutorials_src/approximation",
+        "_tutorials_src/poincare_learning",
+        "_tutorials_src/tools",
     ],
     "within_subsection_order": "gallery_order.ExampleOrder",
     # Links from the code of the examples to the API reference, and lists
