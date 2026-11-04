@@ -70,9 +70,9 @@ dimension tree itself, are adapted to the data.
 :start-at: import numpy
 ```
 
-Output:
+```{code-block} none
+:class: sphx-glr-script-out
 
-```text
 Ranks of the approximation: [1 1 1 1 2 2 4 3 3 3 1]
 Storage complexity: 186 parameters
 Relative test error: 1.89e-05
