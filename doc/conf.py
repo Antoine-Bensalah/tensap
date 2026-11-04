@@ -147,9 +147,27 @@ sphinx_gallery_conf = {
 
 html_theme = "pydata_sphinx_theme"
 html_title = f"tensap {release}"
+# Style of the site (colours of the mathematics and of the code).
+html_static_path = ["_static"]
+html_css_files = ["tensap.css"]
+
+# Logo of tensap (an unbalanced tree tensor network), with a version for the
+# dark theme, and the favicon (PNG for the browsers without SVG favicons).
+html_favicon = "_static/tensap_favicon.png"
+
 html_theme_options = {
+    "logo": {
+        "image_light": "_static/tensap_logo.svg",
+        "image_dark": "_static/tensap_logo_dark.svg",
+        "alt_text": "tensap",
+    },
     "github_url": "https://github.com/anthony-nouy/tensap",
     "header_links_before_dropdown": 6,
+    # Everything on one line in the header: the search is an icon (Ctrl+K
+    # still opens it), next to the theme switcher and the GitHub link.
+    "navbar_align": "left",
+    "navbar_persistent": ["search-button"],
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
     "navigation_with_keys": False,
     "show_toc_level": 2,
 }

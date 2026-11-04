@@ -1,0 +1,114 @@
+/* Style of the tensap documentation, on top of pydata-sphinx-theme. */
+
+:root,
+html[data-theme="light"] {
+  --tensap-math-color: #1d4f91;
+  --tensap-code-color: #8a2f8f;
+  --tensap-code-bg: #f0f1f4;
+}
+
+html[data-theme="dark"] {
+  --tensap-math-color: #8cb8f2;
+  --tensap-code-color: #e09ee6;
+  --tensap-code-bg: #22262e;
+}
+
+/* Mathematics in blue, inline and displayed. */
+mjx-container {
+  color: var(--tensap-math-color);
+}
+
+/* A displayed formula wider than the page scrolls horizontally, instead of
+   overflowing into the margin. */
+mjx-container[display="true"] {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 0.2em 0;
+}
+
+/* Inline code in violet, on a very light grey background, without a border.
+   Links to the API keep the link colour, so that they stand out from plain
+   code. */
+code.literal,
+.bd-content code:not(pre code) {
+  color: var(--tensap-code-color);
+  background: var(--tensap-code-bg);
+  border: none;
+  border-radius: 0.25em;
+  padding: 0.05em 0.3em;
+}
+
+.bd-content a code.literal,
+.bd-content a code {
+  color: var(--pst-color-link);
+}
+
+/* Headings closer to a mathematics book: a smaller scale than the theme's
+   (2.625 / 2.125 / 1.75 / 1.5 / 1.25 rem), and code in a heading at the
+   size of the heading. */
+:root {
+  --pst-font-size-h1: 1.875rem;
+  --pst-font-size-h2: 1.5rem;
+  --pst-font-size-h3: 1.25rem;
+  --pst-font-size-h4: 1.125rem;
+  --pst-font-size-h5: 1rem;
+  --pst-font-size-h6: 1rem;
+}
+
+.bd-content h1 {
+  margin-top: 0.5em;
+}
+
+.bd-content h2,
+.bd-content h3,
+.bd-content h4 {
+  margin-top: 1.6em;
+  margin-bottom: 0.6em;
+}
+
+.bd-content :is(h1, h2, h3, h4, h5, h6) code,
+.bd-content :is(h1, h2, h3, h4, h5, h6) code.literal {
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Logo in the header. */
+.bd-header .navbar-brand {
+  height: 100%;
+  max-height: none;
+}
+
+.bd-header .navbar-brand img.logo__image {
+  height: 3.4rem;
+  max-height: none;
+  width: auto;
+}
+
+/* Colours of the logo, used soberly: headings in the navy of the logo,
+   links and the current section in a deep teal (between its teal and its
+   navy), hover and highlights in its orange (darkened for contrast on a
+   white background). */
+html[data-theme="light"] {
+  --pst-color-heading: #1f3a5f;
+  --pst-color-primary: #0e5f6b;
+  --pst-color-primary-highlight: #0a4b55;
+  --pst-color-link-higher-contrast: #0a4b55;
+  --pst-color-secondary: #c2620f;
+  --pst-color-secondary-highlight: #a65208;
+  --pst-color-secondary-bg: #fbe6d0;
+  --pst-color-target: #fbe6d0;
+}
+
+html[data-theme="dark"] {
+  --pst-color-heading: #d6e3f0;
+  --pst-color-primary: #5cc0cc;
+  --pst-color-primary-highlight: #7fd0da;
+  --pst-color-link-higher-contrast: #7fd0da;
+  --pst-color-secondary: #f0a050;
+  --pst-color-secondary-highlight: #f5b878;
+  --pst-color-secondary-bg: #4a2e12;
+  --pst-color-target: #4a2e12;
+}

@@ -322,17 +322,17 @@ The leaf nodes $\alpha \in {\mathcal{L}}(T)$ are such that
 
 Given a dimension tree $T$, a {py:class}`~tensap.TreeBasedTensor` `X` is a tensor in *tree-based format* (see {cite:p}`Falco2018`, {cite:p}`Hackbusch2019`). It represents an order $d$ tensor $X \in {\mathbb{R}}^{N_1 \times \cdots \times N_d}$ in the set of tensors with $\alpha$-ranks bounded by some integer $r_\alpha$, $\alpha \in T$. Such a tensor admits a representation
 
-> $$X_{i_1, \ldots, i_d} = \sum_{\substack{1 \leq k_\beta \leq r_\beta \beta \in T\setminus \{D\}}} \prod_{\alpha \in T\setminus {\mathcal{L}}(T)} C^\alpha_{(k_\beta)_{\beta \in S(\alpha)},k_\alpha} \prod_{\alpha \in {\mathcal{L}}(T)} C^{\alpha}_{i_\alpha,k_\alpha},$$
->
-> with $C^\alpha$, $\alpha \in T$, some tensors that
-> parameterize the representation of $X$. When $T$ is a
-> binary tree, the corresponding format is the so-called hierarchical
-> Tucker (HT) format. The particular case of a linear binary tree is the
-> tensor train Tucker format.
+$$X_{i_1, \ldots, i_d} = \sum_{\substack{1 \leq k_\beta \leq r_\beta \beta \in T\setminus \{D\}}} \prod_{\alpha \in T\setminus {\mathcal{L}}(T)} C^\alpha_{(k_\beta)_{\beta \in S(\alpha)},k_\alpha} \prod_{\alpha \in {\mathcal{L}}(T)} C^{\alpha}_{i_\alpha,k_\alpha},$$
+
+with $C^\alpha$, $\alpha \in T$, some tensors that
+parameterize the representation of $X$. When $T$ is a
+binary tree, the corresponding format is the so-called hierarchical
+Tucker (HT) format. The particular case of a linear binary tree is the
+tensor train Tucker format.
 
 The *Tucker format* corresponds to a trivial tree $T=\{\{1\},\ldots,\{d\},\{1,\ldots,d\}\}$ and admits the representation
 
-> $$X_{i_1, \ldots, i_d} = \sum_{k_1=1}^{r_1} \ldots \sum_{k_d=1}^{r_d} C^{1,\ldots,d}_{k_1,\ldots,k_d} C^{1}_{i_1,k_1} \ldots C^{d}_{i_d,k_d}.$$
+$$X_{i_1, \ldots, i_d} = \sum_{k_1=1}^{r_1} \ldots \sum_{k_d=1}^{r_d} C^{1,\ldots,d}_{k_1,\ldots,k_d} C^{1}_{i_1,k_1} \ldots C^{d}_{i_d,k_d}.$$
 
 A *degenerate tree-based format* is defined as the set of tensors with
 $\alpha$-ranks bounded by some integer $r_\alpha$, for all
@@ -348,10 +348,10 @@ parameterize the representation of $X$.
 
 The *tensor train format* is a degenerate tree-based format with a linear tree $T$ and all leaf nodes inactive except the first one, that means $A = \{\{1\},\{1,2\}, \ldots, \{1,\ldots,d\}\}$. A tensor $X$ in tensor train format admits a representation
 
-> $$X_{i_1,\ldots,i_d} = \sum_{k_1=1}^{r_1} \ldots \sum_{k_{d-1}=1}^{r_{d-1}} C^1_{1,i_1,k_1} C^2_{k_1,i_2,k_2} \ldots C^{d-1}_{k_{d-2},i_{d-1},k_{d-1}} C^d_{k_{d-1},i_d,1}$$
->
-> with tensor $C^\nu$ and rank $r_\nu$ associated with the
-> node $\alpha = \{1,\ldots,\nu\}$.
+$$X_{i_1,\ldots,i_d} = \sum_{k_1=1}^{r_1} \ldots \sum_{k_{d-1}=1}^{r_{d-1}} C^1_{1,i_1,k_1} C^2_{k_1,i_2,k_2} \ldots C^{d-1}_{k_{d-2},i_{d-1},k_{d-1}} C^d_{k_{d-1},i_d,1}$$
+
+with tensor $C^\nu$ and rank $r_\nu$ associated with the
+node $\alpha = \{1,\ldots,\nu\}$.
 
 For a more detailed presentation of tree-based formats (possibly degenerate) and more examples, see {cite:p}`Nouy2017book`.  
 If the rank $r_D$ associated with the root node is different from $1$, a {py:class}`~tensap.TreeBasedTensor` `X` represents a tensor of order $d+1$ with entries $X_{i_1,\ldots,i_d,k_D}$, $1\le k_D \le r_D$. I can be used to defined vector-valued functional tensors (see ).

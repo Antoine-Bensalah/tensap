@@ -123,10 +123,10 @@ $\alpha$-singular values) are obtained with
 ### Outer product
 The outer product $X \circ Y$ of two tensors $X\in {\mathbb{R}}^{N_1 \times \cdots \times N_d}$ and $Y \in {\mathbb{R}}^{\hat N_1 \times \cdots \times \hat N_{\hat d}}$ is a tensor $Z \in {\mathbb{R}}^{N_1 \times \ldots \times N_d \times \hat N_1 \times \cdots \times \hat N_{\hat d}}$ of order $d + \hat d$ with entries
 
-> $${Z}_{i_1,\ldots,i_d,j_1,\ldots,j_{\hat d}} =  X_{i_1, \ldots,i_ d} Y_{j_1, \ldots, j_{\hat d}}$$
->
-> It is provided by `X.tensordot(Y, 0)`, similarly to numpy's
-> tensordot function.
+$${Z}_{i_1,\ldots,i_d,j_1,\ldots,j_{\hat d}} =  X_{i_1, \ldots,i_ d} Y_{j_1, \ldots, j_{\hat d}}$$
+
+It is provided by `X.tensordot(Y, 0)`, similarly to numpy's
+tensordot function.
 
 ### Kronecker product
 The Kronecker product $X\otimes Y$ of two tensors $X$ and
@@ -150,41 +150,41 @@ $$Z_{i_1,\ldots,i_d} = X_{i_1,\ldots,i_d} Y_{i_1,\ldots,i_d}$$
 ### Contracted product
 For $I\subset \{1,\ldots,d\}$ and $J \subset \{1,\ldots,\hat d\}$ with $\#I = \#J$, `Z = X.tensordot(Y, I, J)` performs the mode $(I,J)$-contracted product of $X$ and $Z$ which is a tensor Z of order $d + \hat d - \#I - \#J$ with entries
 
-> $$\begin{aligned}
-> {Z}_{(i_\nu)_{\nu \notin I}, (j_\mu)_{\mu \notin J}} =
->             \sum_{\substack{i_\nu=1 \\ \nu \in I}}^{N_\nu} \sum_{\substack{j_\mu=1 \\ \mu \in J}}^{N_\mu} 
->             \prod_{\nu \in I} \prod_{\mu \in J} 
->             \delta_{i_\nu, j_\mu} X_{i_1, \ldots,i_ d} Y_{j_1, \ldots, j_{\hat d}}
-> \end{aligned}$$
->
-> with $\delta_{i,j}$ the Kronecker delta, that is a contraction
-> of tensors $X$ and $Y$ along dimensions $I$ of
-> $X$ and $J$ of $Y$. For example, for
-> order-$4$ tensors $X$ and $Y$, `Z =
-> X.tensordot(Y, [0,1], [1,2])` returns a tensor $Z$ or order
-> $4$ such that
->
-> $$Z_{i_3,i_4,j_1,j_4} = \sum_{i_1,i_2} X_{i_1,i_2,i_3,i_4} Y_{j_1,i_1,i_2,j_4} .$$
->
-> The method `tensordot_eval_diag` provides the diagonal (or
-> entries with equal pairs of indices) of the result of the method
-> `tensor_dot`, but at a cost lower than when using `X.tensordot(Y,
-> I, J).eval_diag()`.
+$$\begin{aligned}
+{Z}_{(i_\nu)_{\nu \notin I}, (j_\mu)_{\mu \notin J}} =
+            \sum_{\substack{i_\nu=1 \\ \nu \in I}}^{N_\nu} \sum_{\substack{j_\mu=1 \\ \mu \in J}}^{N_\mu} 
+            \prod_{\nu \in I} \prod_{\mu \in J} 
+            \delta_{i_\nu, j_\mu} X_{i_1, \ldots,i_ d} Y_{j_1, \ldots, j_{\hat d}}
+\end{aligned}$$
+
+with $\delta_{i,j}$ the Kronecker delta, that is a contraction
+of tensors $X$ and $Y$ along dimensions $I$ of
+$X$ and $J$ of $Y$. For example, for
+order-$4$ tensors $X$ and $Y$, `Z =
+X.tensordot(Y, [0,1], [1,2])` returns a tensor $Z$ or order
+$4$ such that
+
+$$Z_{i_3,i_4,j_1,j_4} = \sum_{i_1,i_2} X_{i_1,i_2,i_3,i_4} Y_{j_1,i_1,i_2,j_4} .$$
+
+The method `tensordot_eval_diag` provides the diagonal (or
+entries with equal pairs of indices) of the result of the method
+`tensor_dot`, but at a cost lower than when using `X.tensordot(Y,
+I, J).eval_diag()`.
 
 For example, for order-$4$ tensors $X$ and $Y$, `X.tensordot_eval_diag(Y,[0,1],[1,2],[2,3],[0,3])` returns the diagonal of $Z$, i.e. an order-one tensor $M$ with entries
 
-> $$M_k = Z_{k,k,k,k} = \sum_{i_1,i_2} X_{i_1,i_2,k,k} Y_{k,i_1,i_2,k}$$
->
-> `X.tensordot_eval_diag(Y,[0,1],[1,2],[2,3],[0,3],diag = True)`
-> returns a tensor $M$ of order $2$ with entries
->
-> $$M_{k_1,k_2} = Z_{k_1,k_2,k_1,k_2} = \sum_{i_1,i_2} X_{i_1,i_2,k_1,k_3} Y_{k,i_1,i_2,k}$$
->
-> `X.tensordot_eval_diag(Y,[0,1],[1,2],[2],[0])` returns the
-> diagonal of $Z$, i.e. a tensor $M$ of order $3$
-> $v$ with entries
->
-> $$M_{k,i_4,j_4} = Z_{k,i_4,k,j_4} = \sum_{i_1,i_2} X_{i_1,i_2,k,i_4} Y_{k,i_1,i_2,j_4}$$
+$$M_k = Z_{k,k,k,k} = \sum_{i_1,i_2} X_{i_1,i_2,k,k} Y_{k,i_1,i_2,k}$$
+
+`X.tensordot_eval_diag(Y,[0,1],[1,2],[2,3],[0,3],diag = True)`
+returns a tensor $M$ of order $2$ with entries
+
+$$M_{k_1,k_2} = Z_{k_1,k_2,k_1,k_2} = \sum_{i_1,i_2} X_{i_1,i_2,k_1,k_3} Y_{k,i_1,i_2,k}$$
+
+`X.tensordot_eval_diag(Y,[0,1],[1,2],[2],[0])` returns the
+diagonal of $Z$, i.e. a tensor $M$ of order $3$
+$v$ with entries
+
+$$M_{k,i_4,j_4} = Z_{k,i_4,k,j_4} = \sum_{i_1,i_2} X_{i_1,i_2,k,i_4} Y_{k,i_1,i_2,j_4}$$
 
 ### Dot product
 The dot product of two tensors $X$ and $Y$ with same shape

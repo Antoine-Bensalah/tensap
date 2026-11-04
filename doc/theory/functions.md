@@ -83,25 +83,25 @@ measure.
 
 In tensap, the orthonormal polynomials $p_i$, $i \geq 0$, are defined using the three-term recurrence relation
 
-> $$\begin{aligned}
-> \begin{aligned}
->                 &\tilde p_{-1}(x) = 0, \quad \tilde p_0(x) = 1, \\
->                 &\tilde p_{i+1}(x) = (x - a_i)\tilde p_{i}(x) - b_i \tilde p_{i-1}(x), \quad i \geq 0,\\
->                 &p_i(x) = \frac{\tilde p_i(x)}{n_i}, \quad i \geq 0
->             \end{aligned}
-> \end{aligned}$$
->
-> with $a_i$ and $b_i$ the recurrence coefficients, and
-> $n_i$ the norm of $\tilde p_i$, defined by
->
-> $$a_i = \frac{\int \tilde p_i(x) x \tilde p_i(x) d\mu(x)}{\int p_i(x) \tilde p_i(x) d\mu(x)}, \quad 
->                 b_i = \frac{\tilde p_i(x) \tilde p_i(x) d\mu(x)}{\int \tilde p_{i-1}(x) \tilde p_{i-1}(x)  d\mu(x)}, \quad
->                 n_i = \sqrt{\int\tilde p_i(x) \tilde p_i(x) d\mu(x)}.$$
->
-> Implementing a new family of orthonormal polynomials in tensap is
-> easy: one only needs to create a class with a method providing the
-> recurrence coefficients $a_i$, $b_i$ and the norms
-> $n_i$, $\forall i \geq 0$.
+$$\begin{aligned}
+\begin{aligned}
+                &\tilde p_{-1}(x) = 0, \quad \tilde p_0(x) = 1, \\
+                &\tilde p_{i+1}(x) = (x - a_i)\tilde p_{i}(x) - b_i \tilde p_{i-1}(x), \quad i \geq 0,\\
+                &p_i(x) = \frac{\tilde p_i(x)}{n_i}, \quad i \geq 0
+            \end{aligned}
+\end{aligned}$$
+
+with $a_i$ and $b_i$ the recurrence coefficients, and
+$n_i$ the norm of $\tilde p_i$, defined by
+
+$$a_i = \frac{\int \tilde p_i(x) x \tilde p_i(x) d\mu(x)}{\int p_i(x) \tilde p_i(x) d\mu(x)}, \quad 
+                b_i = \frac{\tilde p_i(x) \tilde p_i(x) d\mu(x)}{\int \tilde p_{i-1}(x) \tilde p_{i-1}(x)  d\mu(x)}, \quad
+                n_i = \sqrt{\int\tilde p_i(x) \tilde p_i(x) d\mu(x)}.$$
+
+Implementing a new family of orthonormal polynomials in tensap is
+easy: one only needs to create a class with a method providing the
+recurrence coefficients $a_i$, $b_i$ and the norms
+$n_i$, $\forall i \geq 0$.
 
 Are currently implemented in tensap:
 
@@ -210,15 +210,15 @@ command `f.eval(x)`, and one can obtain its derivatives with
 For an introduction to tensorization of functions, see {cite:p}`Ali2020I`, {cite:p}`Ali2020II`, {cite:p}`Ali2021III`.  
 We consider functions defined on the interval $I = [0,1)$. For a given $b \in \{2,3,\ldots, \}$ and $d\in {\mathbb{N}}$, an element $x \in I$ can be identified with the tuple $(i_1,\ldots,i_d,y)$, such that
 
-> $$
->             x = t_{b,d}(i_1,\ldots,i_d,y) = \sum_{k=1}^d i_kb^{-k} + b^{-d}y$$
->
-> with $i_k \in I_b = \{0,\ldots,b-1\}$, $k = 1,\ldots,d$,
-> and $y = b^d x - \lfloor b^d x \rfloor \in [0,1)$. The tuple
-> $(i_1,\ldots,i_d)$ is the representation in base $b$ of
-> $\lfloor b^d x \rfloor$. This defines a bijective map
-> $t_{b,d}$ from $\{0,\ldots,b-1\}^{d} \times [0,1)$ to
-> $[0,1)$.
+$$
+            x = t_{b,d}(i_1,\ldots,i_d,y) = \sum_{k=1}^d i_kb^{-k} + b^{-d}y$$
+
+with $i_k \in I_b = \{0,\ldots,b-1\}$, $k = 1,\ldots,d$,
+and $y = b^d x - \lfloor b^d x \rfloor \in [0,1)$. The tuple
+$(i_1,\ldots,i_d)$ is the representation in base $b$ of
+$\lfloor b^d x \rfloor$. This defines a bijective map
+$t_{b,d}$ from $\{0,\ldots,b-1\}^{d} \times [0,1)$ to
+$[0,1)$.
 
 Such a mapping is represented in tensap by the object {py:class}`~tensap.Tensorizer`:
 `t = tensap.Tensorizer(b, d)`. For a given $x$ in $[0,1)$,
@@ -232,13 +232,13 @@ with `t = tensap.Tensorizer(b, d, D)`.
 
 The map $t_{b,d}$ allows to define a tensorization map $T_{b,d}$, which associates to a univariate function $F$ defined on $[0,1)$ the multivariate function $f = F \circ t_{b,d}$ defined on $I_b^d \times I$, such that
 
-> $$f(i_1,\ldots,i_d,y) = F(t_{b,d}(i_1,\ldots,i_d,y)).$$
->
-> Such a function is represented in tensap by a {py:class}`~tensap.TensorizedFunction`,
-> and can be created with `f = tensap.TensorizedFunction(fun, t)`,
-> with `fun` a `function` or {py:class}`~tensap.Function` and `t` a
-> {py:class}`~tensap.Tensorizer`. The {py:class}`~tensap.TensorizedFunction` `f` is a function of
-> $d+1$ variables that can be evaluated with `f.eval(x)`, with
-> `x` a list or `numpy.ndarray` with $d+1$ columns.
+$$f(i_1,\ldots,i_d,y) = F(t_{b,d}(i_1,\ldots,i_d,y)).$$
+
+Such a function is represented in tensap by a {py:class}`~tensap.TensorizedFunction`,
+and can be created with `f = tensap.TensorizedFunction(fun, t)`,
+with `fun` a `function` or {py:class}`~tensap.Function` and `t` a
+{py:class}`~tensap.Tensorizer`. The {py:class}`~tensap.TensorizedFunction` `f` is a function of
+$d+1$ variables that can be evaluated with `f.eval(x)`, with
+`x` a list or `numpy.ndarray` with $d+1$ columns.
 
 See the example {ref}`sphx_glr_examples_functions_tensorized_function.py`.
