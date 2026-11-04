@@ -9,7 +9,7 @@ jobs:
         run: |
           sudo apt-get install python3-pip
           pip3 install flake8 --break-system-packages
-          flake8 --ignore=W503 --max-line-length=100
+          flake8 --ignore=W503,E203 --max-line-length=100
 
   conda-linux:
     runs-on: ubuntu-latest
