@@ -246,6 +246,40 @@ section#tensap > h1 {
   max-width: 40rem;
   margin: 0 auto;
   color: var(--pst-color-text-muted);
+  /* Lines of even length: no word alone on the last line. */
+  text-wrap: balance;
+}
+
+/* Illustration of the home page: a large tensor approximated by a tree.
+   Under the text on small screens, on its right on wide ones. */
+.tensap-hero__picture img {
+  display: block;
+  width: 100%;
+  max-width: 32rem;
+  height: auto;
+  margin: 1.5rem auto 0;
+}
+
+@media (min-width: 992px) {
+  .tensap-hero {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr;
+    align-items: center;
+    gap: 2rem;
+    text-align: left;
+  }
+  .tensap-hero__text {
+    margin: 0;
+  }
+  .tensap-hero__buttons {
+    white-space: nowrap;
+  }
+  .bd-content .tensap-hero__buttons a.tensap-button:first-child {
+    margin-left: 0;
+  }
+  .tensap-hero__picture img {
+    margin: 0;
+  }
 }
 
 .tensap-hero__buttons {

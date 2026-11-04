@@ -6,17 +6,24 @@ html_theme.sidebar_secondary.remove: true
 
 ```{raw} html
 <div class="tensap-hero">
-  <img class="tensap-hero__logo only-light" src="_static/tensap_logo.svg" alt="tensap">
-  <img class="tensap-hero__logo only-dark" src="_static/tensap_logo_dark.svg" alt="tensap">
-  <p class="tensap-hero__tagline">Tensor Approximation Package</p>
-  <p class="tensap-hero__text">
-    Low-rank tensor formats to approximate and learn high-dimensional functions.
-  </p>
-  <p class="tensap-hero__buttons">
-    <a class="tensap-button tensap-button--primary" href="getting_started/index.html">Getting Started</a>
-    <a class="tensap-button" href="examples/index.html">Examples Gallery</a>
-    <a class="tensap-button" href="theory/index.html">Theory &amp; Methods</a>
-  </p>
+  <div class="tensap-hero__main">
+    <img class="tensap-hero__logo only-light" src="_static/tensap_logo.svg" alt="tensap">
+    <img class="tensap-hero__logo only-dark" src="_static/tensap_logo_dark.svg" alt="tensap">
+    <p class="tensap-hero__tagline">Tensor Approximation Package</p>
+    <p class="tensap-hero__text">
+      Low-rank tensor formats to approximate and learn high-dimensional
+      functions and operators.
+    </p>
+    <p class="tensap-hero__buttons">
+      <a class="tensap-button tensap-button--primary" href="getting_started/index.html">Getting Started</a>
+      <a class="tensap-button" href="examples/index.html">Examples Gallery</a>
+      <a class="tensap-button" href="theory/index.html">Theory &amp; Methods</a>
+    </p>
+  </div>
+  <div class="tensap-hero__picture">
+    <img class="only-light" src="_static/tensap_hero.svg" alt="A large tensor approximated by a tree-based tensor format">
+    <img class="only-dark" src="_static/tensap_hero_dark.svg" alt="A large tensor approximated by a tree-based tensor format">
+  </div>
 </div>
 ```
 
