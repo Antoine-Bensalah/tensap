@@ -37,6 +37,7 @@ extensions = [
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
     "tutorial_pages",  # _ext/: the original tutorials as a gallery; numbering
+    "gallery_thumbnails",  # _ext/: drawn thumbnails of _thumbnails/
 ]
 
 # Narrative pages are written in MyST Markdown (.md); the API pages and the
@@ -107,7 +108,7 @@ intersphinx_mapping = {
 
 templates_path = ["_templates"]
 # api_notes/ holds fragments included by _ext/api_notes.py, not pages.
-exclude_patterns = ["_build", "api_notes", "_tutorials_src", "Thumbs.db", ".DS_Store", "**/*.ipynb"]
+exclude_patterns = ["_build", "api_notes", "_tutorials_src", "_thumbnails", "Thumbs.db", ".DS_Store", "**/*.ipynb"]
 
 # -- Examples Gallery and Use Cases (sphinx-gallery) -----------------------
 
