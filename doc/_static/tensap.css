@@ -144,13 +144,64 @@ html[data-theme="dark"] {
   display: none;
 }
 
-/* Right column: class names as plain text, slightly smaller. */
+/* Left column: the button that folds it is a discreet icon, without its
+   "Collapse Sidebar" label (the tooltip "Expand Sidebar" remains when it is
+   folded), in the muted colour of the text until hovered. */
+.bd-sidebar-primary #pst-collapse-sidebar-button {
+  margin-left: auto;
+}
+
+.bd-sidebar-primary #pst-collapse-sidebar-button .pst-collapse-sidebar-label {
+  display: none;
+}
+
+.bd-sidebar-primary #pst-collapse-sidebar-button .pst-icon {
+  color: var(--pst-color-text-muted);
+  opacity: 0.6;
+  height: 1.1em;
+}
+
+.bd-sidebar-primary #pst-collapse-sidebar-button:hover .pst-icon {
+  color: var(--pst-color-secondary);
+  opacity: 1;
+}
+
+.bd-sidebar-primary.pst-squeeze #pst-collapse-sidebar-button {
+  margin-left: 0;
+}
+
+/* Right column: lighter. Smaller text, tighter entries, and class names in
+   the font of the text (not in bold monospace). */
+.bd-sidebar-secondary nav.page-toc {
+  font-size: 0.85rem;
+}
+
+.bd-sidebar-secondary nav.page-toc .toc-entry a.nav-link {
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  line-height: 1.35;
+}
+
 .bd-sidebar-secondary nav.page-toc code,
 .bd-sidebar-secondary nav.page-toc code.literal {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
   color: inherit;
   background: none;
   padding: 0;
-  font-size: 0.95em;
+}
+
+/* Code blocks with more air: more padding, more space between the lines,
+   and rounder corners. */
+.bd-content div.highlight pre {
+  padding: 1.1rem 1.4rem;
+  line-height: 1.55;
+  border-radius: 0.4rem;
+}
+
+.bd-content div.highlight {
+  margin: 1.25rem 0 1.5rem;
 }
 
 /* Footer: previous and next pages as two framed links. */

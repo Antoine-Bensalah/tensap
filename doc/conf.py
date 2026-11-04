@@ -170,15 +170,17 @@ html_theme_options = {
     "navbar_persistent": ["search-button"],
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
     "navigation_with_keys": False,
-    "show_toc_level": 2,
+    # Right column: the sections of the page only; the subsections of the
+    # section being read unfold as one scrolls.
+    "show_toc_level": 1,
     # Right column: the table of contents of the page only ("Show Source"
     # removed).
     "secondary_sidebar_items": ["page-toc"],
 }
 html_show_sourcelink = False
-# Left column: the navigation of the section only (no "Collapse Sidebar"
-# button).
-html_sidebars = {"**": ["sidebar-nav-bs"]}
+# Left column: the navigation of the section, and a small button (an icon
+# only, see tensap.css) to fold it.
+html_sidebars = {"**": ["sidebar-collapse", "sidebar-nav-bs"]}
 html_context = {"default_mode": "light"}
 
 # -- Options for LaTeX output ------------------------------------------------
