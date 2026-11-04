@@ -73,7 +73,9 @@ TR = tensap.Truncator()
 TR.tolerance = 1e-15
 UR = TR.hsvd(U, TREE)
 
-print("Tree-based format - Compression at tolerance %2.5e" % TR.tolerance)
+print(
+    "Tree-based format - Compression at tolerance %2.5e" % TR.tolerance
+)
 print("Error = %2.5e" % ((UR.full() - U).norm() / U.norm()))
 print("Storage = %d" % UR.storage())
 print("Ranks = %s\n" % UR.ranks)
@@ -96,7 +98,10 @@ print(UR)
 
 SIN_VAL = UR.singular_values()
 
-print("Tensor Train format - Compression at tolerance %2.5e" % TR.tolerance)
+print(
+    "Tensor Train format - Compression at tolerance %2.5e"
+    % TR.tolerance
+)
 print("Error = %2.5e" % ((UR.full() - U).norm() / U.norm()))
 print("Storage = %d" % UR.storage())
 print("TT-rank = %s\n" % UR.ranks)

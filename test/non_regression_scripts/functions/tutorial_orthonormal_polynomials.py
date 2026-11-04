@@ -126,7 +126,9 @@ check_orthonormality(phi, g)
 
 # %% Orthonormal polynomials with respect to a discrete measure
 
-X = tp.DiscreteMeasure(np.random.random(10), np.random.randint(1, 10, 10))
+X = tp.DiscreteMeasure(
+    np.random.random(10), np.random.randint(1, 10, 10)
+)
 p = X.orthonormal_polynomials()
 deg = 5
 phi = tp.PolynomialFunctionalBasis(p, range(deg + 1))

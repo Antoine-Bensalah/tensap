@@ -14,9 +14,15 @@ This example comes from the script
 # ^^^^^^^
 import numpy as np
 import matplotlib.pyplot as plt
-from tensap.poincare_learning.benchmarks.poincare_benchmarks import build_benchmark
-from tensap.poincare_learning.utils._loss_vector_space import _build_ortho_poly_basis
-from tensap.poincare_learning.poincare_loss_vector_space import PoincareLossVectorSpace
+from tensap.poincare_learning.benchmarks.poincare_benchmarks import (
+    build_benchmark,
+)
+from tensap.poincare_learning.utils._loss_vector_space import (
+    _build_ortho_poly_basis,
+)
+from tensap.poincare_learning.poincare_loss_vector_space import (
+    PoincareLossVectorSpace,
+)
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
@@ -47,14 +53,24 @@ def generate_samples(N, X, fun, jac_fun, basis, R=None):
     if jac_fun_set.ndim == 2:
         jac_fun_set = jac_fun_set[:, None, :]
 
-    loss_set = PoincareLossVectorSpace(jac_fun_set, jac_basis_set, basis, R)
+    loss_set = PoincareLossVectorSpace(
+        jac_fun_set, jac_basis_set, basis, R
+    )
 
-    return x_set, fun_set, jac_fun_set, basis_set, jac_basis_set, loss_set
+    return (
+        x_set,
+        fun_set,
+        jac_fun_set,
+        basis_set,
+        jac_basis_set,
+        loss_set,
+    )
 
 
 # %%
 # Functions to fit regressors
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 
 def fit_krr_regressor(z_set, u_set):
 
@@ -62,35 +78,42 @@ def fit_krr_regressor(z_set, u_set):
         KernelRidge(kernel="rbf", gamma=0.1),
         param_grid={
             "alpha": np.logspace(-11, -5, 10),
-            "gamma": np.logspace(-6, 2, 10)},
-        scoring="neg_mean_squared_error"
+            "gamma": np.logspace(-6, 2, 10),
+        },
+        scoring="neg_mean_squared_error",
     )
 
     kr.fit(z_set, u_set)
-    print(f"Best KRR with params: {kr.best_params_} and R2 score: {kr.best_score_:.3f}")
+    print(
+        f"Best KRR with params: {kr.best_params_} and R2 score: "
+        f"{kr.best_score_:.3f}"
+    )
 
     return kr
 
 
 def fit_poly_regressor(z_set, u_set):
-    model = Pipeline([
-        ('poly', PolynomialFeatures()),
-        ('linear', LinearRegression(fit_intercept=False))
-    ])
+    model = Pipeline(
+        [
+            ("poly", PolynomialFeatures()),
+            ("linear", LinearRegression(fit_intercept=False)),
+        ]
+    )
 
-    param_grid = {
-        'poly__degree': [1, 2, 3, 4, 5, 6]
-    }
+    param_grid = {"poly__degree": [1, 2, 3, 4, 5, 6]}
 
     cv = GridSearchCV(
         model,
         param_grid=param_grid,
         scoring="neg_mean_squared_error",
-        cv=10
+        cv=10,
     )
 
     cv.fit(z_set, u_set)
-    print(f"Best Poly with params: {cv.best_params_} and MSE score: {-cv.best_score_:.3f}")
+    print(
+        f"Best Poly with params: {cv.best_params_} and MSE score: "
+        f"{-cv.best_score_:.3f}"
+    )
 
     return cv
 
@@ -101,8 +124,11 @@ def fit_poly_regressor(z_set, u_set):
 
 # if pytorch is installed
 try:
-    from tensap.poincare_learning.benchmarks.poincare_benchmarks_torch import build_benchmark_torch
-    u, jac_u, X = build_benchmark_torch("borehole")
+    from tensap.poincare_learning.benchmarks import (
+        poincare_benchmarks_torch as benchmarks_torch,
+    )
+
+    u, jac_u, X = benchmarks_torch.build_benchmark_torch("borehole")
 
 except ImportError:
     u, jac_u, X = build_benchmark("exp_mean_sin_exp_cos", d=8)
@@ -123,19 +149,26 @@ R = basis.gram_matrix_h1_0()
 # ^^^^^^^^
 
 N_train = 300
-x_train, u_train, jac_u_train, basis_train, jac_basis_train, loss_train = generate_samples(
-    N_train, X, u, jac_u, basis, R)
+(
+    x_train,
+    u_train,
+    jac_u_train,
+    basis_train,
+    jac_basis_train,
+    loss_train,
+) = generate_samples(N_train, X, u, jac_u, basis, R)
 
 
 N_test = 500
-x_test, u_test, jac_u_test, basis_test, jac_basis_test, loss_test = generate_samples(
-    N_test, X, u, jac_u, basis, R)
+x_test, u_test, jac_u_test, basis_test, jac_basis_test, loss_test = (
+    generate_samples(N_test, X, u, jac_u, basis, R)
+)
 
 # %%
 # Choosing hyperparameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^
 
-m = 2   # number of features to learn
+m = 2  # number of features to learn
 init_method = "active_subspace"  # initialization method
 
 # %%
@@ -145,17 +178,22 @@ init_method = "active_subspace"  # initialization method
 # CG on grassmann manifold using pymanopt, when installed
 try:
     optimizer_kwargs = {  # params for pymanopt CG
-        'beta_rule': 'PolakRibiere',
-        'max_iterations': 50,
-        'verbosity': 2,
+        "beta_rule": "PolakRibiere",
+        "max_iterations": 50,
+        "verbosity": 2,
     }
     G, _, _ = loss_train.minimize_pymanopt(
-        G0=None, m=m, init_method=init_method, optimizer_kwargs=optimizer_kwargs
+        G0=None,
+        m=m,
+        init_method=init_method,
+        optimizer_kwargs=optimizer_kwargs,
     )
 
 # quasi newton
 except ImportError:
-    G, _ = loss_train.minimize_qn(G0=None, m=m, init_method=init_method, maxiter=50, tol=1e-10)
+    G, _ = loss_train.minimize_qn(
+        G0=None, m=m, init_method=init_method, maxiter=50, tol=1e-10
+    )
 
 
 # %%
@@ -176,18 +214,20 @@ z_test = basis.eval(x_test) @ G
 fig, ax = plt.subplots(1, z_train.shape[1])
 if z_train.shape[1] == 1:
     ax = [ax]
-ax[0].set_ylabel('u(X)')
+ax[0].set_ylabel("u(X)")
 
 for i in range(z_train.shape[1]):
-    ax[i].scatter(z_train[:, i], u_train, label='train')
-    ax[i].scatter(z_test[:, i], u_test, label='test')
-    ax[i].set_xlabel(f'g_{i}(X)')
+    ax[i].scatter(z_train[:, i], u_train, label="train")
+    ax[i].scatter(z_test[:, i], u_test, label="test")
+    ax[i].set_xlabel(f"g_{i}(X)")
 
-fig.suptitle(f"""
+fig.suptitle(
+    f"""
     Poly features m={z_train.shape[1]}
     Multi-indices with {p_norm}-norm bounded by {max_deg}
     {x_train.shape[0]} train samples""",
-    y=0.)
+    y=0.0,
+)
 plt.show()
 
 
@@ -208,11 +248,11 @@ def f(z):
 # ^^^^^^^^^^^^^^^^^^^^^
 
 y_train = f(z_train)
-err_train = np.sqrt(np.mean((y_train - u_train)**2))
+err_train = np.sqrt(np.mean((y_train - u_train) ** 2))
 rel_err_train = err_train / np.sqrt((u_train**2).mean())
 
 y_test = f(z_test)
-err_test = np.sqrt(np.mean((y_test - u_test)**2))
+err_test = np.sqrt(np.mean((y_test - u_test) ** 2))
 rel_err_test = err_test / np.sqrt((u_test**2).mean())
 
 print(f"\nRegression based on {G.shape[1]} features")
@@ -226,8 +266,8 @@ print(f"RL2 on test set    : {rel_err_test:.3e}")
 # Plot final regression
 # ^^^^^^^^^^^^^^^^^^^^^
 
-plt.scatter(y_train, u_train, label='train')
-plt.scatter(y_test, u_test, label='test')
+plt.scatter(y_train, u_train, label="train")
+plt.scatter(y_test, u_test, label="test")
 plt.ylabel("u(X)")
 plt.xlabel("f(g(X))")
 plt.legend()

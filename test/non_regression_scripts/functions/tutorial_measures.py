@@ -34,7 +34,9 @@ plt.title("cumulative distribution function")
 X.cdf_plot()
 
 plt.figure()
-plt.title("inverse cumulative distribution function (quantile function)")
+plt.title(
+    "inverse cumulative distribution function (quantile function)"
+)
 X.icdf_plot()
 
 # probability density function
@@ -48,7 +50,9 @@ print("X.icdf(.5) ", X.icdf([0.5]))
 print("X.random(2)= \n", X.random(2))
 
 # latin hypercube sampling
-print("X.lhs_random(2, seed=LHS_RNG) = \n", X.lhs_random(2, seed=LHS_RNG))
+print(
+    "X.lhs_random(2, seed=LHS_RNG) = \n", X.lhs_random(2, seed=LHS_RNG)
+)
 
 # %% Normal (Gaussian) probability measure with mean mu and standard deviation sigma
 mu = 1
@@ -58,7 +62,10 @@ X = tp.NormalRandomVariable(mu, sigma)
 # support
 print("support ", X.support())
 print("truncated support ", X.truncated_support())
-print("truncated support with probability 1-2e-8", X.truncated_support(p=1 - 2e-8))
+print(
+    "truncated support with probability 1-2e-8",
+    X.truncated_support(p=1 - 2e-8),
+)
 
 
 # plot
@@ -84,7 +91,8 @@ print("integration error = ", np.abs(v - X.variance()) / X.variance())
 
 X = tp.NormalRandomVariable(0, 1)
 
-# returns a discrete random variable taking n values with equal probability
+# returns a discrete random variable taking n values with equal
+# probability
 Xd = X.discretize(1000)
 plt.figure()
 Xd.pdf_plot()
@@ -103,8 +111,8 @@ print("integration error = ", np.abs(v - X.variance()) / X.variance())
 
 X = tp.NormalRandomVariable(0, 1)
 
-# returns a discrete random variable taking n values from a uniform discretisation
-# of a truncated support
+# returns a discrete random variable taking n values from a uniform
+# discretisation of a truncated support
 Xd2 = X.discretize_support(50)
 plt.figure(1)
 plt.title("uniform discretization of the truncated support")
@@ -132,7 +140,9 @@ X = tp.RandomVector([X1, X2])
 print("random vector X")
 print(X)
 print("X.random(3) = \n", X.random(3))
-print("X.lhs_random(3, seed=LHS_RNG) = \n", X.lhs_random(3, seed=LHS_RNG))
+print(
+    "X.lhs_random(3, seed=LHS_RNG) = \n", X.lhs_random(3, seed=LHS_RNG)
+)
 
 # duplicate a random variable
 X = tp.RandomVector(X1, 5)

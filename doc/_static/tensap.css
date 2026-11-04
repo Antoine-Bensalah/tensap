@@ -351,3 +351,13 @@ p.rubric.tutorial-folder {
   border: 1px solid var(--pst-color-border);
   border-left: 4px solid var(--pst-color-primary);
 }
+
+/* On a laptop screen (a window from 960 to 1400 pixels wide), the left
+   sidebar is a little narrower, so that 72 characters of code fit in a code
+   block. Wider screens keep the default layout. */
+@media (min-width: 960px) and (max-width: 1399.98px) {
+  .bd-sidebar-primary {
+    flex-basis: 18rem;
+    width: 18rem;
+  }
+}

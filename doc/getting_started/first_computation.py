@@ -10,7 +10,8 @@ import tensap
 
 np.random.seed(0)
 
-# 1. The function to approximate, of 6 random variables uniform on [-1, 1].
+# 1. The function to approximate, of 6 random variables uniform on
+# [-1, 1].
 d = 6
 X = tensap.RandomVector(tensap.UniformRandomVariable(-1, 1), d)
 
@@ -28,10 +29,13 @@ y_train = fun(x_train)
 x_test = X.random(10000)
 y_test = fun(x_test)
 
-# 3. One basis of orthonormal polynomials of degree at most 8 per variable.
+# 3. One basis of orthonormal polynomials of degree at most 8 per
+# variable.
 bases = tensap.FunctionalBases(
     [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(9))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(9)
+        )
         for x in X.random_variables
     ]
 )

@@ -43,7 +43,9 @@ DEGREE = 8
 ORTHONORMAL_BASES = True
 if ORTHONORMAL_BASES:
     BASES = [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(DEGREE + 1))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(DEGREE + 1)
+        )
         for x in X.random_variables
     ]
 else:
@@ -155,19 +157,21 @@ DMRG = False
 if DMRG:
     # Rank of the initialization
     SOLVER.rank = 3
-    # Type of rank adaptation: can be 'dmrg' to perform classical DMRG (using
-    # a truncation of the factor to adapt the rank) or 'dmrg_low_rank' to learn
-    # the factor using a rank-adaptive learning
+    # Type of rank adaptation: can be 'dmrg' to perform classical DMRG
+    # (using a truncation of the factor to adapt the rank) or
+    # 'dmrg_low_rank' to learn the factor using a rank-adaptive learning
     # algorithm
     SOLVER.rank_adaptation_options["type"] = "dmrg_low_rank"
     # Maximum alpha-rank for all the nodes of the tree
     SOLVER.rank_adaptation_options["max_rank"] = 10
-    # If True: perform an alternating minimization with fixed tree and ranks
-    # after the rank adaptation using DMRG
-    SOLVER.rank_adaptation_options["post_alternating_minimization"] = False
-    # Model selection type when type is 'dmrg_low_rank': can be 'cv_error' to
-    # use a cross-validation estimator of the error or 'test_error' to use
-    # the error on a test sample
+    # If True: perform an alternating minimization with fixed tree and
+    # ranks after the rank adaptation using DMRG
+    SOLVER.rank_adaptation_options["post_alternating_minimization"] = (
+        False
+    )
+    # Model selection type when type is 'dmrg_low_rank': can be
+    # 'cv_error' to use a cross-validation estimator of the error or
+    # 'test_error' to use the error on a test sample
     SOLVER.rank_adaptation_options["model_selection_type"] = "cv_error"
 
 T0 = time()

@@ -61,7 +61,8 @@ for k in range(1, 9):
     TENSORIZED_FUN_TT = TENSORIZED_FUN_INTERP
     TENSORIZED_FUN_TT.fun.tensor = TR.ttsvd(tens)
     print(
-        "Representation ranks = %s" % TENSORIZED_FUN_TT.fun.tensor.representation_rank
+        "Representation ranks = %s"
+        % TENSORIZED_FUN_TT.fun.tensor.representation_rank
     )
     print("Complexity = %s" % TENSORIZED_FUN_TT.fun.tensor.storage())
     X_TEST = T.X.random(1000)
@@ -110,7 +111,8 @@ for k in range(1, 9):
     TENSORIZED_FUN_TT = TENSORIZED_FUN_INTERP
     TENSORIZED_FUN_TT.fun.tensor = TR.ttsvd(tens)
     print(
-        "Representation ranks = %s" % TENSORIZED_FUN_TT.fun.tensor.representation_rank
+        "Representation ranks = %s"
+        % TENSORIZED_FUN_TT.fun.tensor.representation_rank
     )
     print("Complexity = %s" % TENSORIZED_FUN_TT.fun.tensor.storage())
     X_TEST = T.X.random(1000)

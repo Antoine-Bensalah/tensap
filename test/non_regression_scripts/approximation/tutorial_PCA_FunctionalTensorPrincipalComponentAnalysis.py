@@ -35,7 +35,9 @@ if CHOICE == 1:
 
     DEGREE = 4
     BASES = [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(DEGREE + 1))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(DEGREE + 1)
+        )
         for x in X.random_variables
     ]
 
@@ -45,11 +47,16 @@ elif CHOICE == 2:
     X = tensap.RandomVector(tensap.UniformRandomVariable(-1, 1), D)
 
     def FUN(x):
-        return 1 / (10 + 2 * x[:, 0] + x[:, 2] + 2 * x[:, 3] - x[:, 4]) ** 2
+        return (
+            1
+            / (10 + 2 * x[:, 0] + x[:, 2] + 2 * x[:, 3] - x[:, 4]) ** 2
+        )
 
     DEGREE = 13
     BASES = [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(DEGREE + 1))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(DEGREE + 1)
+        )
         for x in X.random_variables
     ]
 
@@ -63,7 +70,9 @@ elif CHOICE == 3:
 
     DEGREE = 17
     BASES = [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(DEGREE + 1))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(DEGREE + 1)
+        )
         for x in X.random_variables
     ]
 
@@ -81,7 +90,9 @@ elif CHOICE == 4:
 
     DEGREE = 4
     BASES = [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(DEGREE + 1))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(DEGREE + 1)
+        )
         for x in X.random_variables
     ]
 
@@ -92,7 +103,9 @@ elif CHOICE == 5:
 
     DEGREE = 14
     BASES = [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(DEGREE + 1))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(DEGREE + 1)
+        )
         for x in X.random_variables
     ]
 
@@ -112,7 +125,9 @@ elif CHOICE == 6:
     FUN = T.tensorize(IFUN)
     FUN.fun.evaluation_at_multiple_points = True
     DEGREE = 1
-    H = tensap.PolynomialFunctionalBasis(Y.orthonormal_polynomials(), range(DEGREE + 1))
+    H = tensap.PolynomialFunctionalBasis(
+        Y.orthonormal_polynomials(), range(DEGREE + 1)
+    )
     BASES = T.tensorized_function_functional_bases(H)
     X = tensap.RandomVector(BASES.measure)
 
@@ -127,7 +142,10 @@ FPCA.bases = BASES
 FPCA.pca_sampling_factor = 1
 FPCA.tol = 1e-10
 SUB_BASES, OUTPUTS = FPCA.hopca(FUN)
-print("Number of evaluations = \n%s" % [x["number_of_evaluations"] for x in OUTPUTS])
+print(
+    "Number of evaluations = \n%s"
+    % [x["number_of_evaluations"] for x in OUTPUTS]
+)
 print("Ranks {1, ..., d} = \n%s" % [x.cardinal() for x in SUB_BASES])
 
 # %% Approximation in Tucker Format
@@ -151,7 +169,10 @@ print("Ranks = %s" % F.tensor.ranks[F.tensor.tree.dim2ind - 1])
 X_TEST = X.random(1e4)
 F_X_TEST = F(X_TEST)
 Y_TEST = FUN(X_TEST)
-print("Error = %2.5e" % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST)))
+print(
+    "Error = %2.5e"
+    % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST))
+)
 
 print("\nPrescribed tolerance")
 FPCA.tol = 1e-10
@@ -163,7 +184,10 @@ print("Ranks = %s" % F.tensor.ranks[F.tensor.tree.dim2ind - 1])
 X_TEST = X.random(1e4)
 F_X_TEST = F(X_TEST)
 Y_TEST = FUN(X_TEST)
-print("Error = %2.5e" % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST)))
+print(
+    "Error = %2.5e"
+    % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST))
+)
 
 # %% Approximation in tree based format
 print("\n--- Approximation in tree based format ---")
@@ -185,7 +209,10 @@ print("Ranks = %s" % F.tensor.ranks)
 X_TEST = X.random(1e3)
 F_X_TEST = F(X_TEST)
 Y_TEST = FUN(X_TEST)
-print("Error = %2.5e" % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST)))
+print(
+    "Error = %2.5e"
+    % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST))
+)
 
 print("\nPrescribed tolerance")
 FPCA.tol = 1e-10
@@ -198,7 +225,10 @@ print("Ranks = %s" % F.tensor.ranks)
 X_TEST = X.random(1e3)
 F_X_TEST = F(X_TEST)
 Y_TEST = FUN(X_TEST)
-print("Error = %2.5e" % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST)))
+print(
+    "Error = %2.5e"
+    % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST))
+)
 
 # %% Approximation in Tensor Train format
 print("\n--- Approximation in tensor train format ---")
@@ -221,7 +251,10 @@ print("TT-ranks = %s" % TT_RANKS[:-1])
 X_TEST = X.random(1e3)
 F_X_TEST = F(X_TEST)
 Y_TEST = FUN(X_TEST)
-print("Error = %2.5e" % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST)))
+print(
+    "Error = %2.5e"
+    % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST))
+)
 
 print("\nPrescribed tolerance")
 FPCA.tol = 1e-4
@@ -235,4 +268,7 @@ print("TT-ranks = %s" % TT_RANKS[:-1])
 X_TEST = X.random(1e3)
 F_X_TEST = F(X_TEST)
 Y_TEST = FUN(X_TEST)
-print("Error = %2.5e" % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST)))
+print(
+    "Error = %2.5e"
+    % (np.linalg.norm(Y_TEST - F_X_TEST) / np.linalg.norm(Y_TEST))
+)

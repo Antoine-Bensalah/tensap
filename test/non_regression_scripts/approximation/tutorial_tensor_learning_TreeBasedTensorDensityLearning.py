@@ -42,12 +42,16 @@ S = np.array(
     ]
 )
 # Reference measure
-REF = tensap.RandomVector([tensap.UniformRandomVariable(-x, x) for x in 5 * np.diag(S)])
+REF = tensap.RandomVector(
+    [tensap.UniformRandomVariable(-x, x) for x in 5 * np.diag(S)]
+)
 
 
 # Density, defined with respect to the reference measure
 def U(x):
-    return multivariate_normal.pdf(x, np.zeros(ORDER), S) * np.prod(2 * 5 * np.diag(S))
+    return multivariate_normal.pdf(x, np.zeros(ORDER), S) * np.prod(
+        2 * 5 * np.diag(S)
+    )
 
 
 # %% Training and test samples
@@ -62,9 +66,12 @@ XI = REF.random(NUM_REF)
 
 # %% Approximation basis
 DEGREE = 20
-# Orthonormal bases in each dimension, with respect to the reference measure
+# Orthonormal bases in each dimension, with respect to the reference
+# measure
 BASES = [
-    tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(DEGREE + 1))
+    tensap.PolynomialFunctionalBasis(
+        x.orthonormal_polynomials(), range(DEGREE + 1)
+    )
     for x in REF.random_variables
 ]
 BASES = tensap.FunctionalBases(BASES)
@@ -105,7 +112,8 @@ SOLVER.rank_adaptation_options["early_stopping"] = True
 SOLVER.rank_adaptation_options["early_stopping_factor"] = 0.1
 
 SOLVER.tree_adaptation = True
-# For the tree adaptation in density estimation, a tolerance must be provided
+# For the tree adaptation in density estimation, a tolerance must be
+# provided
 SOLVER.tree_adaptation_options["tolerance"] = 1e-6
 
 SOLVER.alternating_minimization_parameters["stagnation"] = 1e-6
@@ -125,7 +133,9 @@ print(T1 - T0)
 
 L2_ERR = np.linalg.norm(U(XI) - F(XI)) / np.linalg.norm(U(XI))
 print("Risk leave-one-out estimation =       %2.5e" % OUTPUT["error"])
-print("Risk estimation using a test sample = %2.5e" % OUTPUT["test_error"])
+print(
+    "Risk estimation using a test sample = %2.5e" % OUTPUT["test_error"]
+)
 print("L2 relative error estimation =         %2.5e" % L2_ERR)
 
 F.tensor.plot(title="Active nodes")

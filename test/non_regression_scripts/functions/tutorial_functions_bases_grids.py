@@ -37,15 +37,27 @@ print("fun(x) =      \n%s\n" % fun(x))
 # %% Vector-valued UserDefinedFunction
 f = tensap.UserDefinedFunction("[x0, 100*x1]", d, 2)
 f.evaluation_at_multiple_points = False
-print("With f.evaluation_at_multiple_points == False, f(x) = \n%s\n" % f(x))
+print(
+    "With f.evaluation_at_multiple_points == False, f(x) = \n%s\n"
+    % f(x)
+)
 f.evaluation_at_multiple_points = True
-print("With f.evaluation_at_multiple_points == True, f(x) =  \n%s\n" % f(x))
+print(
+    "With f.evaluation_at_multiple_points == True, f(x) =  \n%s\n"
+    % f(x)
+)
 
 f = tensap.UserDefinedFunction("[x1,100*x2]", d, [1, 2])
 f.evaluation_at_multiple_points = False
-print("With f.evaluation_at_multiple_points == False, f(x) = \n%s\n" % f(x))
+print(
+    "With f.evaluation_at_multiple_points == False, f(x) = \n%s\n"
+    % f(x)
+)
 f.evaluation_at_multiple_points = True
-print("With f.evaluation_at_multiple_points == True, f(x) =  \n%s\n" % f(x))
+print(
+    "With f.evaluation_at_multiple_points == True, f(x) =  \n%s\n"
+    % f(x)
+)
 
 # %% Evaluation on a FullTensorGrid
 g = tensap.FullTensorGrid(np.linspace(-1, 1, 50), d)
@@ -59,7 +71,9 @@ fx = fun.eval_on_tensor_grid(g)
 g.plot_grid(marker="x")
 
 # %% Functional Bases
-h = tensap.PolynomialFunctionalBasis(tensap.CanonicalPolynomials(), range(5))
+h = tensap.PolynomialFunctionalBasis(
+    tensap.CanonicalPolynomials(), range(5)
+)
 H = tensap.FunctionalBases.duplicate(h, d)
 grid = tensap.FullTensorGrid(np.linspace(-1, 1, 10), d)
 x = grid.array()
@@ -69,7 +83,9 @@ Hx = H.eval(x)
 d = 2
 p = 1
 m = 4
-h = tensap.PolynomialFunctionalBasis(tensap.CanonicalPolynomials(), range(5))
+h = tensap.PolynomialFunctionalBasis(
+    tensap.CanonicalPolynomials(), range(5)
+)
 H = tensap.FunctionalBases.duplicate(h, d)
 I0 = tensap.MultiIndices.with_bounded_norm(d, p, m)
 Psi = tensap.SparseTensorProductFunctionalBasis(H, I0)
@@ -94,7 +110,9 @@ X = tensap.RandomVector(v, d)
 I0 = v.gauss_integration_rule(5).tensorize(d)
 u = fun.eval_on_tensor_grid(I0.points)
 
-h = tensap.PolynomialFunctionalBasis(tensap.HermitePolynomials(), range(p + 1))
+h = tensap.PolynomialFunctionalBasis(
+    tensap.HermitePolynomials(), range(p + 1)
+)
 H = tensap.FunctionalBases.duplicate(h, d)
 H = tensap.FullTensorProductFunctionalBasis(H)
 
@@ -102,5 +120,7 @@ f, _ = H.tensor_product_projection(fun, I0)
 
 N_test = 100
 x_test = X.random(N_test)
-err_test = np.linalg.norm(f(x_test) - fun(x_test)) / np.linalg.norm(fun(x_test))
+err_test = np.linalg.norm(f(x_test) - fun(x_test)) / np.linalg.norm(
+    fun(x_test)
+)
 print("Test error = %2.5e\n" % err_test)

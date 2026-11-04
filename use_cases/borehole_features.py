@@ -35,9 +35,15 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
 
 import tensap
-from tensap.poincare_learning.benchmarks.poincare_benchmarks import _get_shift_scaling
-from tensap.poincare_learning.poincare_loss_vector_space import PoincareLossVectorSpace
-from tensap.poincare_learning.utils._loss_vector_space import _build_ortho_poly_basis
+from tensap.poincare_learning.benchmarks.poincare_benchmarks import (
+    _get_shift_scaling,
+)
+from tensap.poincare_learning.poincare_loss_vector_space import (
+    PoincareLossVectorSpace,
+)
+from tensap.poincare_learning.utils._loss_vector_space import (
+    _build_ortho_poly_basis,
+)
 
 warnings.filterwarnings("ignore")
 np.random.seed(0)
@@ -67,11 +73,20 @@ _, X_phys = tensap.multivariate_functions_benchmark("borehole")
 shift, scaling = _get_shift_scaling(X_phys)
 X = X_phys.get_standard_random_vector()
 d = X.size
-NAMES = ["$r_w$", "$r$", "$T_u$", "$H_u$", "$T_l$", "$H_l$", "$L$", "$K_w$"]
+NAMES = [
+    "$r_w$",
+    "$r$",
+    "$T_u$",
+    "$H_u$",
+    "$T_l$",
+    "$H_l$",
+    "$L$",
+    "$K_w$",
+]
 
 
 def model(xi):
-    """Flow Q and its gradient with respect to the standardized variables."""
+    """Flow Q and its gradient in the standardized variables."""
     x = shift + scaling * xi
     r_w, z, T_u, H_u, T_l, H_l, L, K_w = x.T
     log_r = 7.71 + 1.0056 * z - np.log(r_w)  # ln(r / r_w)
@@ -80,7 +95,9 @@ def model(xi):
     Q = 2 * np.pi * T_u * (H_u - H_l) / (log_r * D)
     # Gradient of ln Q with respect to the physical parameters.
     dlog = np.empty_like(x)
-    dlog[:, 0] = 1 / (r_w * log_r) - A * (1 / (r_w * log_r) - 2 / r_w) / D
+    dlog[:, 0] = (
+        1 / (r_w * log_r) - A * (1 / (r_w * log_r) - 2 / r_w) / D
+    )
     dlog[:, 1] = -1.0056 / log_r + 1.0056 * A / (log_r * D)
     dlog[:, 2] = 1 / T_u - (A / T_u + 1 / T_l) / D
     dlog[:, 3] = 1 / (H_u - H_l)
@@ -99,12 +116,21 @@ xi = X.random(5)
 Q, dQ = model(xi)
 h = 1e-6
 dQ_fd = np.stack(
-    [(model(xi + h * e)[0] - model(xi - h * e)[0]) / (2 * h) for e in np.eye(d)],
+    [
+        (model(xi + h * e)[0] - model(xi - h * e)[0]) / (2 * h)
+        for e in np.eye(d)
+    ],
     axis=1,
 )
 borehole, _ = tensap.multivariate_functions_benchmark("borehole")
-print(f"Gradient, relative difference: {np.abs(dQ - dQ_fd).max() / np.abs(dQ).max():.1e}")
-print(f"Flow, difference: {np.abs(borehole(shift + scaling * xi) - Q).max():.1e}")
+print(
+    "Gradient, relative difference: "
+    f"{np.abs(dQ - dQ_fd).max() / np.abs(dQ).max():.1e}"
+)
+print(
+    "Flow, difference: "
+    f"{np.abs(borehole(shift + scaling * xi) - Q).max():.1e}"
+)
 
 # %%
 # The engineer runs the model at :math:`n = 200` random points, the budget of
@@ -166,12 +192,17 @@ y_test, dy_test = model(x_test)
 
 
 def feature_space(p, x, dy):
-    """Polynomial basis of degree p and the losses on the training and test points."""
+    """Polynomial basis of degree p, losses on training and test."""
     basis = _build_ortho_poly_basis(X, p=1, m=p)
     R = basis.gram_matrix_h1_0()
-    loss = PoincareLossVectorSpace(dy[:, None, :], basis.eval_jacobian(x), basis, R)
+    loss = PoincareLossVectorSpace(
+        dy[:, None, :], basis.eval_jacobian(x), basis, R
+    )
     loss_test = PoincareLossVectorSpace(
-        dy_test[:2000, None, :], basis.eval_jacobian(x_test[:2000]), basis, R
+        dy_test[:2000, None, :],
+        basis.eval_jacobian(x_test[:2000]),
+        basis,
+        R,
     )
     return basis, loss, loss_test
 
@@ -179,7 +210,12 @@ def feature_space(p, x, dy):
 def fit_profile(z, y):
     """Polynomial profile f, of degree selected by cross-validation."""
     cv = GridSearchCV(
-        Pipeline([("poly", PolynomialFeatures()), ("lin", LinearRegression())]),
+        Pipeline(
+            [
+                ("poly", PolynomialFeatures()),
+                ("lin", LinearRegression()),
+            ]
+        ),
         {"poly__degree": [1, 2, 3, 4, 5, 6]},
         scoring="neg_mean_squared_error",
         cv=10,
@@ -191,9 +227,11 @@ GRAD2 = np.mean(np.sum(dy_test[:2000] ** 2, axis=1))
 
 
 def evaluate(basis, loss_test, G):
-    """Relative loss on the test points, profile, and relative error of f o g."""
+    """Relative test loss, profile, and relative error of f o g."""
     # The sign of a feature is arbitrary: choose g increasing with Q.
-    G *= np.sign(np.corrcoef((basis.eval(x_train) @ G)[:, 0], y_train)[0, 1])
+    G *= np.sign(
+        np.corrcoef((basis.eval(x_train) @ G)[:, 0], y_train)[0, 1]
+    )
     f = fit_profile(basis.eval(x_train) @ G, y_train)
     y_pred = f.predict(basis.eval(x_test) @ G)
     err = np.linalg.norm(y_pred - y_test) / np.linalg.norm(y_test)
@@ -257,21 +295,35 @@ for m in [1, 2, 3]:
 # and they show that a small surrogate controls the loss. We compare the
 # two, with one feature, for degrees 2, 3 and 4.
 
-print(f"{'features':>22}{'K':>5}{'rel. loss':>11}{'error':>10}{'time (s)':>10}")
+print(
+    f"{'features':>22}{'K':>5}{'rel. loss':>11}{'error':>10}"
+    f"{'time (s)':>10}"
+)
 for p in [2, 3, 4]:
     basis, loss, loss_test = feature_space(p, x_train, dy_train)
     for method in ["quasi-Newton", "surrogate"]:
+        # The cost of quasi-Newton grows quickly with K: the surrogate
+        # is enough at degree 4.
         if method == "quasi-Newton" and p == 4:
-            continue  # its cost grows quickly with K; the surrogate is enough
+            continue
         t = time()
         if method == "quasi-Newton":
-            G, _ = loss.minimize_qn(m=1, init_method="active_subspace", maxiter=100, tol=1e-10)
+            G, _ = loss.minimize_qn(
+                m=1,
+                init_method="active_subspace",
+                maxiter=100,
+                tol=1e-10,
+            )
         else:
             G, _, _ = loss.minimize_surrogate(m=1)
         t = time() - t
         J, f, err = evaluate(basis, loss_test, G)
         results[(method, p)] = (J, err)
-        print(f"{f'degree {p}, {method}':>22}{basis.cardinal():5d}{J:11.1e}{err:10.1e}{t:10.2f}")
+        print(
+            f"{f'degree {p}, {method}':>22}{basis.cardinal():5d}"
+            f"{J:11.1e}"
+            f"{err:10.1e}{t:10.2f}"
+        )
 basis_4, G_4, f_4 = basis, G, f
 
 # %%
@@ -293,8 +345,12 @@ for ax, b, G, f, title in [
 ]:
     z = (b.eval(x_test[:2000]) @ G).ravel()
     zz = np.linspace(z.min(), z.max(), 200)
-    ax.plot(z, y_test[:2000], ".", ms=2, color="#9ab", label="test points")
-    ax.plot(zz, f.predict(zz[:, None]), color="#e8862a", label="profile $f$")
+    ax.plot(
+        z, y_test[:2000], ".", ms=2, color="#9ab", label="test points"
+    )
+    ax.plot(
+        zz, f.predict(zz[:, None]), color="#e8862a", label="profile $f$"
+    )
     ax.set_xlabel("$g(X)$")
     ax.set_title(title)
 axes[0].set_ylabel("flow $Q$ (m$^3$/year)")
@@ -306,12 +362,18 @@ fig.tight_layout()
 # features, and the degree of one polynomial feature.
 
 fig, axes = plt.subplots(1, 2, figsize=(8, 3.2), sharey=True)
-axes[0].semilogy([1, 2, 3], [results[("linear", m)][1] for m in [1, 2, 3]], "o-",
-                 color="#127a8a")
+axes[0].semilogy(
+    [1, 2, 3],
+    [results[("linear", m)][1] for m in [1, 2, 3]],
+    "o-",
+    color="#127a8a",
+)
 axes[0].set_xticks([1, 2, 3])
 axes[0].set_xlabel("number $m$ of linear features")
 axes[0].set_ylabel("relative error of $f \\circ g$")
-errors = [results[("linear", 1)][1]] + [results[("surrogate", p)][1] for p in [2, 3, 4]]
+errors = [results[("linear", 1)][1]] + [
+    results[("surrogate", p)][1] for p in [2, 3, 4]
+]
 axes[1].semilogy([1, 2, 3, 4], errors, "o-", color="#e8862a")
 axes[1].set_xticks([1, 2, 3, 4])
 axes[1].set_xlabel("degree $p$ of one feature")
@@ -327,7 +389,9 @@ fig.tight_layout()
 # :math:`\mathbb{E}((\partial_{\xi_\nu} g)^2)`, normalized to sum to 1, are
 # compared with those of :math:`Q`.
 
-jac_g = np.einsum("k,nkj->nj", G_4[:, 0], basis_4.eval_jacobian(x_test[:2000]))
+jac_g = np.einsum(
+    "k,nkj->nj", G_4[:, 0], basis_4.eval_jacobian(x_test[:2000])
+)
 share_g = np.mean(jac_g**2, axis=0)
 share_Q = np.mean(dy_test[:2000] ** 2, axis=0)
 share_g, share_Q = share_g / share_g.sum(), share_Q / share_Q.sum()
@@ -365,7 +429,9 @@ x_phys = shift + scaling * x_test[:2000]
 r_w, _, _, H_u, _, H_l, L, K_w = x_phys.T
 Q_D = np.pi * r_w**2 * K_w * (H_u - H_l) / L
 z = (basis_4.eval(x_test[:2000]) @ G_4).ravel()
-rank = np.corrcoef(np.argsort(np.argsort(z)), np.argsort(np.argsort(Q_D)))[0, 1]
+rank = np.corrcoef(
+    np.argsort(np.argsort(z)), np.argsort(np.argsort(Q_D))
+)[0, 1]
 print(f"Rank correlation between g(X) and Q_D: {rank:.5f}")
 
 fig, ax = plt.subplots(figsize=(4.5, 3.5))
@@ -383,9 +449,14 @@ fig.tight_layout()
 
 y = y_test[:2000]
 f_D = fit_profile(Q_D[:, None], y)
-err_D = np.linalg.norm(f_D.predict(Q_D[:, None]) - y) / np.linalg.norm(y)
+err_D = np.linalg.norm(f_D.predict(Q_D[:, None]) - y) / np.linalg.norm(
+    y
+)
 print(f"Best profile of Q_D, fitted on the test points: {err_D:.1e}")
-print(f"f o g, fitted on the 200 training points:       {results[('surrogate', 4)][1]:.1e}")
+print(
+    "f o g, fitted on the 200 training points:       "
+    f"{results[('surrogate', 4)][1]:.1e}"
+)
 
 # %%
 # Back to the first episode

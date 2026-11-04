@@ -54,6 +54,21 @@ a sphinx-gallery script, in a fenced block ```` ```python ```` of a MyST
 page, or with `.. code-block::` or `.. literalinclude::` in reStructuredText.
 Do not paste raw HTML, images of code, or styles specific to one page.
 
+Lines of code are at most 72 characters long (the limit PEP 8 sets for
+comments and docstrings), so that a code block fits in the page without
+scrolling on a laptop screen, from a window 1280 pixels wide. The scripts of
+`examples/`, `use_cases/` and `test/non_regression_scripts/` are formatted
+with
+
+```bash
+ruff format --line-length 72 \
+    examples use_cases test/non_regression_scripts
+```
+
+and the CI checks it. The formatter does not split long strings: cut a long
+message in two adjacent strings, `"first part " f"{value}"`, by hand. The
+same width applies to the code of a theory page.
+
 ## Writing a theory page
 
 The pages of Theory & Methods are MyST Markdown files in `doc/theory/`.

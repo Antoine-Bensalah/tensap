@@ -33,7 +33,9 @@ FUN = tensap.UserDefinedFunction("(1+x0)**2+(2+x0)/(2+x1)", D)
 FUN.evaluation_at_multiple_points = True
 V = tensap.UniformRandomVariable(-1.5, 2)
 X = tensap.RandomVector(V, D)
-BASIS = tensap.PolynomialFunctionalBasis(V.orthonormal_polynomials(), range(P + 1))
+BASIS = tensap.PolynomialFunctionalBasis(
+    V.orthonormal_polynomials(), range(P + 1)
+)
 BASES = tensap.FunctionalBases.duplicate(BASIS, D)
 
 # %% Sparse tensor product functional basis
@@ -81,8 +83,8 @@ ERR = np.linalg.norm(F(X_TEST) - Y_TEST) / np.linalg.norm(Y_TEST)
 print("Least-squares with l1 regularization")
 print("Test error = %2.5e" % ERR)
 
-#  Least-squares with l1 regularization and selection of optimal pattern from
-# l1 solution path
+# Least-squares with l1 regularization and selection of optimal pattern
+# from l1 solution path
 SOLVER.regularization = True
 SOLVER.regularization_type = "l1"
 SOLVER.regularization_options = {"alpha": 0.0}
@@ -91,7 +93,10 @@ SOLVER.basis_adaptation = False
 
 F, OUTPUT = SOLVER.solve()
 ERR = np.linalg.norm(F(X_TEST) - Y_TEST) / np.linalg.norm(Y_TEST)
-print("Least-squares with l1 regularization and selection of optimal pattern")
+print(
+    "Least-squares with l1 regularization and selection of optimal "
+    "pattern"
+)
 print("Test error = %2.5e" % ERR)
 
 # Standard least-squares with basis adaptation :
@@ -119,5 +124,9 @@ for i in range(P + 1):
 SOLVER.basis_adaptation_path = B
 F, OUTPUT = SOLVER.solve()
 ERR = np.linalg.norm(F(X_TEST) - Y_TEST) / np.linalg.norm(Y_TEST)
-print("Standard least-squares with basis adaptation (specific sequence of spaces)")
+print(
+    "Standard least-squares with basis adaptation (specific sequence "
+    "of "
+    "spaces)"
+)
 print("Test error = %2.5e" % ERR)

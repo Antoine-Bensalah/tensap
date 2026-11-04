@@ -84,19 +84,19 @@ measure.
 In tensap, the orthonormal polynomials $p_i$, $i \geq 0$, are defined using the three-term recurrence relation
 
 $$\begin{aligned}
-\begin{aligned}
-                &\tilde p_{-1}(x) = 0, \quad \tilde p_0(x) = 1, \\
-                &\tilde p_{i+1}(x) = (x - a_i)\tilde p_{i}(x) - b_i \tilde p_{i-1}(x), \quad i \geq 0,\\
-                &p_i(x) = \frac{\tilde p_i(x)}{n_i}, \quad i \geq 0
-            \end{aligned}
+&\tilde p_{-1}(x) = 0, \quad \tilde p_0(x) = 1, \\
+&\tilde p_{i+1}(x) = (x - a_i)\tilde p_{i}(x) - b_i \tilde p_{i-1}(x), \quad i \geq 0,\\
+&p_i(x) = \frac{\tilde p_i(x)}{n_i}, \quad i \geq 0
 \end{aligned}$$
 
 with $a_i$ and $b_i$ the recurrence coefficients, and
 $n_i$ the norm of $\tilde p_i$, defined by
 
-$$a_i = \frac{\int \tilde p_i(x) x \tilde p_i(x) d\mu(x)}{\int p_i(x) \tilde p_i(x) d\mu(x)}, \quad 
-                b_i = \frac{\tilde p_i(x) \tilde p_i(x) d\mu(x)}{\int \tilde p_{i-1}(x) \tilde p_{i-1}(x)  d\mu(x)}, \quad
-                n_i = \sqrt{\int\tilde p_i(x) \tilde p_i(x) d\mu(x)}.$$
+$$\begin{aligned}
+a_i &= \frac{\int x \, \tilde p_i(x)^2 \, d\mu(x)}{\int \tilde p_i(x)^2 \, d\mu(x)}, \\
+b_i &= \frac{\int \tilde p_i(x)^2 \, d\mu(x)}{\int \tilde p_{i-1}(x)^2 \, d\mu(x)}, \\
+n_i &= \sqrt{\int \tilde p_i(x)^2 \, d\mu(x)}.
+\end{aligned}$$
 
 Implementing a new family of orthonormal polynomials in tensap is
 easy: one only needs to create a class with a method providing the

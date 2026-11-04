@@ -35,7 +35,9 @@ X = tensap.UniformRandomVariable(-1, 1)
 
 # Interpolation basis and points
 P = 30
-H = tensap.PolynomialFunctionalBasis(X.orthonormal_polynomials(), range(P + 1))
+H = tensap.PolynomialFunctionalBasis(
+    X.orthonormal_polynomials(), range(P + 1)
+)
 X_CP = tensap.chebyshev_points(H.cardinal(), [-1, 1])
 
 # Interpolation of the function
@@ -68,7 +70,9 @@ X = tensap.UniformRandomVariable(-1, 1)
 
 # Interpolation basis and points
 P = 30
-H = tensap.PolynomialFunctionalBasis(X.orthonormal_polynomials(), range(P + 1))
+H = tensap.PolynomialFunctionalBasis(
+    X.orthonormal_polynomials(), range(P + 1)
+)
 X_MP = H.magic_points(X.random(10000))[0]
 
 # Interpolation of the function
@@ -104,7 +108,9 @@ I0 = X.gauss_integration_rule(5)
 
 # Approximation basis
 P = 3
-H = tensap.PolynomialFunctionalBasis(X.orthonormal_polynomials(), range(P + 1))
+H = tensap.PolynomialFunctionalBasis(
+    X.orthonormal_polynomials(), range(P + 1)
+)
 
 # Computation of the projection
 F = H.projection(FUN, I0)
@@ -222,7 +228,9 @@ I0 = X.gauss_integration_rule(5)
 
 # Approximation basis
 P = 3
-H = tensap.PolynomialFunctionalBasis(tensap.HermitePolynomials(), range(P + 1))
+H = tensap.PolynomialFunctionalBasis(
+    tensap.HermitePolynomials(), range(P + 1)
+)
 
 # Computation of the approximation
 F = H.projection(FUN, I0)
@@ -259,7 +267,9 @@ X = tensap.UniformRandomVariable(0, 1)
 
 # Approximation basis: Hermite polynomials of maximal degree P
 P = 10
-H = tensap.PolynomialFunctionalBasis(X.orthonormal_polynomials(), range(P + 1))
+H = tensap.PolynomialFunctionalBasis(
+    X.orthonormal_polynomials(), range(P + 1)
+)
 
 # Solver
 SOLVER = tensap.LinearModelLearningSquareLoss()

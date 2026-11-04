@@ -42,14 +42,17 @@ CHOICE = 1
 if CHOICE == 1:
 
     def FUN(x):
-        return np.sin(10 * np.pi * (2 * x + 0.5)) / (4 * x + 1) + (2 * x - 0.5) ** 4
+        return (
+            np.sin(10 * np.pi * (2 * x + 0.5)) / (4 * x + 1)
+            + (2 * x - 0.5) ** 4
+        )
 
 elif CHOICE == 2:
 
     def FUN(x):
-        return (np.sin(4 * np.pi * x) + 0.2 * np.cos(16 * np.pi * x)) ** (x < 0.5) + (
-            2 * x - 1
-        ) * (x >= 0.5)
+        return (
+            np.sin(4 * np.pi * x) + 0.2 * np.cos(16 * np.pi * x)
+        ) ** (x < 0.5) + (2 * x - 1) * (x >= 0.5)
 
 else:
     raise ValueError("Bad function choice.")
@@ -60,14 +63,18 @@ TENSORIZED_FUN.fun.evaluation_at_multiple_points = True
 
 # %% Approximation basis
 DEGREE = 5
-H = tensap.PolynomialFunctionalBasis(Y.orthonormal_polynomials(), range(DEGREE + 1))
+H = tensap.PolynomialFunctionalBasis(
+    Y.orthonormal_polynomials(), range(DEGREE + 1)
+)
 BASES = T.tensorized_function_functional_bases(H)
 
 # %% Training and test samples
 NUM_TRAIN = 200
 X_TRAIN = X.random(NUM_TRAIN)
 Y_TRAIN = FUN(X_TRAIN)
-X_TRAIN = T.map(X_TRAIN)  # Identification of X_TRAIN with (i_1,...,i_d,y)
+X_TRAIN = T.map(
+    X_TRAIN
+)  # Identification of X_TRAIN with (i_1,...,i_d,y)
 
 NUM_TEST = 1000
 X_TEST = X.random(NUM_TEST)
@@ -120,8 +127,9 @@ SOLVER.bases = BASES
 SOLVER.bases_eval = BASES.eval(X_TRAIN)
 SOLVER.training_data = [None, Y_TRAIN]
 
-# Let the solver go to the maximum number of iterations, to perform model
-# selection a posteriori using the test error and a slope heuristic
+# Let the solver go to the maximum number of iterations, to perform
+# model selection a posteriori using the test error and a slope
+# heuristic
 SOLVER.tolerance["on_stagnation"] = 0
 SOLVER.tolerance["on_error"] = 0
 SOLVER.rank_adaptation_options["early_stopping"] = False
@@ -178,7 +186,8 @@ plt.show()
 
 # %% Model selection using a slope heuristic instead of the test error
 SEL = tensap.ModelSelection()
-# Complexity of each model: standard complexity based on the method storage
+# Complexity of each model: standard complexity based on the method
+# storage
 SEL.data["complexity"] = SEL.complexity(
     OUTPUT["iterates"], fun="storage", c_type="standard"
 )
@@ -195,10 +204,18 @@ SEL.gap_factor = 2
 LAMBDA_HAT, M_HAT, LAMBDA_PATH, M_PATH = SEL.slope_heuristic()
 
 print(
-    "Model selected using a test sample:         %i, test error = %2.5e."
-    % (np.ravel(OUTPUT["selected_model_number"])[0], OUTPUT["test_error"])
+    "Model selected using a test sample:         %i, test error = "
+    "%2.5e."
+    % (
+        np.ravel(OUTPUT["selected_model_number"])[0],
+        OUTPUT["test_error"],
+    )
 )
 print(
-    "Model selected using the slope heuristic:   %i, test error = %2.5e."
-    % (np.ravel(M_HAT)[0], OUTPUT["test_error_iterations"][np.ravel(M_HAT)[0]])
+    "Model selected using the slope heuristic:   %i, test error = "
+    "%2.5e."
+    % (
+        np.ravel(M_HAT)[0],
+        OUTPUT["test_error_iterations"][np.ravel(M_HAT)[0]],
+    )
 )

@@ -44,18 +44,24 @@ TREE.plot(title="Nodes indices")
 TREE.plot_dims(title="Nodes dimensions at the leaves")
 
 TREE.plot(
-    colored_nodes=TREE.ascendants(4), node_color="b", title="Ascendants of node 4"
+    colored_nodes=TREE.ascendants(4),
+    node_color="b",
+    title="Ascendants of node 4",
 )
 
 TREE.plot(
-    colored_nodes=TREE.descendants(4), node_color="b", title="Descendants of node 4"
+    colored_nodes=TREE.descendants(4),
+    node_color="b",
+    title="Descendants of node 4",
 )
 
 # %%
 # Extraction of a subtree
 # ^^^^^^^^^^^^^^^^^^^^^^^
 [SUB_TREE, NOD] = TREE.sub_dimension_tree(4)
-TREE.plot(colored_nodes=NOD, node_color="b", title="Sub-tree to extract")
+TREE.plot(
+    colored_nodes=NOD, node_color="b", title="Sub-tree to extract"
+)
 SUB_TREE.plot(title="Sub-tree")
 
 # %%
@@ -78,10 +84,16 @@ TREE.plot(title="Nodes indices before changing the root")
 TREE.plot_dims(title="Nodes dimensions before changing the root")
 NEWTREE, modified_nodes = TREE.change_root(5)
 NEWTREE.plot(title="Nodes indices after changing the root to node 5")
-NEWTREE.plot_dims(title="Nodes dimensions after changing the root to node 5")
+NEWTREE.plot_dims(
+    title="Nodes dimensions after changing the root to node 5"
+)
 NEWTREE, modified_nodes = TREE.change_root(11)
-NEWTREE.plot(title="Nodes indices after changing the root to leaf node 11")
-NEWTREE.plot_dims(title="Nodes dimensions after changing the root to leaf node 11")
+NEWTREE.plot(
+    title="Nodes indices after changing the root to leaf node 11"
+)
+NEWTREE.plot_dims(
+    title="Nodes dimensions after changing the root to leaf node 11"
+)
 
 
 # %%

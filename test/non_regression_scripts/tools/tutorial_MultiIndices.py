@@ -18,6 +18,7 @@
 Tutorial on MultiIndices.
 
 """
+
 import tensap
 import numpy as np
 
@@ -97,4 +98,7 @@ I1 = tensap.MultiIndices.bounded_by([3, 5, 7, 4, 3])
 I2 = tensap.MultiIndices.bounded_by([7, 5, 3, 4, 2])
 I0 = I1.add_indices(I2)
 I_marg = I0.get_reduced_margin()
-print("I1.add_indices(I2).get_reduced_margin().array = \n%s\n" % I_marg.array)
+print(
+    "I1.add_indices(I2).get_reduced_margin().array = \n%s\n"
+    % I_marg.array
+)

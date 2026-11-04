@@ -48,7 +48,14 @@ np.random.seed(0)
 # :math:`(X_5, X_3)`, :math:`(X_2, X_4)` and :math:`(X_6, X_1)`. The
 # estimators do not know it.
 
-PERM = [5, 2, 1, 3, 0, 4]  # X_{j+1} is the variable PERM[j] of the pairs
+PERM = [
+    5,
+    2,
+    1,
+    3,
+    0,
+    4,
+]  # X_{j+1} is the variable PERM[j] of the pairs
 d = 6
 NAMES = [f"$X_{j + 1}$" for j in range(d)]
 
@@ -60,11 +67,16 @@ def normal_pdf(t, s=1.0):
 def sample(n):
     z = np.random.randn(n, 6)
     sign = np.where(np.random.rand(n) < 0.5, -1, 1)
-    y = np.column_stack([
-        z[:, 0], 0.5 * (z[:, 0] ** 2 - 1) + 0.5 * z[:, 1],
-        1.5 * sign + 0.5 * z[:, 2], 1.5 * sign + 0.5 * z[:, 3],
-        z[:, 4], 0.8 * z[:, 4] + 0.6 * z[:, 5],
-    ])
+    y = np.column_stack(
+        [
+            z[:, 0],
+            0.5 * (z[:, 0] ** 2 - 1) + 0.5 * z[:, 1],
+            1.5 * sign + 0.5 * z[:, 2],
+            1.5 * sign + 0.5 * z[:, 3],
+            z[:, 4],
+            0.8 * z[:, 4] + 0.6 * z[:, 5],
+        ]
+    )
     return y[:, PERM]
 
 
@@ -73,8 +85,10 @@ def banana(a, b):
 
 
 def modes(a, b):
-    return 0.5 * (normal_pdf(a + 1.5, 0.5) * normal_pdf(b + 1.5, 0.5)
-                  + normal_pdf(a - 1.5, 0.5) * normal_pdf(b - 1.5, 0.5))
+    return 0.5 * (
+        normal_pdf(a + 1.5, 0.5) * normal_pdf(b + 1.5, 0.5)
+        + normal_pdf(a - 1.5, 0.5) * normal_pdf(b - 1.5, 0.5)
+    )
 
 
 def correlated(a, b):
@@ -84,7 +98,11 @@ def correlated(a, b):
 def pdf(x):
     y = np.empty_like(x)
     y[:, PERM] = x
-    return banana(y[:, 0], y[:, 1]) * modes(y[:, 2], y[:, 3]) * correlated(y[:, 4], y[:, 5])
+    return (
+        banana(y[:, 0], y[:, 1])
+        * modes(y[:, 2], y[:, 3])
+        * correlated(y[:, 4], y[:, 5])
+    )
 
 
 # %%
@@ -95,7 +113,9 @@ def pdf(x):
 
 BOX = 4.0
 VOLUME = (2 * BOX) ** d
-REF = tensap.RandomVector([tensap.UniformRandomVariable(-BOX, BOX) for _ in range(d)])
+REF = tensap.RandomVector(
+    [tensap.UniformRandomVariable(-BOX, BOX) for _ in range(d)]
+)
 x_err = REF.random(20000)
 p_err = pdf(x_err)
 
@@ -148,10 +168,14 @@ def data(n):
 # For the tensor formats, the ranks are selected with the risk on a test
 # sample of size :math:`n / 5`.
 
-bases = tensap.FunctionalBases([
-    tensap.PolynomialFunctionalBasis(v.orthonormal_polynomials(), range(21))
-    for v in REF.random_variables
-])
+bases = tensap.FunctionalBases(
+    [
+        tensap.PolynomialFunctionalBasis(
+            v.orthonormal_polynomials(), range(21)
+        )
+        for v in REF.random_variables
+    ]
+)
 
 
 def gaussian(x):
@@ -165,17 +189,26 @@ def kde(x):
 
 
 def independent(x):
-    coefs = [np.mean(b.eval(x[:, nu]), axis=0) for nu, b in enumerate(bases.bases)]
+    coefs = [
+        np.mean(b.eval(x[:, nu]), axis=0)
+        for nu, b in enumerate(bases.bases)
+    ]
 
     def p(y):
-        values = [b.eval(y[:, nu]) @ c for nu, (b, c) in enumerate(zip(bases.bases, coefs))]
+        values = [
+            b.eval(y[:, nu]) @ c
+            for nu, (b, c) in enumerate(zip(bases.bases, coefs))
+        ]
         return np.prod(values, axis=0) / VOLUME
+
     return p, coefs
 
 
 def tree_based(x, adapt_tree):
     x_test = data(len(x) // 5)
-    s = tensap.TreeBasedTensorLearning.tensor_train_tucker(d, tensap.DensityL2LossFunction())
+    s = tensap.TreeBasedTensorLearning.tensor_train_tucker(
+        d, tensap.DensityL2LossFunction()
+    )
     s.bases = bases
     s.bases_eval = bases.eval(x)
     s.training_data = x
@@ -233,13 +266,22 @@ for n in SIZES:
         errors[name].append(error(p(x_err)))
         models[name] = (p, model)
 
-print(f"{'':>22}" + "".join(f"{f'n = {n}':>12}" for n in SIZES) + f"{'time (s)':>12}")
+print(
+    f"{'':>22}"
+    + "".join(f"{f'n = {n}':>12}" for n in SIZES)
+    + f"{'time (s)':>12}"
+)
 for name in METHODS:
-    print(f"{name:>22}" + "".join(f"{e:12.3f}" for e in errors[name])
-          + f"{times[name][-1]:12.1f}")
+    print(
+        f"{name:>22}"
+        + "".join(f"{e:12.3f}" for e in errors[name])
+        + f"{times[name][-1]:12.1f}"
+    )
 
 fig, ax = plt.subplots(figsize=(6, 4))
-for name, color in zip(METHODS, ["#9ab", "#8a6", "#bbb", "#f3a35c", "#127a8a"]):
+for name, color in zip(
+    METHODS, ["#9ab", "#8a6", "#bbb", "#f3a35c", "#127a8a"]
+):
     ax.loglog(SIZES, errors[name], "o-", color=color, label=name)
 ax.set_xlabel("number of samples $n$")
 ax.set_ylabel("relative $L^2$ error")
@@ -264,8 +306,10 @@ fig.tight_layout()
 
 p_tree, f_tree = models["adaptive tree"]
 values = p_tree(x_err)
-print(f"Adaptive tree: integral {f_tree.mean():.4f} (exact),"
-      f" min p = {values.min():.1e}, max p = {values.max():.1e}")
+print(
+    f"Adaptive tree: integral {f_tree.mean():.4f} (exact),"
+    f" min p = {values.min():.1e}, max p = {values.max():.1e}"
+)
 
 # %%
 # Marginals, exactly
@@ -280,7 +324,8 @@ print(f"Adaptive tree: integral {f_tree.mean():.4f} (exact),"
 # of :math:`(X_\nu, X_\mu)` with the same bandwidth. The figure shows the
 # marginal densities of the three pairs.
 
-# The pairs (X_5, X_3), (X_2, X_4), (X_6, X_1), and their exact densities.
+# The pairs (X_5, X_3), (X_2, X_4), (X_6, X_1), and their exact
+# densities.
 PAIRS = [(4, 2, banana), (1, 3, modes), (5, 0, correlated)]
 grid = np.linspace(-BOX, BOX, 121)
 G1, G2 = np.meshgrid(grid, grid)
@@ -293,8 +338,12 @@ _, kde_model = models["KDE"]
 fig, axes = plt.subplots(3, 4, figsize=(9, 7), sharex=True, sharey=True)
 for row, (nu, mu, exact) in enumerate(PAIRS):
     pair = [nu, mu]
-    gauss_pair = multivariate_normal(gauss.mean[pair], gauss.cov[np.ix_(pair, pair)])
-    kde_pair = gaussian_kde(kde_model.dataset[pair], bw_method=kde_model.factor)
+    gauss_pair = multivariate_normal(
+        gauss.mean[pair], gauss.cov[np.ix_(pair, pair)]
+    )
+    kde_pair = gaussian_kde(
+        kde_model.dataset[pair], bw_method=kde_model.factor
+    )
     # The marginal is a function of the variables in increasing order.
     tree_pair = f_tree.conditional_expectation(pair)
     order = np.argsort(pair)
@@ -306,7 +355,13 @@ for row, (nu, mu, exact) in enumerate(PAIRS):
     ]
     for col, (title, z) in enumerate(estimates):
         ax = axes[row, col]
-        ax.contourf(G1, G2, np.maximum(z, 0).reshape(G1.shape), levels=12, cmap="Blues")
+        ax.contourf(
+            G1,
+            G2,
+            np.maximum(z, 0).reshape(G1.shape),
+            levels=12,
+            cmap="Blues",
+        )
         if row == 0:
             ax.set_title(title, fontsize="medium")
         if col == 0:
@@ -330,7 +385,8 @@ fig.tight_layout()
 
 tree = f_tree.tensor.tree
 labels = [
-    NAMES[tree.dims[node - 1][0]] if tree.is_leaf[node - 1]
+    NAMES[tree.dims[node - 1][0]]
+    if tree.is_leaf[node - 1]
     else str(f_tree.tensor.ranks[node - 1])
     for node in range(1, tree.nb_nodes + 1)
 ]

@@ -95,7 +95,16 @@ np.random.seed(0)
 
 model, X = tensap.multivariate_functions_benchmark("borehole")
 d = X.size
-NAMES = ["$r_w$", "$r$", "$T_u$", "$H_u$", "$T_l$", "$H_l$", "$L$", "$K_w$"]
+NAMES = [
+    "$r_w$",
+    "$r$",
+    "$T_u$",
+    "$H_u$",
+    "$T_l$",
+    "$H_l$",
+    "$L$",
+    "$K_w$",
+]
 
 # %%
 # Here a run of the model takes a microsecond: we can afford a large
@@ -153,7 +162,9 @@ x_test, y_test = x_ref[:10000], y_ref[:10000]
 
 BASES = tensap.FunctionalBases(
     [
-        tensap.PolynomialFunctionalBasis(x.orthonormal_polynomials(), range(9))
+        tensap.PolynomialFunctionalBasis(
+            x.orthonormal_polynomials(), range(9)
+        )
         for x in X.random_variables
     ]
 )
@@ -171,7 +182,9 @@ def sparse_polynomials(x, y):
         ]
     )
     solver = tensap.LinearModelLearningSquareLoss()
-    solver.basis = tensap.SparseTensorProductFunctionalBasis(bases, indices)
+    solver.basis = tensap.SparseTensorProductFunctionalBasis(
+        bases, indices
+    )
     solver.training_data = [x, y]
     solver.regularization = True
     solver.regularization_type = "l1"
@@ -182,7 +195,9 @@ def sparse_polynomials(x, y):
 
 
 def canonical(x, y):
-    solver = tensap.CanonicalTensorLearning(d, tensap.SquareLossFunction())
+    solver = tensap.CanonicalTensorLearning(
+        d, tensap.SquareLossFunction()
+    )
     solver.bases = BASES
     solver.training_data = [x, y]
     solver.initialization_type = "mean"
@@ -191,7 +206,9 @@ def canonical(x, y):
     solver.tolerance["on_error"] = 1e-6
     solver.alternating_minimization_parameters["max_iterations"] = 50
     solver.alternating_minimization_parameters["stagnation"] = 1e-8
-    solver.alternating_minimization_parameters["one_by_one_factor"] = False
+    solver.alternating_minimization_parameters["one_by_one_factor"] = (
+        False
+    )
     solver.alternating_minimization_parameters["inner_loops"] = 2
     solver.alternating_minimization_parameters["display"] = False
     solver.linear_model_learning.regularization = False
@@ -221,8 +238,9 @@ def tree_based(x, y, adapt_tree):
     solver.rank_adaptation = True
     solver.rank_adaptation_options["max_iterations"] = 15
     solver.rank_adaptation_options["theta"] = 0.8
-    # Stop the rank adaptation when the error increases ten times: with few
-    # runs, large ranks overfit, and the alternating minimization diverges.
+    # Stop the rank adaptation when the error increases ten times: with
+    # few runs, large ranks overfit, and the alternating minimization
+    # diverges.
     solver.rank_adaptation_options["early_stopping"] = True
     solver.rank_adaptation_options["early_stopping_factor"] = 10
     solver.tree_adaptation = adapt_tree
@@ -244,7 +262,9 @@ METHODS = {
     "Sparse polynomials": sparse_polynomials,
     "Canonical format": canonical,
     "Tensor train": lambda x, y: tree_based(x, y, adapt_tree=False),
-    "Adaptive tree-based format": lambda x, y: tree_based(x, y, adapt_tree=True),
+    "Adaptive tree-based format": lambda x, y: tree_based(
+        x, y, adapt_tree=True
+    ),
 }
 
 
@@ -262,7 +282,9 @@ def relative_error(f):
 # :math:`\| Q - f \|_{\text{test}} / \| Q \|_{\text{test}}`.
 
 BUDGETS = [100, 200, 400, 800]
-results = {name: {"error": [], "size": [], "time": []} for name in METHODS}
+results = {
+    name: {"error": [], "size": [], "time": []} for name in METHODS
+}
 surrogates = {}
 for n in BUDGETS:
     x_train = X.random(n)
@@ -285,16 +307,23 @@ for key, title, form in [
     print(title)
     print("     n" + "".join(f"{name:>10}" for name in SHORT))
     for k, n in enumerate(BUDGETS):
-        values = [form.format(results[name][key][k]) for name in METHODS]
+        values = [
+            form.format(results[name][key][k]) for name in METHODS
+        ]
         print(f"{n:>6}" + "".join(values))
     print()
 
 MARKERS = ["s", "^", "v", "o"]
 fig, axes = plt.subplots(1, 2, figsize=(10, 4))
 for marker, name in zip(MARKERS, METHODS):
-    axes[0].loglog(BUDGETS, results[name]["error"], marker=marker, label=name)
+    axes[0].loglog(
+        BUDGETS, results[name]["error"], marker=marker, label=name
+    )
     axes[1].loglog(
-        results[name]["size"], results[name]["error"], marker=marker, ls=""
+        results[name]["size"],
+        results[name]["error"],
+        marker=marker,
+        ls="",
     )
 axes[0].set_xlabel("number of runs $n$")
 axes[0].set_ylabel("relative test error")
@@ -356,26 +385,46 @@ rows = [
     ("mean", np.mean(y_ref), mean),
     ("standard deviation", np.std(y_ref), np.sqrt(variance)),
     ("1% quantile", np.quantile(y_ref, 0.01), np.quantile(f_ref, 0.01)),
-    ("99% quantile", np.quantile(y_ref, 0.99), np.quantile(f_ref, 0.99)),
+    (
+        "99% quantile",
+        np.quantile(y_ref, 0.99),
+        np.quantile(f_ref, 0.99),
+    ),
     (
         f"P(Q > {THRESHOLD:.0f})",
         np.mean(y_ref > THRESHOLD),
         np.mean(f_ref > THRESHOLD),
     ),
 ]
-print(f"{'':>20}  {'model (1e5 runs)':>17}  {f'surrogate ({N} runs)':>20}")
+print(
+    f"{'':>20}  {'model (1e5 runs)':>17}  {f'surrogate ({N} runs)':>20}"
+)
 for label, ref, sur in rows:
     print(f"{label:>20}  {ref:17.4g}  {sur:20.4g}")
 
 fig, ax = plt.subplots(figsize=(6, 3.5))
 bins = np.linspace(0, 250, 101)
-ax.hist(y_ref, bins, density=True, histtype="step", lw=2, label="model, $10^5$ runs")
 ax.hist(
-    f_ref, bins, density=True, histtype="step", ls="--", lw=1.5,
+    y_ref,
+    bins,
+    density=True,
+    histtype="step",
+    lw=2,
+    label="model, $10^5$ runs",
+)
+ax.hist(
+    f_ref,
+    bins,
+    density=True,
+    histtype="step",
+    ls="--",
+    lw=1.5,
     label=f"surrogate built from {N} runs",
 )
 ax.axvline(THRESHOLD, color="0.4", lw=0.8)
-ax.text(THRESHOLD + 3, ax.get_ylim()[1] * 0.85, "threshold", color="0.4")
+ax.text(
+    THRESHOLD + 3, ax.get_ylim()[1] * 0.85, "threshold", color="0.4"
+)
 ax.set_xlabel("flow $Q$ (m³/year)")
 ax.set_ylabel("probability density")
 ax.legend(fontsize="small")
@@ -413,8 +462,14 @@ fig.tight_layout()
 S, ST = np.zeros(d), np.zeros(d)
 for nu in range(d):
     others = [mu for mu in range(d) if mu != nu]
-    S[nu] = mean_and_variance(f.conditional_expectation([nu]))[1] / variance
-    ST[nu] = 1 - mean_and_variance(f.conditional_expectation(others))[1] / variance
+    S[nu] = (
+        mean_and_variance(f.conditional_expectation([nu]))[1] / variance
+    )
+    ST[nu] = (
+        1
+        - mean_and_variance(f.conditional_expectation(others))[1]
+        / variance
+    )
 
 M = 100000
 A, B = X.random(M), X.random(M)
@@ -430,7 +485,10 @@ for nu in range(d):
 
 # Monte Carlo estimates of indices close to 0 can be slightly negative.
 S_ref, ST_ref = np.maximum(S_ref, 0), np.maximum(ST_ref, 0)
-print(f"{'':>6}{'S, model':>11}{'S, surr.':>11}{'ST, model':>11}{'ST, surr.':>11}")
+print(
+    f"{'':>6}{'S, model':>11}{'S, surr.':>11}{'ST, model':>11}"
+    f"{'ST, surr.':>11}"
+)
 for nu in range(d):
     print(
         f"{NAMES[nu].strip('$'):>6}{S_ref[nu]:11.3f}{S[nu]:11.3f}"
@@ -440,9 +498,19 @@ for nu in range(d):
 fig, ax = plt.subplots(figsize=(7, 3.5))
 pos = np.arange(d)
 w = 0.2
-ax.bar(pos - 1.5 * w, S_ref, w, color="#9ab", label="first order, model (MC)")
-ax.bar(pos - 0.5 * w, S, w, color="#127a8a", label="first order, surrogate")
-ax.bar(pos + 0.5 * w, ST_ref, w, color="#f3c89c", label="total, model (MC)")
+ax.bar(
+    pos - 1.5 * w,
+    S_ref,
+    w,
+    color="#9ab",
+    label="first order, model (MC)",
+)
+ax.bar(
+    pos - 0.5 * w, S, w, color="#127a8a", label="first order, surrogate"
+)
+ax.bar(
+    pos + 0.5 * w, ST_ref, w, color="#f3c89c", label="total, model (MC)"
+)
 ax.bar(pos + 1.5 * w, ST, w, color="#e8862a", label="total, surrogate")
 ax.set_xticks(pos)
 ax.set_xticklabels(NAMES)
@@ -473,7 +541,8 @@ fig.tight_layout()
 
 tree = f.tensor.tree
 labels = [
-    NAMES[tree.dims[node - 1][0]] if tree.is_leaf[node - 1]
+    NAMES[tree.dims[node - 1][0]]
+    if tree.is_leaf[node - 1]
     else str(f.tensor.ranks[node - 1])
     for node in range(1, tree.nb_nodes + 1)
 ]

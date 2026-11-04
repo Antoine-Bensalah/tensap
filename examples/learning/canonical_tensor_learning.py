@@ -58,7 +58,9 @@ Y_TEST = fun(X_TEST)
 # %%
 # Learning in canonical tensor format
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-SOLVER = tensap.CanonicalTensorLearning(ORDER, tensap.SquareLossFunction())
+SOLVER = tensap.CanonicalTensorLearning(
+    ORDER, tensap.SquareLossFunction()
+)
 SOLVER.rank_adaptation = True
 SOLVER.initialization_type = "mean"
 SOLVER.tolerance["on_error"] = 1e-6
@@ -83,5 +85,6 @@ F, OUTPUT = SOLVER.solve()
 
 TEST_ERROR = SOLVER.loss_function.test_error(F, [X_TEST, Y_TEST])
 print(
-    "\nCanonical rank = %i, test error = %2.5e" % (len(F.tensor.core.data), TEST_ERROR)
+    "\nCanonical rank = %i, test error = %2.5e"
+    % (len(F.tensor.core.data), TEST_ERROR)
 )

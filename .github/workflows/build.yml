@@ -8,8 +8,9 @@ jobs:
       - name: Lint
         run: |
           sudo apt-get install python3-pip
-          pip3 install flake8 --break-system-packages
-          flake8 --ignore=W503 --max-line-length=100
+          pip3 install flake8 ruff --break-system-packages
+          flake8 --ignore=W503,E203 --max-line-length=100
+          ruff format --check --line-length 72 examples use_cases test/non_regression_scripts
 
   conda-linux:
     runs-on: ubuntu-latest

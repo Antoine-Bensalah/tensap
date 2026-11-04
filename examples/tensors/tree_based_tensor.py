@@ -40,13 +40,18 @@ TREE.plot_dims(title="Nodes dimensions")
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 TENSOR = tensap.TreeBasedTensor.rand(TREE)
 TENSOR.plot(title="Active nodes")
-TENSOR.plot([x.storage() for x in TENSOR.tensors], title="Tensors' storage complexity")
+TENSOR.plot(
+    [x.storage() for x in TENSOR.tensors],
+    title="Tensors' storage complexity",
+)
 TENSOR.plot(TENSOR.representation_rank, title="Representation ranks")
 
 # %%
 # Truncation of a TreeBasedTensor with prescribed rank
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-TRUNCATOR = tensap.Truncator(tolerance=0, max_rank=np.random.randint(1, 5))
+TRUNCATOR = tensap.Truncator(
+    tolerance=0, max_rank=np.random.randint(1, 5)
+)
 TENSOR = tensap.TreeBasedTensor.rand(TREE)
 TENSOR_TRUNCATED = TRUNCATOR.hsvd(TENSOR)
 print(
@@ -97,13 +102,17 @@ TRUNCATOR = tensap.Truncator(tolerance=5e-1)
 A_TRUNCATED = TRUNCATOR.hsvd(A, TREE, ACTIVE_NODES)
 ERR = (A - A_TRUNCATED.full()).norm() / A.norm()
 print("Tolerance = %2.5e, error = %2.5e\n" % (TRUNCATOR.tolerance, ERR))
-A_TRUNCATED.plot(A_TRUNCATED.representation_rank, title="Representation ranks")
+A_TRUNCATED.plot(
+    A_TRUNCATED.representation_rank, title="Representation ranks"
+)
 
 TRUNCATOR.tolerance = 1e-2
 A_TRUNCATED = TRUNCATOR.hsvd(A, TREE, ACTIVE_NODES)
 ERR = (A - A_TRUNCATED.full()).norm() / A.norm()
 print("Tolerance = %2.5e, error = %2.5e\n" % (TRUNCATOR.tolerance, ERR))
-A_TRUNCATED.plot(A_TRUNCATED.representation_rank, title="Representation ranks")
+A_TRUNCATED.plot(
+    A_TRUNCATED.representation_rank, title="Representation ranks"
+)
 
 # %%
 # Tensor train format
@@ -154,7 +163,10 @@ print("norm of T1*T2", Ttimes.norm())
 print("\nSum of T1 along dimensions:\n-------------------------")
 print("dimensions of T1        : ", T1.shape)
 print("dimensions of T1.reduce_sum(0) : ", T1.reduce_sum(0).shape)
-print("dimensions of T1.reduce_sum([2,5,7]) : ", T1.reduce_sum([2, 5, 7]).shape)
+print(
+    "dimensions of T1.reduce_sum([2,5,7]) : ",
+    T1.reduce_sum([2, 5, 7]).shape,
+)
 print("sum of all entries = ", T1.reduce_sum())
 
 
@@ -176,7 +188,10 @@ T3 = T1.change_root(num3)
 T3.plot(title="Nodes indices with root" + str(num3))
 T3bis = T2.change_root(num3)
 T3bis.plot(
-    title="Nodes indices with root " + str(num3) + " from format with root " + str(num2)
+    title="Nodes indices with root "
+    + str(num3)
+    + " from format with root "
+    + str(num2)
 )
 print((T3 - T3bis).norm() / (T3.norm() + T3bis.norm()) * 2)
 
@@ -189,11 +204,15 @@ TREE = tensap.DimensionTree.balanced(ORDER)
 T1 = tensap.TreeBasedTensor.rand(TREE)
 T1.plot(title="Initial tensor format")
 T2 = T1.inactivate_nodes([9, 5])
-print("Check T1-T2 = 0 : ", (T2 - T1).norm() / (T1.norm() + T2.norm()) * 2)
+print(
+    "Check T1-T2 = 0 : ", (T2 - T1).norm() / (T1.norm() + T2.norm()) * 2
+)
 T2.plot(title="Inactivate nodes [9,5]")
 T3 = T2.activate_nodes([9, 5])
 T3.plot(title="Reactivate nodes [9,5]")
-print("Check T1-T3 = 0 : ", (T3 - T1).norm() / (T1.norm() + T3.norm()) * 2)
+print(
+    "Check T1-T3 = 0 : ", (T3 - T1).norm() / (T1.norm() + T3.norm()) * 2
+)
 
 
 # %%
