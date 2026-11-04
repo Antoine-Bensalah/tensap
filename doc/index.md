@@ -10,8 +10,7 @@ html_theme.sidebar_secondary.remove: true
   <img class="tensap-hero__logo only-dark" src="_static/tensap_logo_dark.svg" alt="tensap">
   <p class="tensap-hero__tagline">Tensor Approximation Package</p>
   <p class="tensap-hero__text">
-    Low-rank tensor formats for the approximation of functions and tensors:
-    interpolation, projection and statistical learning.
+    Low-rank tensor formats to approximate and learn high-dimensional functions.
   </p>
   <p class="tensap-hero__buttons">
     <a class="tensap-button tensap-button--primary" href="getting_started/index.html">Getting Started</a>

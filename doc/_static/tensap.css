@@ -180,24 +180,16 @@ section#tensap > h1 {
   margin: 0.5rem 0 1.5rem;
   padding: 1.5rem 1rem 1rem;
   border-radius: 0.75rem;
-  background:
-    url("tensap_pattern.svg") right -250px center / 480px auto no-repeat,
-    url("tensap_pattern.svg") left -250px center / 480px auto no-repeat,
-    linear-gradient(135deg, #eaf1f7 0%, #eef6f6 55%, #fbf1e6 100%);
+  background: linear-gradient(135deg, #eaf1f7 0%, #eef6f6 55%, #fbf1e6 100%);
 }
-
 
 .tensap-hero > * {
   position: relative;
 }
 
 html[data-theme="dark"] .tensap-hero {
-  background:
-    url("tensap_pattern_dark.svg") right -250px center / 480px auto no-repeat,
-    url("tensap_pattern_dark.svg") left -250px center / 480px auto no-repeat,
-    linear-gradient(135deg, #18263a 0%, #15292e 55%, #2b2219 100%);
+  background: linear-gradient(135deg, #18263a 0%, #15292e 55%, #2b2219 100%);
 }
-
 
 .tensap-hero__logo {
   height: 4.75rem;
@@ -212,7 +204,7 @@ html[data-theme="dark"] .tensap-hero {
 }
 
 .tensap-hero__text {
-  max-width: 34rem;
+  max-width: 40rem;
   margin: 0 auto;
   color: var(--pst-color-text-muted);
 }
