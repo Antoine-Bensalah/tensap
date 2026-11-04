@@ -1,4 +1,4 @@
-Use cases
+Use Cases
 =========
 
 A use case starts from a scientific problem and shows how tensap addresses

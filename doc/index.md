@@ -98,7 +98,7 @@ Concepts, notations and algorithms.
 One method or feature per example.
 :::
 
-:::{grid-item-card} {octicon}`beaker;1.4em` Use cases
+:::{grid-item-card} {octicon}`beaker;1.4em` Use Cases
 :link: use_cases/index
 :link-type: doc
 

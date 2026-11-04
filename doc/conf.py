@@ -109,7 +109,7 @@ templates_path = ["_templates"]
 # api_notes/ holds fragments included by _ext/api_notes.py, not pages.
 exclude_patterns = ["_build", "api_notes", "_tutorials_src", "Thumbs.db", ".DS_Store", "**/*.ipynb"]
 
-# -- Examples Gallery and Use cases (sphinx-gallery) -----------------------
+# -- Examples Gallery and Use Cases (sphinx-gallery) -----------------------
 
 # Examples that are not executed when the documentation is built: too long,
 # or requiring tensorflow. Their code is shown without its output.

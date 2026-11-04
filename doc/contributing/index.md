@@ -45,7 +45,14 @@ seed after the imports. An example is executed when the documentation is
 built, unless its name is in `NOT_EXECUTED` in `doc/conf.py`; its position
 in its section is set in `doc/_ext/gallery_order.py`.
 
-Use cases follow the same format, in `use_cases/`.
+Use Cases follow the same format, in `use_cases/`.
+
+Code is shown the same way on every page: the style of the code blocks
+(padding, line spacing, colours) is set once for the whole site, in
+`doc/_static/tensap.css`. To keep it uniform, write code only in the cells of
+a sphinx-gallery script, in a fenced block ```` ```python ```` of a MyST
+page, or with `.. code-block::` or `.. literalinclude::` in reStructuredText.
+Do not paste raw HTML, images of code, or styles specific to one page.
 
 ## Writing a theory page
 

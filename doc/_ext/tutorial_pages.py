@@ -1,4 +1,4 @@
-"""The "Tensap tutorials", a subsection of the Use cases.
+"""The "Tensap tutorials", a subsection of the Use Cases.
 
 The original tutorials of tensap are kept, unchanged, as non-regression
 scripts in ``test/non_regression_scripts/``. When the documentation is
@@ -15,8 +15,8 @@ sphinx-gallery then executes the copies (except those of NOT_EXECUTED in
 conf.py), shows their outputs and figures, caches them, and offers the
 script for download: it runs cell by cell as the original does.
 
-The Use cases list the tutorials last, after the use cases. The sections
-of the Examples Gallery, of the Use cases, of the tutorials and of the API
+The Use Cases list the tutorials last, after the use cases. The sections
+of the Examples Gallery, of the Use Cases, of the tutorials and of the API
 reference are numbered, as in Theory & Methods.
 """
 
