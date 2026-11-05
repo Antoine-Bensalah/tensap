@@ -9,22 +9,19 @@ import tensap
 from tensap.tensor_algebra.tools.tt_products import hadamard_round
 
 
-def _smooth_tt(levels, tolerance, phase=0.0):
-    """A smooth function of two variables on a grid of 2^levels[0] x
-    2^levels[1] points, as a TT tensor of order sum(levels) with modes of
-    size 2 (binary digits of the two indices), rounded at the tolerance."""
+def _smooth_qtt(levels, tolerance, phase=0.0):
+    t = tensap.Tensorizer(2, levels, 2)
     x = (np.arange(2 ** levels[0]) + 0.5) / 2 ** levels[0]
     y = (np.arange(2 ** levels[1]) + 0.5) / 2 ** levels[1]
     X, Y = np.meshgrid(x, y, indexing="ij")
     f = np.exp(-((X - 0.4) ** 2 + (Y - 0.6) ** 2) / 0.02) * (Y - 0.6) + np.sin(5 * X * Y + phase)
-    digits = tensap.FullTensor(f.reshape([2] * sum(levels)))
-    return tensap.TTTensor.from_full(digits, tolerance), f
+    return tensap.quantize(f, t, tolerance), f
 
 
 @pytest.mark.parametrize("tolerance", [1e-4, 1e-8])
 def test_tt_product_meets_the_tolerance(tolerance):
-    x, f = _smooth_tt([5, 4], tolerance)
-    y, g = _smooth_tt([5, 4], tolerance, phase=1.0)
+    x, f = _smooth_qtt([5, 4], tolerance)
+    y, g = _smooth_qtt([5, 4], tolerance, phase=1.0)
     exact = x.hadamard_product(y)
     truncator = tensap.Truncator(tolerance=tolerance, max_rank=200)
     z = truncator.hadamard_product(x, y)
@@ -37,7 +34,7 @@ def test_tt_product_meets_the_tolerance(tolerance):
 
 
 def test_tt_product_rank_cap_and_special_cases():
-    x, _ = _smooth_tt([4, 4], 1e-10)
+    x, _ = _smooth_qtt([4, 4], 1e-10)
     capped = tensap.Truncator(tolerance=1e-12, max_rank=3).hadamard_product(x, x)
     assert max(capped.ranks) <= 3
     zero = x * 0.0
