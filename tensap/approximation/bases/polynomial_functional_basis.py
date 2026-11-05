@@ -26,7 +26,7 @@ import tensap
 
 class PolynomialFunctionalBasis(tensap.FunctionalBasis):
     """
-    Class PolynomialFunctionalBasis.
+    Functional basis of univariate polynomials.
 
     Attributes
     ----------

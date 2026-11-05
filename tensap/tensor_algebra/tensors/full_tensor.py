@@ -26,7 +26,7 @@ import tensap
 
 class FullTensor:
     """
-    Class FullTensor.
+    Tensor stored as a full multidimensional array.
 
     Attributes
     ----------

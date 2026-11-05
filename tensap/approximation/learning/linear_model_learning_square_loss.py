@@ -26,7 +26,7 @@ import tensap
 
 class LinearModelLearningSquareLoss(tensap.LinearModelLearning):
     """
-    Class LinearModelLearningSquareLoss.
+    Learning of a linear model by least squares.
 
     Attributes
     ----------

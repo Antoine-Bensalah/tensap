@@ -27,7 +27,7 @@ import tensap
 
 class NormalRandomVariable(tensap.RandomVariable):
     """
-    Class NormalRandomVariable.
+    Normal (gaussian) random variable.
 
     Attributes
     ----------

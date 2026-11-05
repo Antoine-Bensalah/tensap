@@ -25,7 +25,7 @@ import tensap
 
 class Tensorizer:
     """
-    Class Tensorizer.
+    Map that identifies a variable in [0, 1]^dim with b-adic digits and a remainder.
 
     Attributes
     ----------

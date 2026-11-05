@@ -25,7 +25,7 @@ import tensap
 
 class DiscreteRandomVariable(tensap.RandomVariable):
     """
-    Class DiscreteRandomVariable.
+    Random variable taking a finite number of values.
 
     Attributes
     ----------

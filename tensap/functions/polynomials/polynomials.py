@@ -26,7 +26,7 @@ import tensap
 
 class UnivariatePolynomials(ABC):
     """
-    Class UnivariatePolynomials.
+    Base class for univariate polynomials.
 
     """
 
@@ -284,7 +284,7 @@ class UnivariatePolynomials(ABC):
 
 class CanonicalPolynomials(UnivariatePolynomials):
     """
-    Class CanonicalPolynomials.
+    Canonical polynomials, the monomials x^n.
 
     Attributes
     ----------

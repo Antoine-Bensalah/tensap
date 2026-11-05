@@ -24,10 +24,22 @@ import numpy as np
 
 
 class Copula(ABC):
-    pass
+    """
+    Abstract class for copulas.
+
+    A copula is the joint cumulative distribution function of a random vector
+    whose marginals are uniform on [0, 1]. Subclasses implement the methods
+    pdf and cdf.
+    """
 
 
 class IndependentCopula(Copula):
+    """
+    Independent copula, whose density is equal to 1 on [0, 1]^d.
+
+    Its cumulative distribution function is the product of its arguments.
+    """
+
     def pdf(self, u):
         return np.ones((np.shape(u)[0], 1))
 

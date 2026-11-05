@@ -26,7 +26,7 @@ import tensap
 
 class Function:
     """
-    Class Function.
+    Base class for functions of several variables.
 
     Attributes
     ----------

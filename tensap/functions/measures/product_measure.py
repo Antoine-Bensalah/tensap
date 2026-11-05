@@ -25,7 +25,7 @@ import tensap
 
 class ProductMeasure(tensap.Measure):
     """
-    Class ProductMeasure.
+    Product of measures.
 
     Attributes
     ----------

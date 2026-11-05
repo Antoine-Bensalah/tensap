@@ -26,7 +26,7 @@ import tensap
 
 class CanonicalTensorLearning(tensap.TensorLearning):
     """
-    Class CanonicalTensorLearning.
+    Learning of a tensor in canonical format.
 
     See also tensap.TensorLearning.
 

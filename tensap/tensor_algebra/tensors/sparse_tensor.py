@@ -27,7 +27,7 @@ import tensap
 
 class SparseTensor:
     """
-    Class SparseTensor.
+    Sparse tensor, given by its nonzero entries.
 
     Attributes
     ----------

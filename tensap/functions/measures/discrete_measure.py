@@ -25,8 +25,7 @@ import tensap
 
 class DiscreteMeasure(tensap.Measure):
     """
-    Class DiscreteMeasure: discrete measure in R^d
-    sum_{i=1}^n w_i delta_{x_i}.
+    Discrete measure on R^d, sum_{i=1}^n w_i delta_{x_i}.
 
     Attributes
     ----------

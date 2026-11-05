@@ -28,7 +28,8 @@ import tensap
 
 class TensorPrincipalComponentAnalysis:
     """
-    Class TensorPrincipalComponentAnalysis: principal component analysis of an
+    Principal component analysis of an algebraic tensor.
+
     algebraic tensor.
 
     Attributes

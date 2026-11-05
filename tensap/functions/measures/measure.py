@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 
 class Measure(ABC):
     """
-    Class Measure.
+    Base class for measures.
 
     """
 

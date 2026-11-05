@@ -8,7 +8,7 @@ import tensap
 
 class ProbabilityMeasure(tensap.Measure):
     """
-    Class ProbabilityMeasure.
+    Base class for probability measures.
 
     """
 

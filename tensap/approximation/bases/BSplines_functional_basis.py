@@ -212,6 +212,19 @@ class BSplinesFunctionalBasis(tensap.FunctionalBasis):
 
 
 class DilatedBSplines:
+    """
+    Dilated B-splines of degree n on (0, 1), using b-adic dilations.
+
+    A dilated B-spline is indexed by a level l and a local index j.
+
+    Parameters
+    ----------
+    n : int
+        The degree of the B-splines.
+    b : int, optional
+        The base of dilation. The default is 2.
+    """
+
     def __init__(self, n, b=2):
         self.degree = n  # Degree
         self.base = b  # base of dilation
@@ -335,6 +348,11 @@ class DilatedBSplines:
 
 
 class DilatedBSplinesFunctionalBasis(tensap.FunctionalBasis):
+    """
+    Functional basis of dilated B-splines on (0, 1).
+
+    See the constructor for the parameters.
+    """
 
     def __init__(self, B, Ind):
         """

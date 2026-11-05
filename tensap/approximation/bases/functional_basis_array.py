@@ -27,7 +27,7 @@ import tensap
 
 class FunctionalBasisArray(tensap.Function):
     """
-    Class FunctionalBasisArray.
+    Function, or array of functions, given by its coefficients on a functional basis.
 
     Attributes
     ----------

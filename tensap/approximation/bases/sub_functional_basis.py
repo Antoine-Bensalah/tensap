@@ -26,7 +26,7 @@ import tensap
 
 class SubFunctionalBasis(tensap.FunctionalBasis):
     """
-    Class SubFunctionalBasis.
+    Basis of linear combinations of the functions of an underlying basis.
 
     Attributes
     ----------

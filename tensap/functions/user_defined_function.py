@@ -25,7 +25,7 @@ import tensap
 
 class UserDefinedFunction(tensap.Function):
     """
-    Class UserDefinedFunction.
+    Function defined by the user, from a Python function or an expression.
 
     Attributes
     ----------

@@ -27,7 +27,7 @@ import tensap
 
 class SparseTensorProductFunctionalBasis(tensap.FunctionalBasis):
     """
-    Class SparseTensorProductFunctionalBasis.
+    Sparse tensor product of functional bases, indexed by multi-indices.
 
     Attributes
     ----------

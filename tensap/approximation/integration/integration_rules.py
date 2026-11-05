@@ -25,7 +25,7 @@ import tensap
 
 class IntegrationRule:
     """
-    Class IntegrationRule.
+    Integration rule, defined by points and weights.
 
     Attributes
     ----------
@@ -168,7 +168,7 @@ class IntegrationRule:
 
 class FullTensorProductIntegrationRule(IntegrationRule):
     """
-    Class FullTensorProductIntegrationRule.
+    Tensor product of integration rules.
 
     """
 

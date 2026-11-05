@@ -34,7 +34,7 @@ except ImportError:
 
 class LinearModelLearningCustomLoss(tensap.LinearModelLearning):
     """
-    Class LinearModelLearningCustomLoss.
+    Learning of a linear model with a custom loss function.
 
     Attributes
     ----------

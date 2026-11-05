@@ -26,9 +26,9 @@ import tensap
 
 class EmpiricalRandomVariable(tensap.RandomVariable):
     """
-    Class EmpiricalRandomVariable. A random variable fitted using gaussian
-    kernel smoothing, this class gives best results in the case of normal
-    distributions.
+    Random variable fitted to a sample by gaussian kernel smoothing.
+
+    It gives the best results for normal distributions.
 
     Attributes
     ----------

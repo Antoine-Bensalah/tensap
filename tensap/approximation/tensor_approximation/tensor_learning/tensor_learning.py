@@ -28,7 +28,7 @@ import tensap
 
 class TensorLearning(tensap.Learning):
     """
-    Class TensorLearning.
+    Base class for the learning of tensors.
 
     See also tensap.Learning.
 

@@ -26,8 +26,6 @@ import tensap
 
 class DeltaFunctionalBasis(tensap.FunctionalBasis):
     """
-    Class DeltaFunctionalBasis.
-
     Basis of univariate functions defined on a finite set of values in R^d.
 
     The is_orthonormal attribute remains at its default value of False.

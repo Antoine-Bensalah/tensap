@@ -27,7 +27,7 @@ import tensap
 
 class UniformRandomVariable(tensap.RandomVariable):
     """
-    Class UniformRandomVariable.
+    Random variable with a uniform distribution on an interval.
 
     Attributes
     ----------

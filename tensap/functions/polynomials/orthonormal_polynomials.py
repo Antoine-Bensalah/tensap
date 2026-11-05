@@ -27,7 +27,7 @@ import tensap
 
 class OrthonormalPolynomials(tensap.UnivariatePolynomials):
     """
-    Class OrthonormalPolynomials.
+    Base class for polynomials orthonormal with respect to a measure.
 
     Attributes
     ----------
@@ -264,7 +264,7 @@ class OrthonormalPolynomials(tensap.UnivariatePolynomials):
 
 class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
     """
-    Class ShiftedOrthonormalPolynomials.
+    Orthonormal polynomials after a shift and a scaling of the variable.
 
     Attributes
     ----------
@@ -431,7 +431,7 @@ class ShiftedOrthonormalPolynomials(tensap.UnivariatePolynomials):
 
 class HermitePolynomials(OrthonormalPolynomials):
     """
-    Class HermitePolynomials.
+    Hermite polynomials, orthonormal with respect to the standard gaussian measure.
 
     Polynomials defined on R and orthonormal with respect to the standard
     gaussian measure 1/sqrt(2*pi)*exp(-x^2/2).
@@ -482,7 +482,7 @@ class HermitePolynomials(OrthonormalPolynomials):
 
 class LegendrePolynomials(OrthonormalPolynomials):
     """
-    Class LegendrePolynomials.
+    Legendre polynomials, orthonormal for the uniform probability measure on [-1, 1].
 
     Polynomials defined on [-1,1], orthonormal with respect to the standard
     uniform measure 1/2.
@@ -541,7 +541,7 @@ class LegendrePolynomials(OrthonormalPolynomials):
 
 class LegendrePolynomialsLebesgue(OrthonormalPolynomials):
     """
-    Class LegendrePolynomialsLebesgue.
+    Legendre polynomials, orthonormal for the Lebesgue measure on [-1, 1].
 
     Polynomials defined on [-1,1], orthonormal with respect to the Lebesgue
       measure.
@@ -602,7 +602,7 @@ class LegendrePolynomialsLebesgue(OrthonormalPolynomials):
 
 class EmpiricalPolynomials(OrthonormalPolynomials):
     """
-    Class EmpiricalPolynomials.
+    Polynomials orthonormal with respect to a smoothed empirical distribution.
 
     Polynomials defined on R and orthonormal with respect to the gaussian
     kernel smoothed distribution based on a sample x, which was centered and
@@ -791,8 +791,6 @@ class EmpiricalPolynomials(OrthonormalPolynomials):
 
 class DiscretePolynomials(OrthonormalPolynomials):
     """
-    Class DiscretePolynomials.
-
     Polynomials orthonormal with respect to a discrete measure.
 
     """
