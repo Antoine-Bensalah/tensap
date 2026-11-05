@@ -50,6 +50,17 @@ def _random_G(case, rng, m=M):
 # --- the loss --------------------------------------------------------------------------
 
 
+def test_poincare_loss_is_the_mean_squared_distance_to_the_row_space(rng):
+    jac_u = rng.standard_normal((5, 1, 4))
+    jac_g = rng.standard_normal((5, 2, 4))
+    expected = 0
+    for ju, jg in zip(jac_u, jac_g):
+        q = np.linalg.qr(jg.T)[0]  # orthonormal basis of the row space of jg
+        expected += np.sum((ju.T - q @ q.T @ ju.T) ** 2) / 5
+    npt.assert_allclose(_loss.poincare_loss(jac_u, jac_g), expected)
+    npt.assert_allclose(_loss.poincare_loss(jac_u, jac_u), 0, atol=1e-28)
+
+
 def test_augmented_loss_tends_to_the_loss(rng):
     jac_u = rng.standard_normal((5, 1, 4))
     jac_g = rng.standard_normal((5, 2, 4))
@@ -58,7 +69,46 @@ def test_augmented_loss_tends_to_the_loss(rng):
     assert _loss.poincare_loss_augmented(jac_u, jac_g, 1.0) > exact
 
 
+def test_surrogate_loss(rng):
+    jac_u = rng.standard_normal((5, 4))  # scalar function: one row per sample
+    jac_g = rng.standard_normal((5, 2, 4))
+    assert _loss.poincare_loss_surrogate(jac_u, jac_g) > 0
+    # zero when the feature contains the gradient
+    npt.assert_allclose(_loss.poincare_loss_surrogate(jac_u, jac_u[:, None, :]), 0, atol=1e-28)
+
+
+def test_loss_vanishes_at_the_feature_of_the_target(loss, case, rng):
+    G0 = case[3]
+    npt.assert_allclose(loss.eval(G0), 0, atol=1e-25)
+    assert loss.eval(_random_G(case, rng)) > 1e-3
+    # invariance by a change of basis of the features
+    npt.assert_allclose(loss.eval(3 * G0), 0, atol=1e-25)
+
+
+def test_jacobian_of_the_features(case, basis):
+    x, _, jac_basis, G0 = case
+    jac_g = lvs._eval_jac_g(G0, jac_basis)
+    h = 1e-6
+    for j in range(D):
+        e = np.zeros(D)
+        e[j] = h
+        fd = (basis.eval(x + e) @ G0 - basis.eval(x - e) @ G0) / (2 * h)
+        npt.assert_allclose(jac_g[:, :, j], fd, atol=1e-8)
+    npt.assert_allclose(lvs._eval_jac_g(np.ravel(G0, order="F"), jac_basis), jac_g)
+
+
 # --- derivatives and matrices ---------------------------------------------------------------
+
+
+def test_gradient_by_finite_differences(loss, case, rng):
+    G = _random_G(case, rng, 2)
+    grad = loss.eval_gradient(G)
+    V = rng.standard_normal(G.shape)
+    h = 1e-6
+    fd = (loss.eval(G + h * V) - loss.eval(G - h * V)) / (2 * h)
+    npt.assert_allclose(np.sum(grad * V), fd, rtol=1e-5)
+    # the gradient is 2 (S_G - H_G) G
+    npt.assert_allclose(grad, 2 * (loss.eval_SG_X(G, G) - loss.eval_HG_X(G, G)), atol=1e-12)
 
 
 def test_hessian_by_finite_differences(loss, case, rng):
@@ -89,6 +139,19 @@ def test_sigma_and_h_matrices(loss, case, rng):
     npt.assert_allclose(loss.eval_SG_X(G, Y), X_, atol=1e-8)
 
 
+def test_surrogate_matrices(loss, case, rng):
+    A, B, C = loss.eval_surrogate_matrices()
+    npt.assert_allclose(C, 0)
+    for mat in (A, B):
+        npt.assert_allclose(mat, mat.T, atol=1e-12)
+        assert np.all(np.linalg.eigvalsh(mat) > -1e-12)
+    # B - A is positive semi-definite, singular in the direction of the feature
+    G0 = case[3]
+    assert np.all(np.linalg.eigvalsh(B - A) > -1e-10)
+    npt.assert_allclose(G0.T @ (B - A) @ G0, 0, atol=1e-10)
+    npt.assert_allclose(loss.eval_surrogate(G0), 0, atol=1e-25)
+
+
 # --- minimizers --------------------------------------------------------------------------------
 
 
@@ -96,6 +159,43 @@ def _subspace_distance(G, G0):
     """1 - the smallest cosine of the principal angles between the spans."""
     q, q0 = np.linalg.qr(G)[0], np.linalg.qr(G0)[0]
     return 1 - np.linalg.svd(q.T @ q0, compute_uv=False).min()
+
+
+def test_surrogate_minimization_recovers_the_feature(loss, case):
+    G, value, surrogate = loss.minimize_surrogate(m=1)
+    npt.assert_allclose(value, 0, atol=1e-20)
+    assert _subspace_distance(G, case[3]) < 1e-10
+    npt.assert_allclose(surrogate, 0, atol=1e-10)
+    G, losses_opt, losses, surrogates = loss.minimize_surrogate_greedy(2)
+    assert losses.size == 1 and losses[0] < 1e-7  # stops when the loss vanishes
+
+
+@pytest.mark.parametrize("precond", ["sigma", "cg_sigma"])
+def test_quasi_newton_recovers_the_feature(loss, case, precond):
+    G, value = loss.minimize_qn(m=1, init_method="surrogate", precond_method=precond,
+                                precond_kwargs={"rtol": 1e-12} if precond == "cg_sigma" else {})
+    assert value < 1e-10
+    assert _subspace_distance(G, case[3]) < 1e-6
+
+
+@pytest.mark.parametrize("init", ["random", "random_linear", "surrogate_greedy",
+                                  "active_subspace"])
+def test_initializations(loss, case, init):
+    G0 = tensap.poincare_learning.poincare_loss_vector_space_learning._initialization(
+        loss.jac_u, loss.jac_basis, 1, init, n_try=2, seed=0)
+    assert G0.shape[-2:] == (case[2].shape[1], 1)
+    G, values = loss.minimize_qn(G0, maxiter=5)
+    assert np.all(np.isfinite(values))
+
+
+@pytest.mark.parametrize("precond", [None, "hessian"])
+def test_quasi_newton_with_other_preconditioners(loss, precond):
+    # G <- orth(G + P^-1 H_G G) is the quasi-Newton iteration for P = S_G only:
+    # without preconditioner, or with the Hessian (singular at a minimum, so
+    # that the step depends on the cutoff of numpy.linalg.lstsq), there is no
+    # guarantee: only the iterations are checked
+    G, value = loss.minimize_qn(m=1, precond_method=precond, maxiter=5)
+    assert np.isfinite(value) and G.shape == (loss.jac_basis.shape[1], 1)
 
 
 def test_wrong_options(loss):
@@ -117,7 +217,36 @@ def test_active_subspace():
     assert _subspace_distance(G, w[:, None]) < 1e-12
 
 
+def test_pymanopt_minimization(loss, case):
+    pytest.importorskip("pymanopt")
+    G, value, _ = loss.minimize_pymanopt(m=1, init_method="surrogate")
+    assert value < 1e-10
+
+
 # --- projected and truncated losses ---------------------------------------------------------------
+
+
+def test_project_basis(loss, case, rng):
+    K = case[2].shape[1]
+    sub = np.linalg.qr(rng.standard_normal((K, 4)))[0]
+    projected = loss.project_basis(sub)
+    G = rng.standard_normal((4, 1))
+    npt.assert_allclose(projected.eval(G), loss.eval(sub @ G))
+    assert isinstance(projected.basis, tensap.SubFunctionalBasis)
+    loss.R = np.eye(K)
+    npt.assert_allclose(loss.project_basis(sub).R, sub.T @ sub, atol=1e-14)
+
+
+def test_truncated_loss(case, rng):
+    _, _, jac_basis, _ = case
+    jac_u = rng.standard_normal((N, 3, D))  # vector-valued function
+    t = tensap.PoincareLossVectorSpaceTruncated(jac_u, jac_basis, m=1)
+    for ju in t.jac_u:
+        assert np.linalg.matrix_rank(ju) == 1  # rank one truncation of each Jacobian
+    t.truncate(3)
+    npt.assert_allclose(t.jac_u, jac_u)
+    full = tensap.PoincareLossVectorSpaceTruncated(jac_u, jac_basis)
+    npt.assert_allclose(full.jac_u, jac_u)
 
 
 # --- benchmarks ------------------------------------------------------------------------------
@@ -147,4 +276,30 @@ def test_benchmark_jacobians_by_finite_differences(case_name, kwargs, rng):
         npt.assert_allclose(jac[:, :, j], fd, rtol=1e-6, atol=1e-7)
 
 
+def test_unknown_benchmark():
+    with pytest.raises(NotImplementedError):
+        build_benchmark("other")
+
+
 # --- scikit-learn estimator ---------------------------------------------------------------
+
+
+@pytest.mark.parametrize("innerp", ["l2", "h1_0", "other"])
+def test_polynomial_feature_estimator(case, innerp):
+    from tensap.poincare_learning.utils._sklearn_wrapper import PolynomialFeatureEstimator
+
+    x, jac_u, _, G0 = case
+    est = PolynomialFeatureEstimator(X, 1, 2, innerp, fit_method="surrogate",
+                                     fit_parameters={"m": 1})
+    est.fit(x, jac_u)
+    assert est.G.shape == (G0.shape[0], 1)
+    npt.assert_allclose(est.G.T @ est.G, np.eye(1), atol=1e-12)
+    if innerp == "l2":
+        assert _subspace_distance(est.G, G0) < 1e-8
+        npt.assert_allclose(est.score(x, jac_u), 0, atol=1e-18)
+    est.fit_method = "surrogate_greedy"
+    est.fit_parameters = {"m_max": 2}
+    est.fit(x, jac_u)
+    est.fit_method = "other"
+    with pytest.raises(NotImplementedError):
+        est.fit(x, jac_u)

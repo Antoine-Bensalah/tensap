@@ -13,6 +13,9 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
+from tensap.poincare_learning.benchmarks.poincare_benchmarks import (  # noqa: E402
+    build_benchmark,
+)
 from tensap.poincare_learning.benchmarks.poincare_benchmarks_torch import (  # noqa: E402
     build_benchmark_torch,
 )
@@ -58,6 +61,25 @@ def test_jacobians_by_finite_differences(case, kwargs):
         npt.assert_allclose(jac[:, :, j], fd, rtol=1e-5, atol=1e-6 * (1 + np.abs(y).max()))
 
 
+@pytest.mark.parametrize(
+    "case, kwargs",
+    [
+        ("sin_squared_norm", {"d": 4, "c": 0.7, "R": np.diag([1.0, 2.0, 0.5, 1.0])}),
+        ("cos_squared_norm", {"d": 4}),
+        ("sum_cos_sin_squared_norm", {"d": 3, "R1": np.diag([1.0, 2.0, 3.0])}),
+        ("exp_mean_sin_exp_cos", {"d": 5, "c": 2.0}),
+        ("quartic_sin_collective", {"d": 4, "mat_lst": [np.eye(3), np.diag([1.0, 2.0, 3.0])]}),
+    ],
+)
+def test_torch_and_numpy_benchmarks_agree(case, kwargs):
+    fun, fun_jac, X = build_benchmark_torch(case, **kwargs)
+    fun_np, fun_jac_np, _ = build_benchmark(case, **kwargs)
+    x = X.random(6)
+    npt.assert_allclose(_evaluate(fun, x), _evaluate(fun_np, x), rtol=1e-12)
+    npt.assert_allclose(np.reshape(fun_jac(x), (6, -1)), np.reshape(fun_jac_np(x), (6, -1)),
+                        rtol=1e-10, atol=1e-12)
+
+
 def test_known_values():
     # Ishigami at (pi/2, pi/2, 1): 1 + a + b
     fun, _, _ = build_benchmark_torch("ishigami")
@@ -94,3 +116,8 @@ def test_piston_against_its_formula():
     V = S / (2 * k) * (np.sqrt(A**2 + 4 * k * P0 * V0 / T0 * Ta) - A)
     C = 2 * np.pi * np.sqrt(M / (k + S**2 * P0 * V0 / T0 * Ta / V**2))
     npt.assert_allclose(_evaluate(fun, z).ravel(), C, rtol=1e-12)
+
+
+def test_unknown_benchmark():
+    with pytest.raises(NotImplementedError):
+        build_benchmark_torch("other")
