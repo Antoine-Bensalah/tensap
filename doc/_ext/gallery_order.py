@@ -12,6 +12,7 @@ EXAMPLES = [
     "tensor_truncation.py",
     "tucker_tensor.py",
     "tt_tensor.py",
+    "qtt.py",
     "measures.py",
     "orthonormal_polynomials.py",
     "functions_bases_grids.py",
@@ -42,6 +43,7 @@ EXAMPLES = [
     "greedy_with_updates.py",
     "tt_solvers.py",
     "anisotropic_greedy.py",
+    "qtt_poisson.py",
     # Tensap tutorials, Linear solvers
     "tutorial_linearsolver_tucker_poisson.py",
     "tutorial_linearsolver_high_dim_poisson.py",
