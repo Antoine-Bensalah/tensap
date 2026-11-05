@@ -30,6 +30,8 @@ from .solvers.linear_solvers import (
     LinearSolver,
     TruncatedRichardsonIterations,
     TruncatedPCG,
+    RankOneALSLinearSolver,
+    GreedyLinearSolver,
 )
 from .solvers.inverse_approximators import (
     RankOneInverseApproximatorByALS,
