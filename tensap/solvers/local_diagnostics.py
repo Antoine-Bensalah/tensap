@@ -4,7 +4,7 @@
 """
 Module local_diagnostics: what the local solves of an alternating solver did.
 
-The alternating solvers (such as TuckerTensorALSLinearSolver)
+The alternating solvers (TTTensorALSLinearSolver, TuckerTensorALSLinearSolver)
 solve many small systems: directly, or iteratively (CG, GMRES) with a
 tolerance and a maximal number of iterations. An iterative local solve can
 stop before its tolerance; a preconditioner can be disabled when it is not

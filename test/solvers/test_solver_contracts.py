@@ -53,6 +53,36 @@ def test_pcg_breakdown_on_a_negative_operator():
     assert output["flag"] == 3 and output["iter"] == 1 and output["error"] == pytest.approx(1.0)
 
 
+def test_local_failures_are_reported():
+    """Matrix-free local CG limited to one iteration: the failures and the
+    worst local residual reach the output of the outer solve."""
+    d, n = 4, 4
+    A = tensap.TTOperator.eye([n] * d) * 2.0
+    for k in range(d):
+        cores = [np.eye(n).reshape(1, n, n, 1)] * d
+        T = np.diag(-np.ones(n - 1), 1) + np.diag(-np.ones(n - 1), -1)
+        cores = list(cores)
+        cores[k] = T.reshape(1, n, n, 1) * 0.5
+        A = A + tensap.TTOperator(cores)
+    b = tensap.TTTensor.randn([n] * d, [2] * (d - 1))
+    x0 = tensap.TTTensor.randn([n] * d, [2] * (d - 1))
+    _, output = tensap.TTTensorALSLinearSolver(
+        A, b, x0=x0, dense_max_size=0, local_max_iterations=1, max_iterations=2,
+        tolerance=0.0, display=False).solve()
+    local = output["local"]
+    assert local["solves"] > 0 and local["iterative"] == local["solves"]
+    assert local["failures"] > 0 and local["worst_residual"] > 1e-6
+    _, output = tensap.TTTensorALSLinearSolver(A, b, x0=x0, max_iterations=2, tolerance=0.0,
+                                               display=False).solve()
+    assert output["local"]["failures"] == 0 and output["local"]["iterative"] == 0
+    _, output = tensap.TTTensorALSLinearSolver(
+        A, b, x0=x0, dense_max_size=0, local_method="gmres", max_iterations=2,
+        tolerance=0.0, display=False).solve()
+    assert output["local"]["failures"] == 0 and output["local"]["worst_residual"] < 1e-8
+    with pytest.raises(ValueError, match="local_method"):
+        tensap.TTTensorALSLinearSolver(A, b, local_method="minres")
+
+
 def test_tt_tensor_and_frame_own_their_data():
     """Neither an alias of the input nor a replacement of a core can
     invalidate the norm certified by the orthogonality center."""
