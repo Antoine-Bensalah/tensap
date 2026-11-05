@@ -103,6 +103,22 @@ class Truncator:
             n="\n",
         )
 
+    def hadamard_product(self, x, y):
+        """The entrywise product of x and y at the precision of the truncator.
+
+        Every format has the same contract: the result approximates the exact
+        product x.hadamard_product(y) to the relative tolerance (and maximal
+        rank) of the truncator. By default it is that exact product,
+        truncated. For two TT tensors (TTTensor), it is computed directly by a
+        two-site DMRG fit (tools.tt_products.hadamard_round), without forming
+        the cores of rank r_x r_y: O(d n^2 r^4) per sweep instead of the
+        O(d n r^6) of the rounding of the exact product.
+        """
+        if isinstance(x, tensap.TTTensor) and isinstance(y, tensap.TTTensor):
+            from tensap.tensor_algebra.tools.tt_products import hadamard_round
+            return hadamard_round(x, y, self)[0]
+        return self.truncate(x.hadamard_product(y))
+
     def truncate(self, tensor):
         """
         Compute the truncation of the tensor with relative precision
