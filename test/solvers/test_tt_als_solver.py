@@ -10,6 +10,8 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 import tensap
+from tensap.tensorized_pde_discretization import Dirichlet
+from tensap.tensorized_pde_discretization.finite_volumes import Axis, Grid
 
 
 def _laplacian(n, d, shift=0.0):
@@ -162,6 +164,25 @@ def test_minimize_residual():
     assert output["error"] < 1e-9
 
 
+# --- QTT Poisson problem -------------------------------------------------------------
+
+
+def test_qtt_poisson_dirichlet_dmrg():
+    grid = Grid([Axis(1.0, 4, Dirichlet(), Dirichlet()), Axis(1.0, 3, Dirichlet(), Dirichlet())])
+    A = -1.0 * grid.laplacian()
+    xc, yc = np.meshgrid(grid.axes[0].cell_centers(), grid.axes[1].cell_centers(),
+                         indexing="ij")
+    f = np.exp(-20 * ((xc - 0.5) ** 2 + (yc - 0.4) ** 2))
+    b = grid.quantize(f)
+    truncator = tensap.Truncator(tolerance=1e-10, max_rank=30)
+    x, output = _solver(A, b, algorithm="dmrg", truncator=truncator, tolerance=1e-8,
+                        max_iterations=20).solve()
+    reference = np.linalg.solve(-grid.laplacian_matrix().toarray(), f.ravel())
+    npt.assert_allclose(grid.dequantize(x).ravel(), reference,
+                        atol=1e-7 * np.abs(reference).max())
+    assert output["flag"] == 0
+
+
 # --- options and errors --------------------------------------------------------------
 
 
@@ -249,3 +270,19 @@ def test_amen_matrix_free_non_symmetric():
     x, _ = _solver(A, b, algorithm="amen", dense_max_size=0, local_tolerance=1e-13,
                    tolerance=1e-9, max_iterations=20).solve()
     npt.assert_allclose(x.full().numpy().ravel(), _dense_solution(A, b), atol=1e-7)
+
+
+def test_qtt_poisson_dirichlet_amen():
+    grid = Grid([Axis(1.0, 4, Dirichlet(), Dirichlet()), Axis(1.0, 4, Dirichlet(), Dirichlet())],
+                ordering="interleaved")
+    A = -1.0 * grid.laplacian()
+    xc, yc = np.meshgrid(grid.axes[0].cell_centers(), grid.axes[1].cell_centers(),
+                         indexing="ij")
+    f = np.exp(-20 * ((xc - 0.5) ** 2 + (yc - 0.4) ** 2))
+    b = grid.quantize(f)
+    truncator = tensap.Truncator(tolerance=1e-10, max_rank=30)
+    x, output = _solver(A, b, algorithm="amen", truncator=truncator, tolerance=1e-8,
+                        max_iterations=30).solve()
+    reference = np.linalg.solve(-grid.laplacian_matrix().toarray(), f.ravel())
+    npt.assert_allclose(grid.dequantize(x).ravel(), reference,
+                        atol=1e-7 * np.abs(reference).max())

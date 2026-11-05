@@ -81,6 +81,8 @@ from .tensor_algebra.tools.qtt import (
     qtt_corner,
 )
 
+from . import tensorized_pde_discretization
+
 from .tools.utils import *
 from .tools.multi_indices import MultiIndices
 from .tools.grids import TensorGrid, FullTensorGrid, SparseTensorGrid
