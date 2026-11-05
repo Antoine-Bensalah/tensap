@@ -38,6 +38,10 @@ class Truncator:
         The thresholding type ('hard' or 'soft').
     thresholding_parameter : float
         The thresholding parameter.
+    greedy_updates : bool
+        Truncation of a Tucker tensor with a diagonal core (canonical format):
+        if True, each greedy correction is followed by an ALS update of all
+        the rank-one factors; if False, pure greedy algorithm (MATLAB).
 
     """
 
@@ -47,6 +51,7 @@ class Truncator:
         max_rank=np.inf,
         thresholding_type="hard",
         thresholding_parameter=None,
+        greedy_updates=True,
     ):
         """
         Constructor for the class Truncator.
@@ -61,6 +66,9 @@ class Truncator:
             The thresholding type ('hard' or 'soft'). The default is 'hard'.
         thresholding_parameter : float, optional
             The thresholding parameter. The default is None.
+        greedy_updates : bool, optional
+            Update of the factors in the greedy recompression of canonical
+            tensors. The default is True (False: pure greedy, as in MATLAB).
 
         Returns
         -------
@@ -71,6 +79,7 @@ class Truncator:
         self.max_rank = max_rank
         self.thresholding_type = thresholding_type
         self.thresholding_parameter = thresholding_parameter
+        self.greedy_updates = greedy_updates
         self._hsvd_type = 2  # 1 for root to leaves, 2 for leaves to root
 
     def __repr__(self):
@@ -80,6 +89,7 @@ class Truncator:
             + "{t}max_rank = {},{n}"
             + "{t}thresholding_type = {},{n}"
             + "{t}thresholding_parameter = {},{n}"
+            + "{t}greedy_updates = {},{n}"
             + "{t}_hsvd_type = {}>"
         ).format(
             self.__class__.__name__,
@@ -87,6 +97,7 @@ class Truncator:
             self.max_rank,
             self.thresholding_type,
             self.thresholding_parameter,
+            self.greedy_updates,
             self._hsvd_type,
             t="\t",
             n="\n",
@@ -145,6 +156,8 @@ class Truncator:
         - order 2: truncated SVD of the core of the orthonormalized tensor,
           the result has a diagonal core (the singular values);
         - FullTensor core: HOSVD of the core of the orthonormalized tensor;
+        - DiagonalTensor core: recompression by a greedy algorithm with
+          rank-one corrections and updates of the factors;
         - TreeBasedTensor core: the frames are absorbed into the leaves and
           the tree-based tensor is truncated by hsvd.
 
@@ -177,6 +190,8 @@ class Truncator:
             return self._truncate_tucker_svd(tensor)
         if isinstance(tensor.core, tensap.FullTensor):
             return self._truncate_tucker_hosvd(tensor)
+        if isinstance(tensor.core, tensap.DiagonalTensor):
+            return self._truncate_tucker_greedy(tensor)
         if isinstance(tensor.core, tensap.TreeBasedTensor):
             return tensap.TuckerTensorVector.from_tree_based_tensor(
                 self.hsvd(tensor.tree_based_tensor())
@@ -197,6 +212,46 @@ class Truncator:
             self.max_rank = saved_max_rank
         new_frames = x.tensor_frame.space_times_matrix(svd.space)
         return type(x)(tensap.DiagonalTensor(svd.core.data, 2), new_frames)
+
+    def _truncate_tucker_greedy(self, tensor):
+        """
+        Recompression of a Tucker tensor with a diagonal core (canonical
+        format) by the greedy algorithm applied to I y = x: rank-one
+        corrections computed by ALS, each followed by an update of all the
+        rank-one factors by ALS if self.greedy_updates.
+
+        Differences with MATLAB: by default the factors are updated after each
+        correction (MATLAB uses the pure greedy algorithm, greedy_updates=False,
+        which converges much more slowly), and the number of corrections is bounded by the rank of x
+        (instead of the size of the first dimension), since x itself is an
+        exact representation of that rank.
+        """
+        x_norm = tensor.norm()
+        if x_norm == 0:
+            return tensor
+        identity = tensap.BaseTuckerTensor.eye([s[0] for s in tensor.shape])
+        local_solver = tensap.RankOneALSLinearSolver(
+            identity, tensor, max_iterations=30, stagnation=1e-5, display=False
+        )
+        update = None
+        if self.greedy_updates:
+            update = tensap.TuckerTensorALSLinearSolver(
+                identity, tensor, max_iterations_frames=2, display=False
+            ).update_frames_by_als
+        max_iterations = int(np.min([tensor.core.data.size, np.min(self.max_rank)]))
+        solver = tensap.GreedyLinearSolver(
+            identity,
+            tensor,
+            local_solver=local_solver,
+            update=update,
+            max_iterations=max_iterations,
+            tolerance=self.tolerance,
+            display=False,
+        )
+        out = solver.solve()[0]
+        if (out - tensor).norm() / x_norm > self.tolerance:
+            warnings.warn("Truncator: the approximation is not accurate enough.")
+        return out
 
     def _truncate_tucker_hosvd(self, tensor):
         """

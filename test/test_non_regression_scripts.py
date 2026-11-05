@@ -34,6 +34,9 @@ SLOW_SCRIPTS = {
     "tutorial_magic_points.py",  # ~20 s
     "tutorial_poincare_learning_surrogate.py",  # ~15 s
     "tutorial_tensor_learning_digits_recognition.py",  # trains a network
+    "tutorial_linearsolver_truncation_poisson_solution.py",  # ~35 s
+    "tutorial_linearsolver_update_poisson_solution.py",  # ~30 s
+    "tutorial_linearsolver_high_dim_poisson.py",  # ~80 s
 }
 
 # Known failures of scripts, with the reason.

@@ -32,6 +32,7 @@ from .solvers.linear_solvers import (
     TruncatedPCG,
     RankOneALSLinearSolver,
     GreedyLinearSolver,
+    TuckerTensorALSLinearSolver,
 )
 from .solvers.inverse_approximators import (
     RankOneInverseApproximatorByALS,

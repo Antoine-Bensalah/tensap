@@ -2,10 +2,12 @@
 Unit tests of Truncator.truncate on tensap.BaseTuckerTensor with every core.
 
 Order 2: compared with the truncated SVD of the dense matrix (Eckart-Young).
-Order > 2: full cores (HOSVD) and tree-based cores (hsvd of the tree with
-the frames absorbed in the leaves), checked on tensors of
+Order > 2: diagonal cores (greedy recompression) and tree-based cores (hsvd
+of the tree with the frames absorbed in the leaves), checked on tensors of
 known low rank stored with redundant terms, against the dense tensor.
 """
+
+import warnings
 
 import numpy as np
 import numpy.testing as npt
@@ -65,6 +67,47 @@ def test_order_two_operator(rng):
 
 
 # --- diagonal core: greedy recompression -------------------------------------------------
+
+
+def test_diagonal_core_greedy_recompression(rng):
+    np.random.seed(0)  # random initializations of the rank-one ALS
+    x = _redundant_canonical(rng, [5, 4, 6], 2, copies=3)
+    y = tensap.Truncator(tolerance=1e-6).truncate(x)
+    assert isinstance(y.core, tensap.DiagonalTensor)
+    assert _relative_error(y, x) <= 1e-6
+    assert max(y.representation_rank()) <= 5  # at most n_1 corrections
+
+
+def test_diagonal_core_pure_greedy_option(rng):
+    # pure greedy algorithm (MATLAB): less accurate than with updates
+    x = _redundant_canonical(rng, [5, 4, 6], 4)
+    errors = []
+    for greedy_updates in [False, True]:
+        np.random.seed(0)
+        truncator = tensap.Truncator(tolerance=1e-12, max_rank=3,
+                                     greedy_updates=greedy_updates)
+        with pytest.warns(UserWarning, match="not accurate enough"):
+            y = truncator.truncate(x)
+        assert isinstance(y.core, tensap.DiagonalTensor)
+        errors.append(_relative_error(y, x))
+    assert errors[1] <= errors[0]
+    assert "greedy_updates = True" in repr(truncator)
+
+
+def test_diagonal_core_not_accurate_enough_warns(rng):
+    np.random.seed(0)
+    x = _redundant_canonical(rng, [5, 4, 6], 3)
+    with pytest.warns(UserWarning, match="not accurate enough"):
+        y = tensap.Truncator(tolerance=1e-8, max_rank=1).truncate(x)
+    assert y.representation_rank() == (1, 1, 1)
+
+
+def test_diagonal_core_zero_tensor(rng):
+    x = _redundant_canonical(rng, [3, 3, 3], 2) * 0.0
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        y = tensap.Truncator().truncate(x)
+    assert y.norm() == 0
 
 
 # --- tree-based core: hsvd --------------------------------------------------------------

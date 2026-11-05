@@ -1,0 +1,126 @@
+# Copyright (c) 2024
+# This file is part of tensap (tensor approximation package).
+
+"""
+Tutorial: updates of the greedy iterates for a 4D Poisson equation, with a
+canonical or Tucker core. Python counterpart of the MATLAB tutorial
+tutorial_LinearSolvers_updatePoissonSolution.m.
+
+Problem
+-------
+On (0, 1)^d, d = 4, with n = 50 interior points per direction, the finite
+difference Poisson equation A x = b, A = sum_mu I x ... x K x ... x I and
+b = 1 x ... x 1.
+
+Steps
+-----
+After each rank-one correction of the greedy solver, the iterate is updated
+by a Galerkin problem (TuckerTensorALSLinearSolver):
+
+1. canonical format (diagonal core): update of the core, or of the core and
+   the frames;
+2. Tucker format (full core of size 10^4 after 10 corrections, solved by the
+   conjugate gradient without assembling the matrix).
+
+Acceptance: the updates must improve on the pure greedy iterate (ordering) and
+reach an absolute relative residual ||A x - b|| / ||b|| (thresholds about 4
+times the values observed with seed 0: 5e-3, 4e-3 and 2e-4 for the canonical
+variants, 3e-2 for 10 pure greedy corrections, 2e-6 for the updated Tucker
+core).
+"""
+
+# %% Imports
+import time
+
+import numpy as np
+import scipy.sparse as sp
+import tensap
+
+
+def residual(A, b, x):
+    value = (A @ x - b).norm() / b.norm()
+    assert np.isfinite(value)
+    return value
+
+
+def greedy(A, b, update=None, **kwargs):
+    np.random.seed(0)
+    start = time.time()
+    solver = tensap.GreedyLinearSolver(
+        A, b, update=update, display=False, **kwargs
+    )
+    x, _ = solver.solve()
+    return x, time.time() - start
+
+
+# %% 1D discretization
+L = 1.0
+n = 50
+h = L / (n + 1)
+K = (
+    1
+    / h**2
+    * sp.diags([-1, 2, -1], [-1, 0, 1], shape=(n, n), dtype=float)
+)
+Id = sp.identity(n)
+d = 4
+factory = tensap.LaplacianLikeOperatorFactory(K, Id, d)
+ones = tensap.TuckerTensorVector.ones([1] * d, [n] * d)
+
+# %% 1. Updates: canonical case
+A = factory.make_canonical_tensor()
+b = ones
+u0, t0 = greedy(A, b)
+su = tensap.TuckerTensorALSLinearSolver(A, b, display=False)
+u1, t1 = greedy(A, b, update=su.update_core)
+su.max_iterations = 1
+su.max_iterations_frames = 1
+u2, t2 = greedy(A, b, update=lambda x: su.solve(x)[0])
+print("CANONICAL")
+print(
+    f"  pure greedy          residual {residual(A, b, u0):.2e}  ({t0:.1f} s)"
+)
+print(
+    f"  update of the core   residual {residual(A, b, u1):.2e}  ({t1:.1f} s)"
+)
+print(
+    f"  core and frames      residual {residual(A, b, u2):.2e}  ({t2:.1f} s)"
+)
+assert residual(A, b, u2) < residual(A, b, u1) < residual(A, b, u0)
+assert (
+    residual(A, b, u0) < 2e-2
+    and residual(A, b, u1) < 2e-2
+    and residual(A, b, u2) < 1e-3
+)
+
+# %% 2. Updates: Tucker case (full core)
+A = factory.make_tucker_tensor()
+b = tensap.TuckerTensorVector(
+    tensap.FullTensor(ones.core.full().numpy()), ones.tensor_frame
+)
+u3, t3 = greedy(A, b, max_iterations=10)
+su = tensap.TuckerTensorALSLinearSolver(A, b, display=False)
+u4, t4 = greedy(A, b, update=su.update_core, max_iterations=10)
+su.max_iterations = 1
+su.max_iterations_frames = 1
+u5, t5 = greedy(
+    A, b, update=lambda x: su.solve(x)[0], max_iterations=10
+)
+print("TUCKER (full core)")
+print(
+    f"  pure greedy          residual {residual(A, b, u3):.2e}  ({t3:.1f} s)"
+)
+print(
+    f"  update of the core   residual {residual(A, b, u4):.2e}  ({t4:.1f} s), "
+    f"core of size {np.prod(u4.representation_rank())}"
+)
+print(
+    f"  core and frames      residual {residual(A, b, u5):.2e}  ({t5:.1f} s)"
+)
+assert residual(A, b, u4) < residual(A, b, u3)
+assert residual(A, b, u5) <= residual(A, b, u4)
+assert (
+    residual(A, b, u3) < 0.1
+    and residual(A, b, u4) < 1e-5
+    and residual(A, b, u5) < 1e-5
+)
