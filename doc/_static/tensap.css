@@ -1,0 +1,397 @@
+/* Style of the tensap documentation, on top of pydata-sphinx-theme. */
+
+:root,
+html[data-theme="light"] {
+  --tensap-math-color: #1d4f91;
+  --tensap-code-color: #8a2f8f;
+  --tensap-code-bg: #f0f1f4;
+}
+
+html[data-theme="dark"] {
+  --tensap-math-color: #8cb8f2;
+  --tensap-code-color: #e09ee6;
+  --tensap-code-bg: #22262e;
+}
+
+/* Mathematics in blue, inline and displayed. */
+mjx-container {
+  color: var(--tensap-math-color);
+}
+
+/* A displayed formula wider than the page scrolls horizontally, instead of
+   overflowing into the margin. */
+mjx-container[display="true"] {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding: 0.2em 0;
+}
+
+/* Inline code in violet, on a very light grey background, without a border.
+   Links to the API keep the link colour, so that they stand out from plain
+   code. */
+code.literal,
+.bd-content code:not(pre code) {
+  color: var(--tensap-code-color);
+  background: var(--tensap-code-bg);
+  border: none;
+  border-radius: 0.25em;
+  padding: 0.05em 0.3em;
+}
+
+.bd-content a code.literal,
+.bd-content a code {
+  color: var(--pst-color-link);
+}
+
+/* Headings closer to a mathematics book: a smaller scale than the theme's
+   (2.625 / 2.125 / 1.75 / 1.5 / 1.25 rem), and code in a heading at the
+   size of the heading. */
+:root {
+  --pst-font-size-h1: 1.875rem;
+  --pst-font-size-h2: 1.5rem;
+  --pst-font-size-h3: 1.25rem;
+  --pst-font-size-h4: 1.125rem;
+  --pst-font-size-h5: 1rem;
+  --pst-font-size-h6: 1rem;
+}
+
+.bd-content h1 {
+  margin-top: 0.5em;
+}
+
+.bd-content h2,
+.bd-content h3,
+.bd-content h4 {
+  margin-top: 1.6em;
+  margin-bottom: 0.6em;
+}
+
+.bd-content :is(h1, h2, h3, h4, h5, h6) code,
+.bd-content :is(h1, h2, h3, h4, h5, h6) code.literal {
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Logo in the header. */
+.bd-header .navbar-brand {
+  height: 100%;
+  max-height: none;
+}
+
+.bd-header .navbar-brand img.logo__image {
+  height: 3.4rem;
+  max-height: none;
+  width: auto;
+}
+
+/* Colours of the logo, used soberly: headings in the navy of the logo,
+   links and the current section in a deep teal (between its teal and its
+   navy), hover and highlights in its orange (darkened for contrast on a
+   white background). */
+html[data-theme="light"] {
+  --pst-color-heading: #1f3a5f;
+  --pst-color-primary: #0e5f6b;
+  --pst-color-primary-highlight: #0a4b55;
+  --pst-color-link-higher-contrast: #0a4b55;
+  --pst-color-secondary: #c2620f;
+  --pst-color-secondary-highlight: #a65208;
+  --pst-color-secondary-bg: #fbe6d0;
+  --pst-color-target: #fbe6d0;
+}
+
+html[data-theme="dark"] {
+  --pst-color-heading: #d6e3f0;
+  --pst-color-primary: #5cc0cc;
+  --pst-color-primary-highlight: #7fd0da;
+  --pst-color-link-higher-contrast: #7fd0da;
+  --pst-color-secondary: #f0a050;
+  --pst-color-secondary-highlight: #f5b878;
+  --pst-color-secondary-bg: #4a2e12;
+  --pst-color-target: #4a2e12;
+}
+
+/* Inline formulas slightly smaller, to blend into the text. */
+mjx-container:not([display="true"]) {
+  font-size: 95%;
+}
+
+/* Admonitions in the colours of the logo: a pale background and a coloured
+   rule on the left, no shadow. Notes in teal, warnings in orange. */
+html[data-theme="light"] {
+  --pst-color-info: #0e5f6b;
+  --pst-color-info-bg: #e6f2f4;
+  --pst-color-warning: #c2620f;
+  --pst-color-warning-bg: #fbeee0;
+}
+
+html[data-theme="dark"] {
+  --pst-color-info: #5cc0cc;
+  --pst-color-info-bg: #15343a;
+  --pst-color-warning: #f0a050;
+  --pst-color-warning-bg: #3d2a16;
+}
+
+.bd-content .admonition {
+  box-shadow: none;
+  border-left-width: 0.25rem;
+}
+
+/* Left column: no "Section Navigation" title. */
+.bd-sidebar-primary .bd-links__title {
+  display: none;
+}
+
+/* Left column: the button that folds it is a discreet icon, without its
+   "Collapse Sidebar" label (the tooltip "Expand Sidebar" remains when it is
+   folded), in the muted colour of the text until hovered. */
+.bd-sidebar-primary #pst-collapse-sidebar-button {
+  margin-left: auto;
+}
+
+.bd-sidebar-primary #pst-collapse-sidebar-button .pst-collapse-sidebar-label {
+  display: none;
+}
+
+.bd-sidebar-primary #pst-collapse-sidebar-button .pst-icon {
+  color: var(--pst-color-text-muted);
+  opacity: 0.6;
+  height: 1.1em;
+}
+
+.bd-sidebar-primary #pst-collapse-sidebar-button:hover .pst-icon {
+  color: var(--pst-color-secondary);
+  opacity: 1;
+}
+
+.bd-sidebar-primary.pst-squeeze #pst-collapse-sidebar-button {
+  margin-left: 0;
+}
+
+/* Right column: lighter. Smaller text, tighter entries, and class names in
+   the font of the text (not in bold monospace). */
+.bd-sidebar-secondary nav.page-toc {
+  font-size: 0.85rem;
+}
+
+.bd-sidebar-secondary nav.page-toc .toc-entry a.nav-link {
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+  line-height: 1.35;
+}
+
+.bd-sidebar-secondary nav.page-toc code,
+.bd-sidebar-secondary nav.page-toc code.literal {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Code blocks with more air: more padding, more space between the lines,
+   and rounder corners. */
+.bd-content div.highlight pre {
+  padding: 1.1rem 1.4rem;
+  line-height: 1.55;
+  border-radius: 0.4rem;
+}
+
+.bd-content div.highlight {
+  margin: 1.25rem 0 1.5rem;
+}
+
+/* Footer: previous and next pages as two framed links. */
+.prev-next-area a.left-prev,
+.prev-next-area a.right-next {
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.4rem;
+  padding: 0.6rem 1rem;
+}
+
+.prev-next-area a.left-prev:hover,
+.prev-next-area a.right-next:hover {
+  border-color: var(--pst-color-secondary);
+}
+
+/* -- Home page ------------------------------------------------------------ */
+
+/* The title is shown by the logo at the top of the page. */
+section#tensap > h1 {
+  display: none;
+}
+
+.tensap-hero {
+  text-align: center;
+  margin: 0.5rem 0 1.5rem;
+  padding: 1.5rem 1rem 1rem;
+}
+
+.tensap-hero__logo {
+  height: 4.75rem;
+  width: auto;
+}
+
+.tensap-hero__tagline {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--pst-color-heading);
+}
+
+.tensap-hero__text {
+  max-width: 40rem;
+  margin: 0 auto;
+  color: var(--pst-color-text-muted);
+  /* Lines of even length: no word alone on the last line. */
+  text-wrap: balance;
+}
+
+/* Illustration of the home page: a large tensor approximated by a tree.
+   Under the text on small screens, on its right on wide ones. */
+.tensap-hero__picture img {
+  display: block;
+  width: 100%;
+  max-width: 32rem;
+  height: auto;
+  margin: 1.5rem auto 0;
+}
+
+@media (min-width: 992px) {
+  .tensap-hero {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr;
+    align-items: center;
+    gap: 2rem;
+    text-align: left;
+  }
+  .tensap-hero__text {
+    margin: 0;
+  }
+  .tensap-hero__buttons {
+    white-space: nowrap;
+  }
+  .bd-content .tensap-hero__buttons a.tensap-button:first-child {
+    margin-left: 0;
+  }
+  .tensap-hero__picture img {
+    margin: 0;
+  }
+}
+
+.tensap-hero__buttons {
+  margin: 1.25rem 0 0.5rem;
+}
+
+.bd-content a.tensap-button {
+  display: inline-block;
+  margin: 0.25rem;
+  padding: 0.55em 1.2em;
+  border: 1px solid var(--pst-color-primary);
+  border-radius: 0.4rem;
+  color: var(--pst-color-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.bd-content a.tensap-button--primary {
+  background-color: var(--pst-color-primary);
+  color: var(--pst-color-background);
+}
+
+.bd-content a.tensap-button:hover {
+  border-color: var(--pst-color-secondary);
+  background-color: var(--pst-color-secondary);
+  color: var(--pst-color-background);
+}
+
+.tensap-cards .sd-card {
+  border: 1px solid var(--pst-color-border);
+  border-radius: 0.5rem;
+  box-shadow: none;
+  transition: border-color 0.15s;
+}
+
+.tensap-cards .sd-card:hover {
+  border-color: var(--pst-color-secondary);
+}
+
+.tensap-cards .sd-card-title {
+  color: var(--pst-color-heading);
+  font-weight: 600;
+}
+
+.tensap-cards .sd-card-title .sd-octicon {
+  color: var(--pst-color-secondary);
+  margin-right: 0.4em;
+  vertical-align: -0.25em;
+}
+
+.tensap-cards .sd-card-text {
+  color: var(--pst-color-text-muted);
+  font-size: 0.95rem;
+}
+
+/* Compact cards, so that the two grids fit on one screen. */
+.tensap-cards .sd-card-body {
+  padding: 0.8rem 1rem;
+}
+
+.tensap-cards .sd-card-title {
+  margin-bottom: 0.3rem;
+}
+
+.bd-content section#tensap h2 {
+  margin-top: 1.2em;
+}
+
+/* Folders of the Tensap tutorials (rubrics, so that they are not numbered). */
+p.rubric.tutorial-folder {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 2.5rem 0 1rem;
+}
+
+/* In the code of the galleries, the names of tensap are links to the API
+   reference: shown in the primary colour, underlined only on hover. */
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"],
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"] span {
+  color: var(--pst-color-primary);
+  text-decoration: none;
+}
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"]:hover,
+.bd-content div.highlight a[class*="sphx-glr-backref-module-tensap"]:hover span {
+  text-decoration: underline;
+}
+
+/* "native" underlines the names of modules: not in this site. */
+.bd-content div.highlight .nn {
+  text-decoration: none;
+}
+
+/* Outputs of the galleries: on the page background, in a thin frame with a
+   bar in the primary colour on the left, instead of the yellow box of
+   sphinx-gallery. The code above them keeps its grey background. */
+.bd-content div.sphx-glr-script-out .highlight {
+  background: transparent;
+  border: none;
+}
+.bd-content div.sphx-glr-script-out .highlight pre {
+  background: transparent;
+  color: var(--pst-color-text-base);
+  border: 1px solid var(--pst-color-border);
+  border-left: 4px solid var(--pst-color-primary);
+}
+
+/* On a laptop screen (a window from 960 to 1400 pixels wide), the left
+   sidebar is a little narrower, so that 72 characters of code fit in a code
+   block. Wider screens keep the default layout. */
+@media (min-width: 960px) and (max-width: 1399.98px) {
+  .bd-sidebar-primary {
+    flex-basis: 18rem;
+    width: 18rem;
+  }
+}
