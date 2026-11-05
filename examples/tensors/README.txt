@@ -1,4 +1,5 @@
 Tensors and tensor formats
 --------------------------
 
-Full tensors, dimension trees, tree-based tensors and their truncation.
+Full tensors, dimension trees, tree-based and Tucker tensors, and their
+truncation.

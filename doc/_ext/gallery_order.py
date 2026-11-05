@@ -10,6 +10,7 @@ EXAMPLES = [
     "dimension_tree.py",
     "tree_based_tensor.py",
     "tensor_truncation.py",
+    "tucker_tensor.py",
     "measures.py",
     "orthonormal_polynomials.py",
     "functions_bases_grids.py",
