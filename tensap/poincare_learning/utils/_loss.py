@@ -59,12 +59,13 @@ def poincare_loss_augmented(jac_u, jac_g, alpha=1):
         Poincare loss.
 
     """
-    N, d = jac_u.shape[0], jac_u.shape[-1]
+    N = jac_u.shape[0]
     out = np.linalg.norm(jac_u)**2 / N
     for ju, jg in zip(jac_u, jac_g):
+        # ||ju||^2 - tr(ju jg^T (alpha^2 I + jg jg^T)^-1 jg ju^T)
         jgju = jg @ ju.T
-        gram = alpha**2 * np.eye(d) + jg @ jg.T
-        out -= np.linalg.norm(jgju.T @ np.linalg.solve(gram, jgju))**2 / N
+        gram = alpha**2 * np.eye(jg.shape[0]) + jg @ jg.T
+        out -= np.trace(jgju.T @ np.linalg.solve(gram, jgju)) / N
     return out
 
 
