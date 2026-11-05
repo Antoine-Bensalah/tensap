@@ -226,7 +226,8 @@ class TreeBasedTensor:
         """
         result = np.isin(self.tree.dim2ind[dim], self.active_nodes)
         if result.size == 1:
-            result = result[0]
+            # a scalar dim gives a 0-d array
+            result = bool(np.ravel(result)[0])
         return result
 
     def __repr__(self):
@@ -351,7 +352,7 @@ class TreeBasedTensor:
             tensor.tensors[root] = tensor.tensors[root].tensor_matrix_product(
                 arg, tensor.tensors[root].order - 1
             )
-            tensor.ranks[root] = arg.shape[1]
+            tensor.ranks[root] = arg.shape[0]
         else:
             raise ValueError("Wrong shapes.")
         return tensor
@@ -710,7 +711,8 @@ class TreeBasedTensor:
 
         """
         tree = self.tree
-        ranks = self.ranks
+        # copy: the ranks of the inactive nodes are set below
+        ranks = np.array(self.ranks)
         ranks[self.non_active_nodes - 1] = self.shape[
             np.logical_not(self.is_active_node[tree.dim2ind - 1])
         ]
@@ -761,6 +763,10 @@ class TreeBasedTensor:
         tensor_star = self
 
         nodes = tensap.fast_setdiff(np.arange(1, nb_nodes + 1), self.tree.root)
+        # no pair of nodes can be permuted (e.g. trivial tree): nothing to
+        # gain, and the random search below would never end
+        if all(np.all(self.nodes_permutation_cost(a) == 0) for a in nodes):
+            return self
 
         proba_m = 1 / np.arange(1, self.order + 1) ** 2
 
@@ -1886,7 +1892,7 @@ class TreeBasedTensor:
                 tmp = tensors2[nod - 1].tensor_matrix_product(out[nod - 1], 0)
                 out[nod - 1] = tensors1[nod - 1].tensordot(tmp, 0, 0)
                 out[nod - 1] = out[nod - 1].reshape(
-                    [tensors1[nod - 1].shape[-1], tensors2[nod - 1].shape[-1]]
+                    [self.ranks[nod - 1], tensor2.ranks[nod - 1]]
                 )
                 out[nod - 1] = out[nod - 1].numpy()
 
@@ -1909,7 +1915,10 @@ class TreeBasedTensor:
                         [tensors1[nod - 1].shape[-1], tensors2[nod - 1].shape[-1]]
                     )
                 out[nod - 1] = out[nod - 1].numpy()
-        out = out[nod_level - 1]
+        if tree.is_leaf[tree.root - 1]:  # a tree with a single node
+            out = out[tree.root - 1]
+            return out.item() if out.size == 1 else out
+        out = out[[tree.root - 1]]
         if out.size == 1:
             out = out[0]
         return out
@@ -2026,7 +2035,7 @@ class TreeBasedTensor:
         """
         Plot the tree with the nodes indices and the active nodes.
 
-        This method requires the package igraph.
+        This method requires the packages networkx and matplotlib.
 
         Parameters
         ----------
@@ -2271,11 +2280,9 @@ class TreeBasedTensor:
                     tensap.FullTensor(matrices[ind]), 0, 0
                 )
             else:
+                # identity matrix: evaluation of the diagonal of the tensor
                 out = out.outer_product_eval_diag(
-                    tensap.FullTensor(np.eye(diag_below[alpha - 1].shape[0])),
-                    [],
-                    [],
-                    True,
+                    tensap.FullTensor(np.eye(tensors[alpha - 1].shape[0])), 0, 0
                 )
             # out = out.squeeze()
 
@@ -2296,12 +2303,12 @@ class TreeBasedTensor:
                             tensap.FullTensor(matrices[ind]), 0, 0
                         )
                     else:
+                        # identity matrix: evaluation of the diagonal
                         ind = tree.child_number(child) - 1
                         tmp = tmp.outer_product_eval_diag(
                             tensap.FullTensor(np.eye(tensors[alpha - 1].shape[ind])),
-                            [],
-                            [],
-                            True,
+                            0,
+                            0,
                         )
                 # tmp = tmp.squeeze()
                 if active_ch.size != 0:
@@ -2366,9 +2373,8 @@ class TreeBasedTensor:
                     ind = tree.child_number(child) - 1
                     tmp = tmp.outer_product_eval_diag(
                         tensap.FullTensor(np.eye(self.tensors[gamma - 1].shape[ind])),
-                        [],
-                        [],
-                        True,
+                        0,
+                        0,
                     )
             # tmp = tmp.squeeze()
             if active_ch.size != 0:
@@ -2392,8 +2398,9 @@ class TreeBasedTensor:
                     tensap.FullTensor(matrices[ind]), 0, 0
                 )
             else:
+                # identity matrix: evaluation of the diagonal of the tensor
                 g_alpha = g_alpha.outer_product_eval_diag(
-                    tensap.FullTensor(np.eye(u_alpha[alpha - 1].shape[0])), [], [], True
+                    tensap.FullTensor(np.eye(self.tensors[alpha - 1].shape[0])), 0, 0
                 )
             # g_alpha = g_alpha.squeeze()
         else:
@@ -2417,9 +2424,8 @@ class TreeBasedTensor:
                             tensap.FullTensor(
                                 np.eye(self.tensors[alpha - 1].shape[ind])
                             ),
-                            [],
-                            [],
-                            True,
+                            0,
+                            0,
                         )
                 # tmp = tmp.squeeze()
                 if active_ch.size != 0:
@@ -2464,7 +2470,10 @@ class TreeBasedTensor:
                 self.shape[dim] = self.tensors[parent_nod - 1].shape[ind - 1]
             else:
                 self.shape[dim] = self.tensors[nod - 1].shape[0]
-                self.ranks[nod - 1] = self.tensors[nod - 1].shape[-1]
+                if nod == self.tree.root and self.tensors[nod - 1].order == 1:
+                    self.ranks[nod - 1] = 1  # a root leaf of rank 1 is a vector
+                else:
+                    self.ranks[nod - 1] = self.tensors[nod - 1].shape[-1]
         return self
 
     @staticmethod
