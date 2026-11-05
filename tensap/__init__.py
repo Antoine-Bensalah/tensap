@@ -31,7 +31,18 @@ from .tensor_algebra.tensors.tree_based_tensor import TreeBasedTensor
 from .tensor_algebra.tensors.canonical_tensor import CanonicalTensor
 from .tensor_algebra.tensors.diagonal_tensor import DiagonalTensor
 from .tensor_algebra.tensors.sparse_tensor import SparseTensor
+from .tensor_algebra.tensors.tucker_like_tensor import (
+    BaseTuckerTensor,
+    TuckerTensorVector,
+    TuckerTensorOperator,
+)
+from .tensor_algebra.tensors.frame import Frame, FrameVector, FrameOperator
+from .tensor_algebra.tensors.tensor_frame import TFrame, TFrameVector, TFrameOperator
 from .tensor_algebra.tools.truncator import Truncator
+from .tensor_algebra.tools.convert_tensors import convert_tensors
+from .tensor_algebra.tools.laplacian_like_operator_factory import (
+    LaplacianLikeOperatorFactory,
+)
 
 from .tools.utils import *
 from .tools.multi_indices import MultiIndices

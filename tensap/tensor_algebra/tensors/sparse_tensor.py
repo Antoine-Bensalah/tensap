@@ -644,11 +644,14 @@ class SparseTensor:
         """
         Kronecker product of tensors.
 
-        Similar to numpy.kron but for sparse tensors.
+        Similar to numpy.kron but for sparse tensors (port of Matlab
+        SparseTensor.kron): z(i * n_y + j) = x(i) y(j) in every dimension,
+        with the convention of FullTensor.kron (the index of self varies
+        slowest). Only the products of the non-zero entries are stored.
 
         Parameters
         ----------
-        y : Tensor
+        y : SparseTensor
             The second tensor of the Kronecker product.
 
         Returns
@@ -657,7 +660,20 @@ class SparseTensor:
             The tensor resulting from the Kronecker product.
 
         """
-        raise NotImplementedError("Method not implemented.")
+        y = SparseTensor(y)
+        order = max(self.order, y.order)
+        shape_x = np.concatenate([self.shape, np.ones(order - self.order, dtype=int)])
+        shape_y = np.concatenate([y.shape, np.ones(order - y.order, dtype=int)])
+        ix = np.hstack([self.indices.array,
+                        np.zeros((self.indices.array.shape[0], order - self.order), dtype=int)])
+        iy = np.hstack([y.indices.array,
+                        np.zeros((y.indices.array.shape[0], order - y.order), dtype=int)])
+        # all the pairs (entry of self, entry of y), the index of y varying fastest
+        pairs_x = np.repeat(np.arange(ix.shape[0]), iy.shape[0])
+        pairs_y = np.tile(np.arange(iy.shape[0]), ix.shape[0])
+        indices = ix[pairs_x] * shape_y + iy[pairs_y]
+        data = np.ravel(np.outer(self.data, y.data))
+        return SparseTensor(data, tensap.MultiIndices(indices), shape_x * shape_y)
 
     def dot_with_rank_one_metric(self, y, M):
         """
