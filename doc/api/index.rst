@@ -18,6 +18,7 @@ use, see :doc:`/examples/index`.
    approximation
    linear_algebra
    solvers
+   tensorized_pde_discretization
    tools
    poincare_learning
 

@@ -71,6 +71,36 @@ Construction of operators
 
    convert_tensors
 
+Quantized tensor trains
+-----------------------
+
+Quantization of arrays, functions and matrices into tensor trains with
+modes of size b (module ``tensap.tensor_algebra.tools.qtt``), in the
+layout of a :class:`~tensap.Tensorizer`, and the QTT primitives of 1D
+operators.
+
+.. autosummary::
+   :toctree: generated/
+   :template: function
+
+   quantize
+   dequantize
+   quantize_function
+   quantize_operator
+   dequantize_operator
+   grid_points
+   to_functional_tensor
+   qtt_layout_product
+   qtt_embed
+   qtt_insert_axis
+   qtt_elementary_vector
+   qtt_identity
+   qtt_shift
+   qtt_elementary_matrix
+   qtt_ones_matrix
+   qtt_banded
+   qtt_corner
+
 Truncation
 ----------
 

@@ -425,7 +425,7 @@ def qtt_banded(diagonals: dict, L: int, b: int = 2, periodic: bool = False,
     ----------
     diagonals : dict
         {offset k: value c_k}: c_k on the k-th diagonal (k > 0 above the main
-        diagonal, k < 0 below). |k| < b^L.
+        diagonal, k < 0 below), with abs(k) < b^L.
     L, b : int
         Size b^L.
     periodic : bool, optional

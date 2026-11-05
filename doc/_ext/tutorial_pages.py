@@ -86,6 +86,11 @@ TITLES = {
         "Truncation of the solution of a Poisson equation",
     "tutorial_linearsolver_update_poisson_solution":
         "Updates of the greedy iterates",
+    "tutorial_qtt_poisson_rectangle": "Poisson equation on a rectangle in QTT format",
+    "tutorial_qtt_tt_solvers": "Alternating TT solvers in QTT format",
+    "tutorial_staggered_helmholtz": "Helmholtz-Hodge decomposition on a staggered grid",
+    "tutorial_staggered_stokes": "Heat and Stokes equations on a staggered grid",
+    "tutorial_staggered_taylor_green": "Taylor-Green vortex on a staggered grid",
 }
 ORIGIN = re.compile(r"``test/non_regression_scripts/([^`]+\.py)``")
 CELL = re.compile(r"^# %%\s*(.*?)\s*$")

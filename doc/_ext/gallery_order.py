@@ -48,6 +48,11 @@ EXAMPLES = [
     "tutorial_linearsolver_update_poisson_solution.py",
     "tutorial_linearsolver_truncation_poisson_solution.py",
     "tutorial_linearsolver_parametric_diffusion_reaction.py",
+    "tutorial_qtt_poisson_rectangle.py",
+    "tutorial_qtt_tt_solvers.py",
+    "tutorial_staggered_helmholtz.py",
+    "tutorial_staggered_stokes.py",
+    "tutorial_staggered_taylor_green.py",
 ]
 
 
