@@ -37,3 +37,22 @@ jobs:
             gallery-${{ hashFiles('tensap/**', 'pyproject.toml') }}-
       - name: Build (warnings are errors)
         run: make html -C doc
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc/_build/html
+
+  # Publication on the GitHub Pages of the fork only, from the branch
+  # ab/site. Anthony's site is not touched.
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.repository == 'Antoine-Bensalah/tensap' && github.ref == 'refs/heads/ab/site'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
