@@ -338,3 +338,13 @@ def test_vectorize_with_sparsity_pattern():
     # without sparsity: unchanged behaviour
     w = A.vectorize()
     assert w.tensor_frame.frames[0].shape[0] == n * n
+
+
+def test_truncation_of_an_operator_keeps_its_sparsity():
+    A = _laplacian_tucker()
+    A2 = A + A
+    truncated = tensap.Truncator(tolerance=1e-12).truncate(A2)
+    npt.assert_allclose(truncated.full().numpy(), 2 * A.full().numpy(), atol=1e-12)
+    for frame in truncated.tensor_frame.frames:
+        off_band = np.abs(np.triu(frame.data, k=2)).max(axis=(1, 2))
+        assert np.all(off_band == 0.0)

@@ -117,6 +117,9 @@ class Truncator:
 
         """
 
+        if isinstance(tensor, tensap.BaseTuckerTensor):
+            return self._truncate_tucker(tensor)
+
         if not hasattr(tensor, "order"):
             tensor = tensap.FullTensor(tensor)
 
@@ -132,6 +135,104 @@ class Truncator:
         else:
             raise ValueError("Wrong tensor order.")
         return out
+
+    def _truncate_tucker(self, tensor):
+        """
+        Truncate a BaseTuckerTensor (TuckerTensorVector or TuckerTensorOperator).
+
+        As Truncator.truncate for a TuckerLikeTensor in the MATLAB
+        ApproximationToolbox: an operator is vectorized, then
+        - order 2: truncated SVD of the core of the orthonormalized tensor,
+          the result has a diagonal core (the singular values);
+        - FullTensor core: HOSVD of the core of the orthonormalized tensor;
+        - TreeBasedTensor core: the frames are absorbed into the leaves and
+          the tree-based tensor is truncated by hsvd.
+
+        Parameters
+        ----------
+        tensor : tensap.BaseTuckerTensor
+            The Tucker tensor to truncate.
+
+        Raises
+        ------
+        NotImplementedError
+            For another type of core.
+
+        Returns
+        -------
+        tensap.BaseTuckerTensor
+            The truncated tensor, of the same subclass as tensor.
+
+        """
+        if isinstance(tensor, tensap.TuckerTensorOperator):
+            # truncation of the vectorization restricted to the union of the
+            # sparsity patterns: the zero entries of the frames stay exactly
+            # zero, and the SVDs act on shorter vectors
+            shape = tensor.shape
+            vector, patterns = tensor.vectorize(sparsity=True)
+            vector = self._truncate_tucker(vector)
+            return vector.unvectorize([s[0] for s in shape], [s[1] for s in shape], patterns)
+
+        if tensor.order == 2:
+            return self._truncate_tucker_svd(tensor)
+        if isinstance(tensor.core, tensap.FullTensor):
+            return self._truncate_tucker_hosvd(tensor)
+        if isinstance(tensor.core, tensap.TreeBasedTensor):
+            return tensap.TuckerTensorVector.from_tree_based_tensor(
+                self.hsvd(tensor.tree_based_tensor())
+            )
+        raise NotImplementedError(
+            "Truncation of a BaseTuckerTensor is not implemented for a "
+            f"{type(tensor.core).__name__} core."
+        )
+
+    def _truncate_tucker_svd(self, tensor):
+        """Truncated SVD of an order-2 Tucker tensor, with a diagonal core."""
+        x = tensor.orth()
+        saved_max_rank = self.max_rank
+        self.max_rank = np.min(self.max_rank)
+        try:
+            svd = self.trunc_svd(x.core.full().numpy())
+        finally:
+            self.max_rank = saved_max_rank
+        new_frames = x.tensor_frame.space_times_matrix(svd.space)
+        return type(x)(tensap.DiagonalTensor(svd.core.data, 2), new_frames)
+
+    def _truncate_tucker_hosvd(self, tensor):
+        """
+        HOSVD of a Tucker tensor with a FullTensor core: orthonormalize the
+        frames, run HOSVD on the (small) core, and push the resulting factor
+        matrices back into the frames.
+        """
+        x = tensor.orth()
+        core = x.core
+        order = core.order
+
+        max_rank = np.atleast_1d(self.max_rank)
+        if max_rank.size == 1:
+            max_rank = np.repeat(max_rank, order)
+        local_tol = self.tolerance / np.sqrt(order)
+
+        saved_max_rank = self.max_rank
+        factors = []
+        for dim in range(order):
+            self.max_rank = max_rank[dim]
+            factors.append(
+                self.trunc_svd(core.matricize(dim).numpy(), local_tol).space[0]
+            )
+        self.max_rank = saved_max_rank
+
+        new_core = core.tensor_matrix_product(factors[0].T, 0)
+        for dim in range(1, order):
+            new_core = new_core.tensor_matrix_product(factors[dim].T, dim)
+
+        new_frames = [
+            frame.space_times_matrix(factor)
+            for frame, factor in zip(x.tensor_frame.frames, factors)
+        ]
+        new_tensor_frame = x.tensor_frame.__class__(new_frames)
+
+        return type(x)(new_core, new_tensor_frame)
 
     def trunc_svd(self, matrix, tolerance=None, power=2):
         """
