@@ -76,11 +76,15 @@ filterwarnings = [
   "ignore:FigureCanvasAgg is non-interactive:UserWarning",
 ]
 
-# Coverage (pytest --cov=tensap): branches are measured.
+# Coverage (pytest --cov=tensap): branches are measured, and the run fails
+# below the threshold. The fast suite covers 78 % of the branches and lines
+# (80 % with PyTorch and pymanopt): the threshold leaves a small margin for the
+# environments without optional dependencies.
 [tool.coverage.run]
 branch = true
 
 [tool.coverage.report]
+fail_under = 75
 show_missing = false
 
 [project.urls]
