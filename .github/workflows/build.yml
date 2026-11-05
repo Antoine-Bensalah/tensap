@@ -6,7 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Format
-        run: pipx run ruff format --check --line-length 72 examples
+        run: pipx run ruff format --check --line-length 72 examples use_cases test/non_regression_scripts
       - name: Lint
         run: |
           sudo apt-get install python3-pip

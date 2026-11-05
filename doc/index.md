@@ -105,6 +105,13 @@ Concepts, notations and algorithms.
 One method or feature per example.
 :::
 
+:::{grid-item-card} {octicon}`beaker;1.4em` Use Cases
+:link: use_cases/index
+:link-type: doc
+
+Complete scientific problems.
+:::
+
 :::{grid-item-card} {octicon}`code;1.4em` API Reference
 :link: api/index
 :link-type: doc
@@ -128,6 +135,7 @@ Build the docs, add an example, propose a change.
 getting_started/index
 theory/index
 examples/index
+use_cases/index
 api/index
 contributing/index
 bibliography

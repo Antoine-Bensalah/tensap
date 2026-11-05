@@ -37,6 +37,7 @@ extensions = [
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
     "section_numbers",  # _ext/: numbered sections of the galleries and the API
+    "tutorial_pages",  # _ext/: the original tutorials as a gallery
     "gallery_thumbnails",  # _ext/: drawn thumbnails of _thumbnails/
 ]
 
@@ -111,13 +112,14 @@ templates_path = ["_templates"]
 exclude_patterns = [
     "_build",
     "api_notes",
+    "_tutorials_src",
     "_thumbnails",
     "Thumbs.db",
     ".DS_Store",
     "**/*.ipynb",
 ]
 
-# -- Examples Gallery (sphinx-gallery) -----------------------
+# -- Examples Gallery and Use Cases (sphinx-gallery) -----------------------
 
 # Examples that are not executed when the documentation is built: their code
 # is shown without its output. Empty: every example is executed, and its
@@ -128,8 +130,10 @@ NOT_EXECUTED = []
 
 sphinx_gallery_conf = {
     # Sources at the root of the repository, pages generated in doc/.
-    "examples_dirs": ["../examples"],
-    "gallery_dirs": ["examples"],
+    # _tutorials_src/ is written by _ext/tutorial_pages.py from the scripts
+    # of test/non_regression_scripts/.
+    "examples_dirs": ["../examples", "../use_cases", "_tutorials_src"],
+    "gallery_dirs": ["examples", "use_cases", "tutorials"],
     # Execute every example, except those of NOT_EXECUTED.
     "filename_pattern": (
         r"/(?!(%s)\.py$)[^/]+\.py$" % "|".join(NOT_EXECUTED)
@@ -145,6 +149,11 @@ sphinx_gallery_conf = {
         "../examples/pca",
         "../examples/learning",
         "../examples/poincare",
+        "_tutorials_src/tensor_algebra",
+        "_tutorials_src/functions",
+        "_tutorials_src/approximation",
+        "_tutorials_src/poincare_learning",
+        "_tutorials_src/tools",
     ],
     "within_subsection_order": "gallery_order.ExampleOrder",
     # Links from the code of the examples to the API reference, and lists

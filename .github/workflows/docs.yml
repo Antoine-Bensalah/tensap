@@ -30,7 +30,9 @@ jobs:
         with:
           path: |
             doc/examples
-          key: gallery-${{ hashFiles('tensap/**', 'pyproject.toml') }}-${{ hashFiles('examples/**') }}
+            doc/use_cases
+            doc/tutorials
+          key: gallery-${{ hashFiles('tensap/**', 'pyproject.toml') }}-${{ hashFiles('examples/**', 'use_cases/**', 'test/non_regression_scripts/**') }}
           restore-keys: |
             gallery-${{ hashFiles('tensap/**', 'pyproject.toml') }}-
       - name: Build (warnings are errors)

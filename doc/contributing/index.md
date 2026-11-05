@@ -45,6 +45,8 @@ seed after the imports. An example is executed when the documentation is
 built, unless its name is in `NOT_EXECUTED` in `doc/conf.py`; its position
 in its section is set in `doc/_ext/gallery_order.py`.
 
+Use Cases follow the same format, in `use_cases/`.
+
 Code is shown the same way on every page: the style of the code blocks
 (padding, line spacing, colours) is set once for the whole site, in
 `doc/_static/tensap.css`. To keep it uniform, write code only in the cells of
@@ -55,12 +57,12 @@ Do not paste raw HTML, images of code, or styles specific to one page.
 Lines of code are at most 72 characters long (the limit PEP 8 sets for
 comments and docstrings), so that a code block fits in the page without
 scrolling on a laptop screen, from a window 1280 pixels wide. The scripts of
-`examples/` are formatted
+`examples/`, `use_cases/` and `test/non_regression_scripts/` are formatted
 with
 
 ```bash
 ruff format --line-length 72 \
-    examples
+    examples use_cases test/non_regression_scripts
 ```
 
 and the CI checks it. The formatter does not split long strings: cut a long
