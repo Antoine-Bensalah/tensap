@@ -31,6 +31,10 @@ $\nu$.
 For obtaining the margin or reduced margin of an multi-index set
 $I$, we can use the methods `I.get_margin()` and `I.get_reduced_margin()`.
 
+For other operations of {py:class}`~tensap.MultiIndices`, see the
+example {ref}`sphx_glr_examples_functions_multi_indices.py`.
+
 ## `TensorGrid`, `FullTensorGrid` and `SparseTensorGrid`
 
-Tensor product grids or sparse grids are represented with classes {py:class}`~tensap.FullTensorGrid` and {py:class}`~tensap.SparseTensorGrid`, that inherit from {py:class}`~tensap.TensorGrid`.
+Tensor product grids or sparse grids are represented with classes {py:class}`~tensap.FullTensorGrid` and {py:class}`~tensap.SparseTensorGrid`, that inherit from {py:class}`~tensap.TensorGrid`.  
+See the example {ref}`sphx_glr_examples_functions_functions_bases_grids.py`.

@@ -16,6 +16,7 @@ html_theme.sidebar_secondary.remove: true
     </p>
     <p class="tensap-hero__buttons">
       <a class="tensap-button tensap-button--primary" href="getting_started/index.html">Getting Started</a>
+      <a class="tensap-button" href="examples/index.html">Examples Gallery</a>
       <a class="tensap-button" href="theory/index.html">Theory &amp; Methods</a>
     </p>
   </div>
@@ -26,6 +27,56 @@ html_theme.sidebar_secondary.remove: true
 </div>
 ```
 
+
+## What tensap does
+
+::::{grid} 1 2 3 3
+:gutter: 2
+:class-container: tensap-cards
+
+:::{grid-item-card} {octicon}`apps;1.4em` Tensor formats
+:link: sphx_glr_examples_tensors
+:link-type: ref
+
+Full, sparse and low-rank tensors, dimension trees.
+:::
+
+:::{grid-item-card} {octicon}`graph;1.4em` Functions and bases
+:link: sphx_glr_examples_functions
+:link-type: ref
+
+Measures, polynomials, B-splines, bases and grids.
+:::
+
+:::{grid-item-card} {octicon}`pin;1.4em` Interpolation
+:link: sphx_glr_examples_interpolation
+:link-type: ref
+
+Interpolation and least squares in tensor formats.
+:::
+
+:::{grid-item-card} {octicon}`stack;1.4em` Tensor PCA
+:link: sphx_glr_examples_pca
+:link-type: ref
+
+Higher-order PCA of tensors and functions.
+:::
+
+:::{grid-item-card} {octicon}`cpu;1.4em` Learning
+:link: sphx_glr_examples_learning
+:link-type: ref
+
+Learning with rank and tree adaptation.
+:::
+
+:::{grid-item-card} {octicon}`git-merge;1.4em` Poincaré learning
+:link: sphx_glr_examples_poincare
+:link-type: ref
+
+Dimension reduction with a Poincaré-based loss.
+:::
+
+::::
 
 ## Documentation
 
@@ -45,6 +96,13 @@ Install tensap and run a first computation.
 :link-type: doc
 
 Concepts, notations and algorithms.
+:::
+
+:::{grid-item-card} {octicon}`image;1.4em` Examples Gallery
+:link: examples/index
+:link-type: doc
+
+One method or feature per example.
 :::
 
 :::{grid-item-card} {octicon}`code;1.4em` API Reference
@@ -69,6 +127,7 @@ Build the docs, add an example, propose a change.
 
 getting_started/index
 theory/index
+examples/index
 api/index
 contributing/index
 bibliography

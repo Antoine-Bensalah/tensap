@@ -10,7 +10,8 @@ The objects {py:class}`~tensap.TensorPrincipalComponentAnalysis` (resp.
 methods for algebraic (resp. functional) tensors based on principal
 component analysis, using an adaptive sampling of the entries of the
 tensor (or the function). See {cite:p}`Nouy2017hopca` for a
-description of the algorithms.
+description of the algorithms, and for examples of use, see the examples {ref}`sphx_glr_examples_pca_tensor_pca.py`
+and {ref}`sphx_glr_examples_pca_functional_tensor_pca.py`.
 
 The difference between the two objects if that {py:class}`~tensap.TensorPrincipalComponentAnalysis`' methods take as first input a function returning components of the algebraic tensor to learn, whereas the methods of {py:class}`~tensap.FunctionalTensorPrincipalComponentAnalysis` take as first input the functional tensor to learn.
 
@@ -203,6 +204,12 @@ with canonical and tree-based tensor formats. See {cite:p}`Grelier2018`,
 {cite:p}`Grelier2019`, {cite:p}`Michel2020` for a detailed presentation
 of algorithms and related theory.
 
+For examples, see the examples
+{ref}`sphx_glr_examples_learning_canonical_tensor_learning.py`,
+{ref}`sphx_glr_examples_learning_tree_based_tensor_learning.py`,
+{ref}`sphx_glr_examples_learning_tree_based_tensor_density_learning.py`,
+{ref}`sphx_glr_examples_learning_tensorized_function_learning.py`.
+
 These algorithms are implemented in the core object {py:class}`~tensap.TensorLearning`,
 common to all the tensor formats, so that implementing such a learning
 algorithm for a new tensor format is simple. In tensap are currently
@@ -278,4 +285,5 @@ cross-validation estimate of the error (specified by
 
 The manual ended with a character classification example, which learns a
 classifier of handwritten digits with a {py:class}`~tensap.TensorLearning`
-object.
+object. It is now an example of the gallery:
+{ref}`sphx_glr_examples_learning_digits_recognition.py`.

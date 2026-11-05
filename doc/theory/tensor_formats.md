@@ -244,7 +244,9 @@ the evaluation of the diagonal of a contraction with matrices with
 ## `TreeBasedTensor` and `DimensionTree`
 
 We present in this section the {py:class}`~tensap.DimensionTree` and {py:class}`~tensap.TreeBasedTensor`
-objects.
+objects. For examples of use, see the example
+{ref}`sphx_glr_examples_tensors_dimension_tree.py` and
+{ref}`sphx_glr_examples_tensors_tree_based_tensor.py`.
 
 ### `DimensionTree`
 
@@ -489,6 +491,9 @@ in different formats. Given a tolerance `tol` and a maximum rank or
 tuple of ranks `r`, a {py:class}`~tensap.Truncator` object can be created with `t =
 tensap.Truncator(tol, r)`. The thresholding type (`'hard'` or
 `'soft'`) can also be specified as a third argument.
+
+For examples of use, see the example
+{ref}`sphx_glr_examples_tensors_tensor_truncation.py`.
 
 ### Truncation
 The generic method `truncate` calls one of the methods presented

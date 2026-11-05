@@ -102,5 +102,8 @@ coefficients, the relative error on 10000 test points is about $2 \cdot
 
 ## Going further
 
+- The {doc}`/examples/index` shows, one example at a time, each feature of
+  tensap; for instance {ref}`sphx_glr_examples_learning_tree_based_tensor_learning.py`
+  gives the options of the learning algorithm used above.
 - {doc}`/theory/index` presents the mathematical objects and the methods.
 - The {doc}`/api/index` describes every class and function.

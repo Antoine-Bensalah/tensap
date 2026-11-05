@@ -2,8 +2,9 @@
 
 This section presents the mathematical objects of tensap and the methods that
 work on them, with the notations used throughout the documentation. Each page
-links the classes it describes to their entry in the {doc}`/api/index`.
-References are listed in the {ref}`bibliography`.
+links the classes it describes to their entry in the {doc}`/api/index`, and
+to the examples of the {doc}`/examples/index` that use them. References are
+listed in the {ref}`bibliography`.
 
 ```{note}
 These pages come from the tensap manual (`manual/tensap_manual.tex`), which

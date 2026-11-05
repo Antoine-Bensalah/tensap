@@ -7,7 +7,8 @@ sub-package. All the objects listed here can be imported from the
 top-level package, for instance ``tensap.FullTensor``, except the
 benchmarks of :doc:`poincare_learning`.
 
-For the mathematical concepts, see :doc:`/theory/index`.
+For the mathematical concepts, see :doc:`/theory/index`; for examples of
+use, see :doc:`/examples/index`.
 
 .. toctree::
    :maxdepth: 2

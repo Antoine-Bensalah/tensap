@@ -13,6 +13,9 @@ We present in this section how to create a {py:class}`~tensap.FullTensor` using 
 and several possible operations with such an object. For an introduction
 to tensor calculus, we refer to the monograph {cite:p}`Hackbusch2019`.
 
+For examples of use, see the example
+{ref}`sphx_glr_examples_tensors_full_tensor.py`.
+
 ## Creating a `FullTensor`
 
 Provided with an array `data` of shape `[N_1, ..., N_d]`, the command `X = tensap.FullTensor(data)` returns a tensor $X \in {\mathbb{R}}^{N_1 \times \cdots \times N_d}$, with order `X.order = d` and shape `X.shape = (N_1, ..., N_d)`. The number of entries of `X` is given by $\texttt{X.size = X.storage()} = \prod_{i=1}^d N_i$. The number of nonzero entries of `X` is given by `X.sparse_storage()`.

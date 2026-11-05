@@ -240,3 +240,5 @@ with `fun` a `function` or {py:class}`~tensap.Function` and `t` a
 {py:class}`~tensap.Tensorizer`. The {py:class}`~tensap.TensorizedFunction` `f` is a function of
 $d+1$ variables that can be evaluated with `f.eval(x)`, with
 `x` a list or `numpy.ndarray` with $d+1$ columns.
+
+See the example {ref}`sphx_glr_examples_functions_tensorized_function.py`.

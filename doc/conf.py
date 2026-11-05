@@ -33,9 +33,11 @@ extensions = [
     "myst_parser",
     "sphinxcontrib.bibtex",
     "sphinx_design",  # cards and buttons of the home page
+    "sphinx_gallery.gen_gallery",
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings
     "section_numbers",  # _ext/: numbered sections of the galleries and the API
+    "gallery_thumbnails",  # _ext/: drawn thumbnails of _thumbnails/
 ]
 
 # Narrative pages are written in MyST Markdown (.md); the API pages and the
@@ -109,10 +111,51 @@ templates_path = ["_templates"]
 exclude_patterns = [
     "_build",
     "api_notes",
+    "_thumbnails",
     "Thumbs.db",
     ".DS_Store",
     "**/*.ipynb",
 ]
+
+# -- Examples Gallery (sphinx-gallery) -----------------------
+
+# Examples that are not executed when the documentation is built: their code
+# is shown without its output. Empty: every example is executed, and its
+# results are kept in the gallery cache of the CI, so that an example runs
+# again only when its script changes. The longest one, digits_recognition,
+# takes about 8 minutes.
+NOT_EXECUTED = []
+
+sphinx_gallery_conf = {
+    # Sources at the root of the repository, pages generated in doc/.
+    "examples_dirs": ["../examples"],
+    "gallery_dirs": ["examples"],
+    # Execute every example, except those of NOT_EXECUTED.
+    "filename_pattern": (
+        r"/(?!(%s)\.py$)[^/]+\.py$" % "|".join(NOT_EXECUTED)
+        if NOT_EXECUTED
+        else r"/[^/]+\.py$"
+    ),
+    "ignore_pattern": r"__init__\.py",
+    # Sections and examples in the order of _ext/gallery_order.py.
+    "subsection_order": [
+        "../examples/tensors",
+        "../examples/functions",
+        "../examples/interpolation",
+        "../examples/pca",
+        "../examples/learning",
+        "../examples/poincare",
+    ],
+    "within_subsection_order": "gallery_order.ExampleOrder",
+    # Links from the code of the examples to the API reference, and lists
+    # of examples at the bottom of each API page (see the class template).
+    "doc_module": ("tensap",),
+    "reference_url": {"tensap": None},
+    "backreferences_dir": "api/backreferences",
+    "remove_config_comments": True,
+    "show_memory": False,
+    "matplotlib_animations": False,
+}
 
 # -- Options for HTML output -------------------------------------------------
 

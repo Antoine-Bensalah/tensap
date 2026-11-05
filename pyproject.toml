@@ -51,6 +51,10 @@ packages = ["tensap",
 doc = [
   "sphinx", "numpydoc", "sphinx-gallery", "myst-parser", "pydata-sphinx-theme",
   "sphinxcontrib-bibtex", "sphinx-design",
+  # Executed examples of the gallery.
+  "matplotlib", "scikit-learn",
+  # digits_recognition uses a cross-entropy loss written with tensorflow.
+  "tensorflow",
 ]
 
 [project.urls]

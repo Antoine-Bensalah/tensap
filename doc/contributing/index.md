@@ -35,18 +35,37 @@ Both rules are checked when the documentation is built.
   page of the object under the rubric "Mathematical description". Follow
   the notation of the Theory & Methods section.
 
-## Code in the pages
+## Adding an example
+
+The examples of the gallery are Python scripts in `examples/<section>/`, in
+the format of [sphinx-gallery](https://sphinx-gallery.github.io/): a
+docstring with a title and a short introduction, then cells separated by
+`# %%` lines, whose first comment lines are rendered as text. Fix the random
+seed after the imports. An example is executed when the documentation is
+built, unless its name is in `NOT_EXECUTED` in `doc/conf.py`; its position
+in its section is set in `doc/_ext/gallery_order.py`.
 
 Code is shown the same way on every page: the style of the code blocks
 (padding, line spacing, colours) is set once for the whole site, in
 `doc/_static/tensap.css`. To keep it uniform, write code only in the cells of
-a fenced block ```` ```python ```` of a MyST
+a sphinx-gallery script, in a fenced block ```` ```python ```` of a MyST
 page, or with `.. code-block::` or `.. literalinclude::` in reStructuredText.
 Do not paste raw HTML, images of code, or styles specific to one page.
 
 Lines of code are at most 72 characters long (the limit PEP 8 sets for
 comments and docstrings), so that a code block fits in the page without
-scrolling on a laptop screen, from a window 1280 pixels wide.
+scrolling on a laptop screen, from a window 1280 pixels wide. The scripts of
+`examples/` are formatted
+with
+
+```bash
+ruff format --line-length 72 \
+    examples
+```
+
+and the CI checks it. The formatter does not split long strings: cut a long
+message in two adjacent strings, `"first part " f"{value}"`, by hand. The
+same width applies to the code of a theory page.
 
 ## Writing a theory page
 
@@ -55,7 +74,8 @@ Write mathematics as in LaTeX, between `$...$` or `$$...$$`. The macros of
 `doc/math_notations.sty` (such as `\Rbb`, `\Ebb` or `\Tc`) are also defined
 for MathJax in `doc/conf.py`, so that the HTML pages and the LaTeX manual use
 the same notations. Link a class or a function to its API page with
-`` {py:class}`~tensap.FullTensor` `` (or `{py:func}` for a function).
+`` {py:class}`~tensap.FullTensor` `` (or `{py:func}` for a function), and an
+example of the gallery with `` {ref}`sphx_glr_examples_tensors_full_tensor.py` ``.
 
 ## Citing a reference
 
