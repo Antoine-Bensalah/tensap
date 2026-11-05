@@ -39,6 +39,8 @@ SLOW_SCRIPTS = {
     "tutorial_linearsolver_high_dim_poisson.py",  # ~80 s
     "tutorial_qtt_poisson_rectangle.py",  # ~50 s
     "tutorial_qtt_tt_solvers.py",  # ~5 min
+    "tutorial_staggered_stokes.py",  # ~150 s
+    "tutorial_staggered_taylor_green.py",  # ~140 s
 }
 
 # Known failures of scripts, with the reason.
