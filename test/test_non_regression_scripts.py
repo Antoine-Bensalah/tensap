@@ -36,6 +36,20 @@ SLOW_SCRIPTS = {
     "tutorial_tensor_learning_digits_recognition.py",  # trains a network
 }
 
+# Known failures of scripts, with the reason.
+# tensorized_function_learning: in the local learning of new_rank_selection
+# (rank-one correction), the regression of a node may return zero
+# coefficients; TensorLearning._solve_standard prints "returning to the
+# previous iteration" but does not restore the previous iterate, the tensor
+# ends at zero, and the selection divides its singular values by its norm
+# (RuntimeWarning 0/0 in tree_based_tensor_learning.py). It happens with the
+# fixed seed of the script.
+KNOWN_FAILURES = {
+    "tutorial_tensor_learning_tensorized_function_learning.py": pytest.mark.xfail(
+        raises=RuntimeWarning, strict=True,
+        reason="zero tensor after a zero local solution in new_rank_selection"),
+}
+
 # Scripts that need an optional dependency: skipped when it is missing.
 REQUIREMENTS = {
     "tutorial_tensor_learning_digits_recognition.py": "tensorflow",
@@ -61,6 +75,8 @@ def _script_params():
     for path in SCRIPTS:
         name = os.path.basename(path)
         marks = [pytest.mark.slow] if name in SLOW_SCRIPTS else []
+        if name in KNOWN_FAILURES:
+            marks.append(KNOWN_FAILURES[name])
         module = REQUIREMENTS.get(name)
         if module is not None and importlib.util.find_spec(module) is None:
             marks.append(pytest.mark.skip(reason=f"{module} is not installed"))
@@ -69,9 +85,12 @@ def _script_params():
 
 
 @pytest.mark.tutorial
-# the scripts may show the warnings of tensap to the user (as the truncation
-# tutorial does): they are displayed, not errors
-@pytest.mark.filterwarnings("default::UserWarning:tensap")
+# warnings are errors in the scripts too (an unexpected warning of a solver
+# or of a truncation is a failure); the expected ones are listed narrowly:
+# tutorial_tensor_truncation truncates a TreeBasedTensor with a tree argument
+# on purpose
+@pytest.mark.filterwarnings(
+    "default:The provided tree and/or is_active_node are not taken into account:UserWarning")
 # some scripts open many figures, closed at the end of the test
 @pytest.mark.filterwarnings("ignore:More than 20 figures have been opened:RuntimeWarning")
 @pytest.mark.parametrize("f", _script_params())
