@@ -44,9 +44,9 @@ class BaseTTTensor:
     Attributes
     ----------
     cores : tuple of numpy.ndarray
-        The d cores, of shape (r_{k-1}, *physical shape, r_k), read-only and
-        owned by the tensor (immutable object: a new tensor is built for any
-        change).
+        The d cores, of shape (r_{k-1}, n_k, r_k) for a TTTensor and
+        (r_{k-1}, m_k, n_k, r_k) for a TTOperator, read-only and owned by
+        the tensor (immutable object: a new tensor is built for any change).
     orth_center : int or None
         Index of the orthogonality center, None if the representation is
         not orthogonalized. Read-only; given to the constructor, it is
