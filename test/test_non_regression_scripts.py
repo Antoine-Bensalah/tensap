@@ -7,6 +7,7 @@ of the Use cases of the documentation.
 """
 
 import glob
+import importlib.util
 import os
 import time
 
@@ -18,6 +19,27 @@ matplotlib.use("Agg")
 
 SCRIPTS_DIR = os.path.join(os.path.dirname(__file__), "non_regression_scripts")
 SCRIPTS = sorted(glob.glob(os.path.join(SCRIPTS_DIR, "**", "*.py"), recursive=True))
+
+# Scripts taking more than about 10 s each: marked "slow", hence excluded
+# from the default run (see [tool.pytest.ini_options] in pyproject.toml).
+# Run them with `pytest -m slow`, or everything with `pytest -m ""`.
+SLOW_SCRIPTS = {
+    "tutorial_tensor_learning_tensorized_function_learning.py",  # ~400 s
+    "tutorial_tensor_learning_TreeBasedTensorDensityLearning.py",  # ~290 s
+    "tutorial_tensor_learning_TreeBasedTensorLearning.py",  # ~90 s
+    "tutorial_tensor_learning_tensor_completion.py",  # ~80 s
+    "tutorial_tensor_learning_CanonicalTensorLearning.py",  # ~50 s
+    "tutorial_poincare_learning_surrogate_greedy.py",  # ~35 s
+    "tutorial_poincare_learning.py",  # ~25 s
+    "tutorial_magic_points.py",  # ~20 s
+    "tutorial_poincare_learning_surrogate.py",  # ~15 s
+    "tutorial_tensor_learning_digits_recognition.py",  # trains a network
+}
+
+# Scripts that need an optional dependency: skipped when it is missing.
+REQUIREMENTS = {
+    "tutorial_tensor_learning_digits_recognition.py": "tensorflow",
+}
 
 
 def execfile(filepath, globals=None, locals=None):
@@ -34,7 +56,25 @@ def execfile(filepath, globals=None, locals=None):
         exec(compile(file.read(), filepath, "exec"), globals, locals)
 
 
-@pytest.mark.parametrize("f", SCRIPTS, ids=lambda f: os.path.relpath(f, SCRIPTS_DIR))
+def _script_params():
+    params = []
+    for path in SCRIPTS:
+        name = os.path.basename(path)
+        marks = [pytest.mark.slow] if name in SLOW_SCRIPTS else []
+        module = REQUIREMENTS.get(name)
+        if module is not None and importlib.util.find_spec(module) is None:
+            marks.append(pytest.mark.skip(reason=f"{module} is not installed"))
+        params.append(pytest.param(path, marks=marks, id=os.path.relpath(path, SCRIPTS_DIR)))
+    return params
+
+
+@pytest.mark.tutorial
+# the scripts may show the warnings of tensap to the user (as the truncation
+# tutorial does): they are displayed, not errors
+@pytest.mark.filterwarnings("default::UserWarning:tensap")
+# some scripts open many figures, closed at the end of the test
+@pytest.mark.filterwarnings("ignore:More than 20 figures have been opened:RuntimeWarning")
+@pytest.mark.parametrize("f", _script_params())
 def test_non_regression_script(f):
     print(f"-- running {f}", flush=True)
     t0 = time.time()

@@ -39,7 +39,6 @@ packages = ["tensap",
             "tensap.poincare_learning",
             "tensap.poincare_learning.benchmarks",
             "tensap.poincare_learning.utils",
-            "tensap.poincare_learning.test",
             "tensap.functions",
             "tensap.functions.measures",
             "tensap.functions.sets",
@@ -56,6 +55,33 @@ doc = [
   # digits_recognition uses a cross-entropy loss written with tensorflow.
   "tensorflow",
 ]
+test = ["pytest", "pytest-xdist", "pytest-timeout", "pytest-cov", "matplotlib", "scikit-learn"]
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+markers = [
+  "slow: long test (more than about 10 s), excluded by default; run with -m slow",
+  "tutorial: runs a non-regression script (former tutorial) end to end",
+]
+# Fast run by default: `pytest` skips the slow tests. Run everything with
+# `pytest -m ""`, in parallel with `pytest -n auto` (pytest-xdist).
+addopts = "-m 'not slow' --durations=10"
+# Fail a test stuck for more than 20 min (pytest-timeout).
+timeout = 1200
+# Warnings are errors, so that deprecations show up before they break the
+# code; the expected ones are filtered explicitly, here or in the tests.
+filterwarnings = [
+  "error",
+  # the non-regression scripts call plt.show() with the non-interactive backend Agg
+  "ignore:FigureCanvasAgg is non-interactive:UserWarning",
+]
+
+# Coverage (pytest --cov=tensap): branches are measured.
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+show_missing = false
 
 [project.urls]
 Homepage = "https://github.com/anthony-nouy/tensap"
