@@ -8,9 +8,9 @@ import tensap
 
 
 def _system(n=4):
-    A = tensap.BaseTuckerTensor.eye([n, n])
+    A = tensap.TTOperator.eye([n, n])
     rng = np.random.default_rng(0)
-    b = tensap.TuckerTensorVector.randn([2, 2], [n, n])
+    b = tensap.TTTensor.randn([n, n], [2])
     return A, b, rng
 
 
@@ -42,9 +42,7 @@ def test_convergence_is_tested_before_stagnation(make):
     tolerance and its change is large -- flag 0 (Richardson returned 2 when
     started at the solution)."""
     A, b, _ = _system()
-    # the residual norm of a Tucker difference is computed with a round-off
-    # of the order of sqrt(eps)
-    x, output = make(A, b, display=False, tolerance=1e-6, stagnation=1e3).solve()
+    x, output = make(A, b, display=False, tolerance=1e-10, stagnation=1e3).solve()
     assert output["flag"] == 0 and output["iter"] == 1
 
 
@@ -53,3 +51,24 @@ def test_pcg_breakdown_on_a_negative_operator():
     x, output = tensap.TruncatedPCG(A * -1.0, b, tensap.Truncator(tolerance=1e-12),
                                     display=False).solve()
     assert output["flag"] == 3 and output["iter"] == 1 and output["error"] == pytest.approx(1.0)
+
+
+def test_tt_tensor_and_frame_own_their_data():
+    """Neither an alias of the input nor a replacement of a core can
+    invalidate the norm certified by the orthogonality center."""
+    owner = np.ones((2, 3, 3))
+    frame = tensap.FrameVector(owner[:, :, :1])
+    owner[:] = 7.0
+    assert np.all(frame.data == 1.0)
+    core = np.ones((1, 2, 1))
+    x = tensap.TTTensor([core, core]).orth()
+    core[:] = 3.0
+    assert x.norm() == pytest.approx(np.linalg.norm(x.full().numpy()))
+    with pytest.raises(TypeError):
+        x.cores[1] = x.cores[1] * 3.0
+    with pytest.raises(AttributeError):
+        x.orth_center = 0
+    with pytest.raises(ValueError, match="orth_center"):
+        tensap.TTTensor([core, core], orth_center=2)
+    shared = tensap.TTTensor(x.cores)
+    assert shared.cores[0] is x.cores[0]  # read-only cores are shared, not copied

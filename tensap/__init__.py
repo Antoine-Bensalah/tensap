@@ -50,6 +50,7 @@ from .tensor_algebra.tensors.tucker_like_tensor import (
     TuckerTensorVector,
     TuckerTensorOperator,
 )
+from .tensor_algebra.tensors.tt_tensor import BaseTTTensor, TTTensor, TTOperator
 from .tensor_algebra.tensors.frame import Frame, FrameVector, FrameOperator
 from .tensor_algebra.tensors.tensor_frame import TFrame, TFrameVector, TFrameOperator
 from .tensor_algebra.tools.truncator import Truncator

@@ -22,7 +22,10 @@ then truncated at the relative precision 1e-4:
    core). The best approximation in canonical format is a hard problem: the
    requested precision is not reached with fewer terms than u, and the
    truncator warns about it;
-2. in tree-based format: the diagonal core is converted to a tree-based
+2. in Tucker format with a TT core: the diagonal core is converted to a
+   TTTensor (exactly, ranks 50), then rounded, and the frames are truncated
+   by SVD;
+3. in tree-based format: the diagonal core is converted to a tree-based
    tensor on a balanced tree, the frames are absorbed into the leaves and the
    tree-based tensor is truncated by hsvd.
 """
@@ -94,7 +97,17 @@ for warning in caught:
 error_can = report("canonical", u_can)
 print(f"  ranks {u_can.representation_rank()}")
 
-# %% 2. Truncation in tree-based format
+# %% 2. Truncation in Tucker format with a TT core
+u_tt = tensap.TuckerTensorVector(
+    tensap.TTTensor.from_diagonal_tensor(u.core), u.tensor_frame
+)
+u_tt_t = t.truncate(u_tt)
+error_tt = report("Tucker-TT", u_tt_t)
+print(
+    f"  Tucker ranks {u_tt_t.representation_rank()}, TT ranks {u_tt_t.core.ranks}"
+)
+
+# %% 3. Truncation in tree-based format
 tree = tensap.DimensionTree.balanced(d)
 u_tree = tensap.TuckerTensorVector(
     u.core.tree_based_tensor(tree), u.tensor_frame
@@ -104,8 +117,9 @@ error_tree = report("tree-based", u_tree_t)
 print(f"  ranks {u_tree_t.tree_based_tensor().ranks.tolist()}")
 
 # %% Self-check
-# The tree-based truncation reaches the requested precision; the canonical
-# one stays within a factor 10 of it (with as many terms as u).
+# The Tucker-TT and tree-based truncations reach the requested precision; the
+# canonical one stays within a factor 10 of it (with as many terms as u).
+assert error_tt <= t.tolerance, error_tt
 assert error_tree <= t.tolerance, error_tree
 assert error_can <= 10 * t.tolerance, error_can
 # The truncations approximate the greedy tensor u, not the solution of the
@@ -113,7 +127,7 @@ assert error_can <= 10 * t.tolerance, error_can
 # about 7e-2, and the truncations must not degrade it (observed: equal to 3
 # digits). An excellent compression of a poor solution is still a poor solution.
 assert residuals["greedy"] < 0.1, residuals["greedy"]
-for name in ("canonical", "tree-based"):
+for name in ("canonical", "Tucker-TT", "tree-based"):
     assert (
         abs(residuals[name] - residuals["greedy"])
         < 1e-2 * residuals["greedy"]

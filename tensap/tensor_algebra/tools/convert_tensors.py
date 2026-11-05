@@ -35,7 +35,8 @@ def convert_tensors(x, y):
         If no conversion path exists between the two types.
     """
     _TYPES = (tensap.FullTensor, tensap.DiagonalTensor, tensap.SparseTensor,
-              tensap.CanonicalTensor, tensap.TreeBasedTensor, tensap.BaseTuckerTensor)
+              tensap.CanonicalTensor, tensap.TreeBasedTensor, tensap.BaseTuckerTensor,
+              tensap.TTTensor)
 
     if not isinstance(x, _TYPES) or not isinstance(y, _TYPES):
         raise NotImplementedError(
@@ -64,6 +65,12 @@ def convert_tensors(x, y):
         return x.tree_based_tensor(y.tree), y
     if isinstance(y, tensap.DiagonalTensor) and isinstance(x, tensap.TreeBasedTensor):
         return x, y.tree_based_tensor(x.tree)
+
+    # DiagonalTensor + TTTensor → TT representation of the diagonal tensor
+    if isinstance(x, tensap.DiagonalTensor) and isinstance(y, tensap.TTTensor):
+        return tensap.TTTensor.from_diagonal_tensor(x), y
+    if isinstance(y, tensap.DiagonalTensor) and isinstance(x, tensap.TTTensor):
+        return x, tensap.TTTensor.from_diagonal_tensor(y)
 
     # SparseTensor + DiagonalTensor → sparse(diag)
     if isinstance(x, tensap.SparseTensor) and isinstance(y, tensap.DiagonalTensor):
