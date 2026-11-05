@@ -57,15 +57,15 @@ class IntegrationRule:
 
     def ndim(self):
         """
-        Return the number of integration points.
+        Return the dimension of the integration points.
 
         Returns
         -------
         int
-            The number of integration points.
+            The dimension of the integration points.
 
         """
-        return self.points.shape[1]
+        return 1 if self.points.ndim == 1 else self.points.shape[1]
 
     def integrate(self, fun):
         """
