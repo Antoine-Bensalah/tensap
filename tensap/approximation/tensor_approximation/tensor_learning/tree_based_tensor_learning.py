@@ -503,7 +503,7 @@ class TreeBasedTensorLearning(tensap.TensorLearning):
         sin_val = np.array([np.nan if x is None else x for x in sin_val], dtype=object)
         sin_val[f.tensor.tree.root - 1] = np.nan
         dim2ind = np.intersect1d(f.tensor.tree.dim2ind, f.tensor.active_nodes)
-        ind = [len(set(x.size)) == 1 for x in f.tensor.tensors[dim2ind - 1]]
+        ind = [len(set(x.shape)) == 1 for x in f.tensor.tensors[dim2ind - 1]]
         sin_val[dim2ind[ind] - 1] = np.nan
         sin_val[s_local.rank != tensor_for_selection.ranks] = np.nan
 

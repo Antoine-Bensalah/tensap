@@ -183,7 +183,13 @@ class DiagonalTensor:
         return DiagonalTensor(self.data - y.data, self.order)
 
     def __mul__(self, y):
+        if np.ndim(y) == 0:
+            # multiplication by a scalar
+            return DiagonalTensor(self.data * y, self.order)
         return DiagonalTensor(self.data * y.data, self.order)
+
+    def __rmul__(self, y):
+        return self * y
 
     def reshape(self, shape):
         """
@@ -501,7 +507,8 @@ class DiagonalTensor:
 
         """
         if isinstance(matrix, list):
-            matrix = np.hstack([np.reshape(x, [-1, 1]) for x in matrix])
+            # each matrix as a column, in Fortran order as for the reshape below
+            matrix = np.hstack([np.reshape(x, [-1, 1], order="F") for x in matrix])
         matrix = np.reshape(
             np.expand_dims(matrix, 1),
             (self.shape[0], y.shape[0], self.order),
@@ -577,9 +584,9 @@ class DiagonalTensor:
             out = np.array(self.data)
         else:
             dims = np.sort(np.atleast_1d(dims))
-            rep = np.concatenate(
-                (np.arange(dims[0] + 1), np.arange(dims[-1] + 1, self.order))
-            )
+            # the dimensions dims are merged into the first one, the others
+            # are kept (not only those before dims[0] and after dims[-1])
+            rep = np.setdiff1d(np.arange(self.order), dims[1:])
             out = deepcopy(self)
             out.shape = out.shape[rep]
             out.order = np.size(rep)

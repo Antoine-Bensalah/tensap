@@ -116,11 +116,12 @@ class FullTensor:
 
         Returns
         -------
-        numpy.ndarray
-            The number of elements of the tensor.
+        int
+            The number of elements of the tensor (the shape is given by
+            shape).
 
         """
-        return np.array(self.data.shape)
+        return int(self.data.size)
 
     @property
     def shape(self):
@@ -330,8 +331,9 @@ class FullTensor:
             evaluations = self.sub_tensor(*ind)
         else:
             no_dims = tensap.fast_setdiff(np.arange(self.order), dims)
+            # Fortran order, as the rows of matricize(dims)
             indices = np.ravel_multi_index(
-                np.transpose(indices), [self.shape[i] for i in dims]
+                np.transpose(indices), [self.shape[i] for i in dims], order="F"
             )
             evaluations = self.matricize(dims).sub_tensor(indices, ":")
             evaluations = evaluations.reshape(
@@ -614,6 +616,8 @@ class FullTensor:
             The reduced tensor.
 
         """
+        if dims is not None:
+            dims = tuple(np.atleast_1d(dims).tolist())
         return FullTensor(np.sum(self.data, dims, keepdims=True))
 
     def reduce_mean(self, dims=None):
@@ -634,6 +638,8 @@ class FullTensor:
             The reduced tensor.
 
         """
+        if dims is not None:
+            dims = tuple(np.atleast_1d(dims).tolist())
         return FullTensor(np.mean(self.data, dims, keepdims=True))
 
     def kron(self, tensor2):
@@ -675,7 +681,7 @@ class FullTensor:
             ),
             shape1 * shape2,
         )
-        return FullTensor(data, shape=self.shape * tensor2.shape)
+        return FullTensor(data, shape=shape1 * shape2)
 
     def orth(self, dim=None):
         """

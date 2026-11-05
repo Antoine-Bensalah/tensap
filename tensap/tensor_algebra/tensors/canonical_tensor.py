@@ -83,6 +83,9 @@ class CanonicalTensor:
         return CanonicalTensor(space, core)
 
     def __radd__(self, arg):
+        if np.ndim(arg) == 0 and arg == 0:
+            # 0 + x, as in sum([x, y]), which starts from 0
+            return self
         return self + arg
 
     def __sub__(self, arg):
@@ -343,7 +346,8 @@ class CanonicalTensor:
             dims = np.sort(dims)
             new_dims = np.setdiff1d(range(self.order), dims[1:])
 
-        out = self.space[dims[0]]
+        # copy: the product must not modify the factor matrices of self
+        out = np.array(self.space[dims[0]])
         for k in dims[1:]:
             out *= self.space[k]
 
@@ -354,7 +358,7 @@ class CanonicalTensor:
             core = deepcopy(self.core)
 
             space[dims[0]] = out
-            space = space[new_dims]
+            space = [space[i] for i in new_dims]
             core.shape = core.shape[new_dims]
             core.order = new_dims.size
             out = CanonicalTensor(space, core)
