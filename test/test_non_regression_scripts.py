@@ -42,11 +42,12 @@ SLOW_SCRIPTS = {
 # coefficients; TensorLearning._solve_standard prints "returning to the
 # previous iteration" but does not restore the previous iterate, the tensor
 # ends at zero, and the selection divides its singular values by its norm
-# (RuntimeWarning 0/0 in tree_based_tensor_learning.py). It happens with the
-# fixed seed of the script.
+# (RuntimeWarning 0/0 in tree_based_tensor_learning.py). Even with the fixed
+# seed of the script, whether it happens depends on the round-off (number of
+# threads of the linear algebra, platform): the failure is not strict.
 KNOWN_FAILURES = {
     "tutorial_tensor_learning_tensorized_function_learning.py": pytest.mark.xfail(
-        raises=RuntimeWarning, strict=True,
+        raises=RuntimeWarning, strict=False,
         reason="zero tensor after a zero local solution in new_rank_selection"),
 }
 
