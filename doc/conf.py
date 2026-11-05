@@ -150,6 +150,7 @@ sphinx_gallery_conf = {
         "../examples/pca",
         "../examples/learning",
         "../examples/poincare",
+        "../examples/solvers",
         "_tutorials_src/tensor_algebra",
         "_tutorials_src/functions",
         "_tutorials_src/approximation",
