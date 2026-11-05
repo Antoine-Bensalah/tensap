@@ -30,6 +30,7 @@ Greedy and alternating solvers
    RankOneALSLinearSolver
    GreedyLinearSolver
    TuckerTensorALSLinearSolver
+   TTTensorALSLinearSolver
 
 Approximate inverses
 --------------------
