@@ -1,0 +1,243 @@
+"""
+Unit tests of TuckerTensorALSLinearSolver.update_core for structured cores:
+TT cores (Galerkin problem on the core solved by TTTensorALSLinearSolver),
+tree-based cores (node by node) and full cores solved matrix-free.
+
+Oracles: dense Galerkin projections on the span of the frames, and the
+energy J(v) = 1/2 (Av, v) - (b, v) of the dense system.
+"""
+
+import numpy as np
+import numpy.testing as npt
+import pytest
+import tensap
+from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor
+
+
+N, D = 4, 3
+
+
+def _factory(n=N, d=D):
+    K = (2 * np.eye(n) - np.eye(n, k=1) - np.eye(n, k=-1)) * (n + 1) ** 2
+    return tensap.LaplacianLikeOperatorFactory(K, np.eye(n), d)
+
+
+def _ones(n=N, d=D):
+    frames = tensap.TFrameVector([tensap.FrameVector(np.ones((1, n, 1))) for _ in range(d)])
+    return tensap.TuckerTensorVector(tensap.DiagonalTensor(np.array([1.0]), d), frames)
+
+
+def _with_core(x, core):
+    return tensap.TuckerTensorVector(core, x.tensor_frame)
+
+
+def _dense_operator(n=N, d=D):
+    K = (2 * np.eye(n) - np.eye(n, k=1) - np.eye(n, k=-1)) * (n + 1) ** 2
+    A = np.zeros((n**d, n**d))
+    for mu in range(d):
+        term = np.ones((1, 1))
+        for nu in range(d):
+            term = np.kron(term, K if nu == mu else np.eye(n))
+        A += term
+    return A
+
+
+def _frames_basis(x):
+    """Matrix whose columns span the tensor product of the frames of x."""
+    basis = np.ones((1, 1))
+    for frame in x.tensor_frame.frames:
+        basis = np.kron(basis, frame.data[:, :, 0].T)
+    return basis
+
+
+def _galerkin(A, b, basis):
+    """Dense Galerkin solution on the range of basis."""
+    q, _ = np.linalg.qr(basis)
+    return q @ np.linalg.solve(q.T @ A @ q, q.T @ b)
+
+
+def _random_tucker(ranks, core, n=N, d=D, seed=0):
+    rng = np.random.default_rng(seed)
+    frames = tensap.TFrameVector(
+        [tensap.FrameVector(rng.standard_normal((r, n, 1))) for r in ranks]
+    )
+    return tensap.TuckerTensorVector(core, frames)
+
+
+# --- TT core ------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("algorithm", ["als", "dmrg", "amen"])
+def test_tt_core_update_is_galerkin_on_the_frames(algorithm):
+    A = _factory().make_tt_tucker_tensor()
+    b = _ones()
+    b = _with_core(b, as_tt_tensor(b.core))
+    np.random.seed(1)
+    core = tensap.TTTensor.randn([3, 3, 3], [3, 3])
+    x = _random_tucker([3, 3, 3], core)
+    solver = tensap.TuckerTensorALSLinearSolver(
+        A, b, core_algorithm=algorithm, max_iterations_core=20,
+        stagnation_core=1e-14, display=False)
+    y = solver.update_core(x)
+    assert isinstance(y.core, tensap.TTTensor)
+    expected = _galerkin(_dense_operator(), b.full().numpy().ravel(), _frames_basis(x))
+    npt.assert_allclose(y.full().numpy().ravel(), expected, atol=1e-9)
+
+
+def test_tt_core_from_a_diagonal_core_and_solve():
+    A = _factory().make_tt_tucker_tensor()
+    b = _ones()
+    b = _with_core(b, as_tt_tensor(b.core))
+    x = _random_tucker([2, 2, 2], tensap.DiagonalTensor(np.array([1.0, 0.5]), D))
+    solver = tensap.TuckerTensorALSLinearSolver(
+        A, b, core_algorithm="dmrg", max_iterations=3, display=False)
+    A_dense, b_dense = _dense_operator(), b.full().numpy().ravel()
+
+    def energy(v):
+        v = v.full().numpy().ravel()
+        return 0.5 * v @ A_dense @ v - b_dense @ v
+
+    y = solver.update_core(x)
+    assert isinstance(y.core, tensap.TTTensor)
+    assert energy(y) <= energy(x) + 1e-12
+    z, output = solver.solve(y)
+    assert energy(z) <= energy(y) + 1e-12
+    assert len(output["errvec"]) == output["iter"]
+
+
+def test_tt_core_as_greedy_update():
+    A = _factory().make_tt_tucker_tensor()
+    b = _ones()
+    b = _with_core(b, as_tt_tensor(b.core))
+    A_dense, b_dense = _dense_operator(), b.full().numpy().ravel()
+    np.random.seed(0)
+    pure, _ = tensap.GreedyLinearSolver(A, b, max_iterations=4, display=False).solve()
+    updater = tensap.TuckerTensorALSLinearSolver(A, b, display=False)
+    np.random.seed(0)
+    updated, _ = tensap.GreedyLinearSolver(A, b, max_iterations=4, display=False,
+                                           update=updater.update_core).solve()
+
+    def residual(v):
+        return np.linalg.norm(b_dense - A_dense @ v.full().numpy().ravel())
+
+    assert residual(updated) < residual(pure)
+
+
+# --- tree-based core ----------------------------------------------------------------
+
+
+def _tree_problem(d=4):
+    factory = _factory(d=d)
+    A = factory.make_tree_based_tensor()
+    b = _ones(d=d)
+    b = _with_core(b, b.core.tree_based_tensor(A.core.tree))
+    return A, b, _dense_operator(d=d), b.full().numpy().ravel()
+
+
+def test_tree_core_update_with_full_ranks_is_galerkin():
+    A, b, A_dense, b_dense = _tree_problem()
+    rng = np.random.default_rng(2)
+    core = tensap.FullTensor(rng.standard_normal((2, 2, 2, 2)))
+    core = tensap.Truncator(tolerance=0.0).hsvd(core, A.core.tree)
+    x = _random_tucker([2, 2, 2, 2], core, d=4, seed=3)
+    solver = tensap.TuckerTensorALSLinearSolver(A, b, max_iterations_core=5, display=False)
+    y = solver.update_core(x)
+    assert isinstance(y.core, tensap.TreeBasedTensor)
+    expected = _galerkin(A_dense, b_dense, _frames_basis(x))
+    npt.assert_allclose(y.full().numpy().ravel(), expected, atol=1e-8)
+
+
+def test_tree_core_greedy_update_decreases_the_residual():
+    A, b, A_dense, b_dense = _tree_problem()
+    np.random.seed(0)
+    pure, _ = tensap.GreedyLinearSolver(A, b, max_iterations=3, display=False).solve()
+    updater = tensap.TuckerTensorALSLinearSolver(A, b, max_iterations_core=3, display=False)
+    np.random.seed(0)
+    updated, _ = tensap.GreedyLinearSolver(A, b, max_iterations=3, display=False,
+                                           update=updater.update_core).solve()
+
+    def residual(v):
+        return np.linalg.norm(b_dense - A_dense @ v.full().numpy().ravel())
+
+    assert isinstance(updated.core, tensap.TreeBasedTensor)
+    assert residual(updated) < residual(pure)
+
+
+# --- full core, matrix-free ---------------------------------------------------------
+
+
+def test_full_core_matrix_free_matches_dense():
+    A = _factory().make_tucker_tensor()
+    b = _ones()
+    b = _with_core(b, tensap.FullTensor(b.core.full().numpy()))
+    rng = np.random.default_rng(4)
+    x = _random_tucker([3, 3, 3], tensap.FullTensor(rng.standard_normal((3, 3, 3))))
+    dense = tensap.TuckerTensorALSLinearSolver(A, b, display=False).update_core(x)
+    free = tensap.TuckerTensorALSLinearSolver(A, b, dense_max_size=0,
+                                              display=False).update_core(x)
+    npt.assert_allclose(free.full().numpy(), dense.full().numpy(), atol=1e-9)
+
+
+def test_tree_core_single_iteration_display(capsys):
+    A, b, _, _ = _tree_problem()
+    x = _random_tucker([2, 2, 2, 2], tensap.DiagonalTensor(np.array([1.0, 0.5]), 4), d=4)
+    solver = tensap.TuckerTensorALSLinearSolver(A, b, max_iterations_core=1, display=True)
+    y = solver.update_core(x)
+    assert isinstance(y.core, tensap.TreeBasedTensor)
+    assert "update_tree_core" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("dense_max_size, preconditioner",
+                         [(2000, None), (0, None), (0, "kronecker_sum")])
+def test_tree_contraction_matches_the_explicit_local_problem(dense_max_size, preconditioner):
+    """Local systems of the nodes: tree contraction (inactive leaves) against
+    the explicit map from the node tensor to the full core."""
+    A, b, _, _ = _tree_problem()
+    tree = A.core.tree
+    np.random.seed(5)
+    ranks = np.full(tree.nb_nodes, 3)
+    ranks[tree.root - 1] = 1
+    core = tensap.TreeBasedTensor.randn(tree, ranks, [3, 3, 3, 3]).inactivate_nodes(tree.dim2ind)
+    x = _random_tucker([3, 3, 3, 3], core, d=4, seed=6).orth()
+    solver = tensap.TuckerTensorALSLinearSolver(A, b, dense_max_size=dense_max_size,
+                                                local_preconditioner=preconditioner,
+                                                local_tolerance=1e-13, display=False)
+    x_frames = x.tensor_frame
+    xAx = x_frames.dot_with_metrics(x_frames, A.tensor_frame)
+    metric_A = [m.transpose(0, 2, 1).reshape(-1, m.shape[1]) for m in xAx]
+    metric_b = list(b.tensor_frame.dot(x_frames))
+    apply, rhs = solver._projected_problem(x)
+    for nod in tree.internal_nodes:
+        local = x.core.orth_at_node(nod)
+        contracted = solver._tree_node_problem(local, nod, metric_A, metric_b)
+        explicit = solver._tree_node_problem_explicit(local, nod, apply, rhs)
+        npt.assert_allclose(contracted, explicit, rtol=1e-8, atol=1e-10)
+
+
+def test_kronecker_terms_and_kronecker_sum_preconditioner():
+    from tensap.solvers.linear_solvers import (
+        _kronecker_sum_preconditioner, _kronecker_terms_apply)
+    rng = np.random.default_rng(7)
+    shape = (3, 4, 2)
+    # a Kronecker sum S_0 x I x I + I x S_1 x I + I x I x S_2, written with the
+    # node tensor of a Laplacian-like tree operator (index 1: identity)
+    spd = []
+    for n in shape:
+        q = rng.standard_normal((n, n))
+        spd.append(q @ q.T + n * np.eye(n))
+    interfaces = [np.stack([s_, np.eye(n)], axis=1) for s_, n in zip(spd, shape)]
+    node = np.zeros((2, 2, 2))
+    node[0, 1, 1] = node[1, 0, 1] = node[1, 1, 0] = 1.0
+    dense = (np.kron(np.kron(spd[0], np.eye(4)), np.eye(2))
+             + np.kron(np.kron(np.eye(3), spd[1]), np.eye(2))
+             + np.kron(np.kron(np.eye(3), np.eye(4)), spd[2]))
+    c = rng.standard_normal(shape)
+    npt.assert_allclose(_kronecker_terms_apply(node, interfaces, c).ravel(), dense @ c.ravel())
+    preconditioner = _kronecker_sum_preconditioner(node, interfaces, shape)
+    npt.assert_allclose(preconditioner.matvec(dense @ c.ravel()), c.ravel(), atol=1e-10)
+
+
+def test_wrong_local_preconditioner():
+    A, b, _, _ = _tree_problem()
+    with pytest.raises(ValueError):
+        tensap.TuckerTensorALSLinearSolver(A, b, local_preconditioner="ilu")

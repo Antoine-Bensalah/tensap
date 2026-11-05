@@ -701,10 +701,10 @@ class TuckerTensorVector(BaseTuckerTensor):
 
         n >= 1: Hadamard products (exact, the ranks are multiplied); n = 0: the
         tensor of ones; n = -1: the solution of diag(x) y = 1 by the greedy
-        solver with Galerkin updates of the core, at most max_iterations
-        rank-one corrections, tolerance and stagnation tolerance (x must be
-        positive, so that diag(x) is SPD); n < -1: (x^(-n))^(-1); n = 1/2:
-        sqrt.
+        solver with Galerkin updates of the core (DMRG for a TT core), at
+        most max_iterations rank-one corrections, tolerance and stagnation
+        tolerance (x must be positive, so that diag(x) is SPD); n < -1:
+        (x^(-n))^(-1); n = 1/2: sqrt.
 
         Matlab computes x = times(x, x) n - 1 times, which gives x^(2^(n-1))
         for n >= 3; here x^n.
@@ -742,7 +742,7 @@ class TuckerTensorVector(BaseTuckerTensor):
         operator = TuckerTensorOperator(core_A, operator.tensor_frame)
         ones = TuckerTensorVector(core_b, ones.tensor_frame)
         updater = tensap.TuckerTensorALSLinearSolver(
-            operator, ones, stagnation=tolerance, display=False
+            operator, ones, core_algorithm="dmrg", stagnation=tolerance, display=False
         )
         solver = tensap.GreedyLinearSolver(
             operator,

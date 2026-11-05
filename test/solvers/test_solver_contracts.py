@@ -53,6 +53,22 @@ def test_pcg_breakdown_on_a_negative_operator():
     assert output["flag"] == 3 and output["iter"] == 1 and output["error"] == pytest.approx(1.0)
 
 
+def test_kronecker_sum_preconditioner_is_rejected_when_not_positive():
+    """M = diag(1, 1, 1, 100) = I x I + 99 e e^T x e e^T is SPD, its projection
+    on the Kronecker sums is not: no preconditioner."""
+    from tensap.solvers.linear_solvers import _kronecker_sum_preconditioner
+    terms = np.stack([np.eye(2), np.diag([0.0, 1.0])], axis=1)  # (test, k, trial)
+    node = np.array([[1.0, 0.0], [0.0, 99.0]])
+    assert _kronecker_sum_preconditioner(node, [terms, terms], (2, 2)) is None
+    # an exact Kronecker sum (I x T + T x I, T SPD) keeps its exact inverse
+    T = np.array([[2.0, -1.0], [-1.0, 2.0]])
+    terms = np.stack([np.eye(2), T], axis=1)
+    node = np.array([[0.0, 1.0], [1.0, 0.0]])
+    P = _kronecker_sum_preconditioner(node, [terms, terms], (2, 2))
+    M = np.kron(np.eye(2), T) + np.kron(T, np.eye(2))
+    np.testing.assert_allclose(P @ (M @ np.arange(4.0)), np.arange(4.0), atol=1e-12)
+
+
 def test_local_failures_are_reported():
     """Matrix-free local CG limited to one iteration: the failures and the
     worst local residual reach the output of the outer solve."""

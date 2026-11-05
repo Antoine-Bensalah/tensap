@@ -19,6 +19,7 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import tensap
+from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor
 from tensap.solvers.local_diagnostics import LocalDiagnostics
 
 
@@ -551,6 +552,76 @@ def _with_unit_diagonal_core(x):
     )
 
 
+def _kronecker_terms_apply(node, interfaces, c):
+    """y(i_0, ..., i_{n-1}) = sum_k node(k_0, ..., k_{n-1}) prod_t
+    L_t(i_t, k_t, j_t) c(j_0, ..., j_{n-1}): a sum of Kronecker products of
+    the matrices L_t(:, k_t, :), applied by one tensordot per axis (BLAS),
+    then contracted with the node tensor."""
+    n = c.ndim
+    labels = [("j", t) for t in range(n)]
+    for t, interface in enumerate(interfaces):
+        position = labels.index(("j", t))
+        c = np.tensordot(interface, c, axes=(2, position))
+        labels = [("i", t), ("k", t)] + labels[:position] + labels[position + 1:]
+    k_axes = [labels.index(("k", t)) for t in range(n)]
+    c = np.tensordot(c, node, axes=(k_axes, list(range(n))))
+    labels = [label for label in labels if label[0] != "k"]
+    return c.transpose([labels.index(("i", t)) for t in range(n)])
+
+
+def _kronecker_sum_preconditioner(node, interfaces, shape):
+    """Inverse of the Kronecker sum closest to the local operator
+    M = sum_k node(k) L_0^{k_0} x ... x L_{n-1}^{k_{n-1}}, applied by fast
+    diagonalization.
+
+    The orthogonal projection of M on the Kronecker sums
+    S_0 x I x ... x I + ... + I x ... x I x S_{n-1} (Frobenius inner product)
+    is given by the partial traces T_t = tr_{s != t}(M) / prod_{s != t} n_s and
+    the mean tau = tr(M) / prod_s n_s: S_t = T_t, with the identity counted
+    n - 1 times too many, removed from the eigenvalues. With the
+    eigendecompositions T_t = Q_t diag(lambda_t) Q_t^T, the inverse is
+    (Q_0 x ... x Q_{n-1}) diag(1 / (sum_t lambda_t - (n - 1) tau))
+    (Q_0 x ... x Q_{n-1})^T. It is exact when M is a Kronecker sum, which is
+    the case of the Laplacian with orthonormal interfaces (the interfaces of
+    the subtrees without the operator K are identities).
+
+    The projection on the Kronecker sums is not a projection on the positive
+    definite ones: for an SPD M far from a sum (diag(1, 1, 1, 100) on 2 x 2),
+    sum_t lambda_t - (n - 1) tau can be negative. Then None is returned (no
+    preconditioner: CG needs an SPD one), and the caller reports it."""
+    n = len(shape)
+    traces = [np.einsum("iki->k", interface) for interface in interfaces]
+    total = np.einsum(node, list(range(n)), *[x for t in range(n) for x in (traces[t], [t])], [])
+    size = int(np.prod(shape))
+    tau = total / size
+    eigenvalues, bases = [], []
+    for t, interface in enumerate(interfaces):
+        weights = np.einsum(node, list(range(n)),
+                            *[x for s in range(n) if s != t for x in (traces[s], [s])], [t])
+        partial = np.tensordot(interface, weights, axes=(1, 0)) * shape[t] / size
+        partial = 0.5 * (partial + partial.T)
+        values, vectors = np.linalg.eigh(partial)
+        eigenvalues.append(values)
+        bases.append(vectors)
+    denominator = -(n - 1) * tau
+    for t in range(n):
+        denominator = np.add.outer(denominator, eigenvalues[t]) if t else (
+            eigenvalues[0] + denominator)
+    if denominator.min() <= 1e-12 * np.abs(denominator).max():
+        return None
+
+    def apply(vector):
+        v = vector.reshape(shape)
+        for t in range(n):
+            v = np.moveaxis(np.tensordot(bases[t].T, v, axes=(1, t)), 0, t)
+        v = v / denominator
+        for t in range(n):
+            v = np.moveaxis(np.tensordot(bases[t], v, axes=(1, t)), 0, t)
+        return v.ravel()
+
+    return spla.LinearOperator((size, size), matvec=apply, dtype=float)
+
+
 def _times_diag_core(core, diag, mu):
     """Multiply a core tensor by diag(diag) along dimension mu."""
     if isinstance(core, tensap.DiagonalTensor):
@@ -570,31 +641,63 @@ class TuckerTensorALSLinearSolver(LinearSolver):
 
     Attributes
     ----------
+    max_iterations_core : int
+        Maximum number of iterations of the core update (iterative core
+        formats only).
     max_iterations_frames : int
         Maximum number of sweeps over the dimensions in update_frames_by_als.
+    stagnation_core : float
+        Stagnation criterion of the core update (iterative core formats only).
     stagnation_frames : float
         Stagnation criterion of update_frames_by_als.
+    core_algorithm : str
+        TT cores: algorithm of the TTTensorALSLinearSolver used for the core
+        update, 'als' (fixed ranks, default), 'dmrg' or 'amen' (Matlab:
+        useDMRG).
+    core_truncator : tensap.Truncator, optional
+        TT cores: truncator of DMRG and AMEn.
     dense_max_size : int
-        Full cores: Galerkin systems on the core up to this size are
-        assembled and solved directly, larger ones by conjugate gradient
-        without assembling the matrix.
+        Full and tree-based cores: Galerkin systems on the core (or on a node)
+        up to this size are assembled and solved directly, larger ones by
+        conjugate gradient without assembling the matrix.
+    local_preconditioner : str or None
+        Tree-based cores, matrix-free local systems: 'kronecker_sum'
+        (default; inverse of the Kronecker sum closest to the local operator,
+        by fast diagonalization) or None.
+    local_tolerance : float
+        Relative tolerance of the conjugate gradient of the matrix-free local
+        systems of the tree-based cores.
     """
 
     def __init__(
         self,
         A,
         b,
+        max_iterations_core=10,
         max_iterations_frames=10,
+        stagnation_core=1e-6,
         stagnation_frames=1e-6,
+        core_algorithm="als",
+        core_truncator=None,
         dense_max_size=2000,
+        local_preconditioner="kronecker_sum",
+        local_tolerance=1e-10,
         **kwargs,
     ):
         super().__init__(A, b, **kwargs)
         if type(A.core) is not type(b.core):
             raise TypeError("A and b must have the same type of core.")
+        self.max_iterations_core = max_iterations_core
         self.max_iterations_frames = max_iterations_frames
+        self.stagnation_core = stagnation_core
         self.stagnation_frames = stagnation_frames
+        self.core_algorithm = core_algorithm
+        self.core_truncator = core_truncator
         self.dense_max_size = dense_max_size
+        if local_preconditioner not in (None, "kronecker_sum"):
+            raise ValueError("local_preconditioner must be None or 'kronecker_sum'.")
+        self.local_preconditioner = local_preconditioner
+        self.local_tolerance = local_tolerance
         # diagnostics of the local solves (reset by solve; also filled when
         # update_core is called directly, e.g. by a greedy solver)
         self._local = LocalDiagnostics()
@@ -664,6 +767,10 @@ class TuckerTensorALSLinearSolver(LinearSolver):
             if int(np.prod(x.representation_rank())) > self.dense_max_size:
                 return self._update_full_core_matrix_free(x)
             return self._update_full_core(x)
+        if isinstance(self.A.core, tensap.TTTensor):
+            return self._update_tt_core(x)
+        if isinstance(self.A.core, tensap.TreeBasedTensor):
+            return self._update_tree_core(x)
         raise NotImplementedError(
             f"update_core is not implemented for a {type(self.A.core).__name__} "
             "core."
@@ -756,6 +863,171 @@ class TuckerTensorALSLinearSolver(LinearSolver):
         self._local.iterative_solve(info, operator, rhs.ravel(), core)
         return tensap.TuckerTensorVector(tensap.FullTensor(core.reshape(ranks)),
                                          x.tensor_frame)
+
+    def _update_tree_core(self, x):
+        """Tree-based core: Galerkin update of the active nodes one after the
+        other, the representation being orthogonal with respect to the
+        updated node (Matlab updateTreeBasedCore and
+        updateInternalNodeTreeBasedCore).
+
+        With inactive leaves (as in Matlab), the local system of a node is
+        built by the tree contraction (TreeBasedTensor.
+        reduce_dot_with_rank_one_metric_at_node) of the projected problem
+        around the node, without forming the full core (_tree_node_problem).
+        With active leaves, the map from the node tensor to the full core is
+        formed explicitly (_tree_node_problem_explicit, moderate sizes
+        only)."""
+        tree = self.A.core.tree
+        if not isinstance(x.core, tensap.TreeBasedTensor):
+            x = tensap.TuckerTensorVector(x.core.tree_based_tensor(tree), x.tensor_frame)
+        x = x.orth()
+        core = x.core
+        leaves = tree.is_leaf
+        contracted = not any(
+            np.any(t.is_active_node[leaves]) for t in (core, self.A.core, self.b.core)
+        )
+        if contracted:
+            x_frames = x.tensor_frame
+            xAx = x_frames.dot_with_metrics(x_frames, self.A.tensor_frame)
+            # rows (k, trial i), columns test j: (A_k w_i, w_j), as Matlab
+            # dot(A.space * x.space, x.space), for the Kronecker product of the
+            # cores of A and x
+            metric_A = [m.transpose(0, 2, 1).reshape(-1, m.shape[1]) for m in xAx]
+            metric_b = list(self.b.tensor_frame.dot(x_frames))
+
+            def local_problem(core, nod):
+                return self._tree_node_problem(core, nod, metric_A, metric_b)
+
+        else:
+            apply, rhs = self._projected_problem(x)
+
+            def local_problem(core, nod):
+                return self._tree_node_problem_explicit(core, nod, apply, rhs)
+
+        nodes = [nod for nod in range(1, tree.nb_nodes + 1) if core.is_active_node[nod - 1]]
+        for _ in range(self.max_iterations_core):
+            core_old = tensap.TreeBasedTensor(list(core.tensors), tree)
+            for nod in nodes:
+                core = core.orth_at_node(nod)
+                shape = core.tensors[nod - 1].shape
+                solution = local_problem(core, nod)
+                core.tensors[nod - 1] = tensap.FullTensor(solution.reshape(shape))
+                core.is_orth = False
+            stagnation = (core - core_old).norm() / core.norm()
+            if self.display:
+                print(f"update_tree_core: stagnation {stagnation:.2e}")
+            if stagnation < self.stagnation_core:
+                break
+        return tensap.TuckerTensorVector(core, x.tensor_frame)
+
+    def _tree_node_problem(self, core, nod, metric_A, metric_b):
+        """Galerkin system of the node nod of a tree-based core with inactive
+        leaves, built by the tree contraction and solved directly (up to
+        dense_max_size unknowns) or by the conjugate gradient without
+        assembling its matrix, preconditioned by local_preconditioner.
+
+        The interfaces of the children and of the parent of the node,
+        L_t(i, k, j) for the test index i, the index k of A and the trial
+        index j, come from the contraction of kron(C_A, C_x) with C_x; the
+        local operator is
+        (M c)(i_1, ..., i_p, i_0) = sum C_A^nod(k_1, ..., k_p, k_0)
+        prod_t L_t(i_t, k_t, j_t) c(j_1, ..., j_p, j_0) (t = 0: the parent,
+        absent at the root), and the right-hand side is built the same way
+        with C_b."""
+        A_core, b_core = self.A.core, self.b.core
+        interfaces = A_core.kron(core).reduce_dot_with_rank_one_metric_at_node(
+            core, metric_A, nod
+        )
+        # (k * r + trial, test) -> (test, k, trial)
+        interfaces = [
+            m.reshape(m.shape[0] // m.shape[1], m.shape[1], m.shape[1]).transpose(2, 0, 1)
+            for m in interfaces
+        ]
+        interfaces_b = [m.T for m in b_core.reduce_dot_with_rank_one_metric_at_node(
+            core, metric_b, nod)]
+        node_A = A_core.tensors[nod - 1].numpy()
+        node_b = b_core.tensors[nod - 1].numpy()
+        shape = core.tensors[nod - 1].shape
+        n = len(shape)
+        test, trial, op = list(range(n)), list(range(n, 2 * n)), list(range(2 * n, 3 * n))
+
+        rhs_operands = [node_b, op]
+        for t, interface in enumerate(interfaces_b):
+            rhs_operands += [interface, [test[t], op[t]]]
+        rhs = np.einsum(*rhs_operands, test, optimize=True).ravel()
+        size = rhs.size
+
+        if size <= self.dense_max_size:
+            operands = [node_A, op]
+            for t, interface in enumerate(interfaces):
+                operands += [interface, [test[t], op[t], trial[t]]]
+            matrix = np.einsum(*operands, test + trial, optimize=True).reshape(size, size)
+            self._local.direct()
+            return np.linalg.solve(matrix, rhs)
+
+        def matvec(vector):
+            return _kronecker_terms_apply(node_A, interfaces, vector.reshape(shape)).ravel()
+
+        operator = spla.LinearOperator((size, size), matvec=matvec, dtype=float)
+        preconditioner = None
+        if self.local_preconditioner == "kronecker_sum":
+            preconditioner = _kronecker_sum_preconditioner(node_A, interfaces, shape)
+            if preconditioner is None:
+                self._local.preconditioner_disabled += 1
+        guess = core.tensors[nod - 1].numpy().ravel()
+        solution, info = spla.cg(operator, rhs, x0=guess, rtol=self.local_tolerance, atol=0.0,
+                                 maxiter=10 * size, M=preconditioner)
+        self._local.iterative_solve(info, operator, rhs, solution)
+        return solution
+
+    @staticmethod
+    def _tree_node_problem_explicit(core, nod, apply, rhs):
+        """Galerkin system of the node nod from the explicit map Psi from the
+        node tensor to the full core (its columns: the full core with the node
+        tensor set to each canonical vector): Psi^T A_c Psi c = Psi^T b_c."""
+        ranks = tuple(core.shape)
+        shape = core.tensors[nod - 1].shape
+        size = int(np.prod(shape))
+        psi = np.empty(ranks + (size,))
+        for n in range(size):
+            unit = np.zeros(size)
+            unit[n] = 1.0
+            core.tensors[nod - 1] = tensap.FullTensor(unit.reshape(shape))
+            psi[..., n] = core.full().numpy()
+        psi_matrix = psi.reshape(-1, size)
+        M = psi_matrix.T @ apply(psi).reshape(-1, size)
+        return np.linalg.solve(M, psi_matrix.T @ rhs.ravel())
+
+    def _update_tt_core(self, x):
+        """TT core: Galerkin problem on the core alone, A and b being projected
+        on the orthonormalized frames of x (a TTOperator with cores of size
+        R_nu x R_nu and a TTTensor), solved by TTTensorALSLinearSolver from
+        the current core (Matlab reduceProblemToTTCore)."""
+        x = tensap.TuckerTensorVector(as_tt_tensor(x.core), x.tensor_frame).orth()
+        x_frames = x.tensor_frame
+        xAx = x_frames.dot_with_metrics(x_frames, self.A.tensor_frame)
+        xb = self.b.tensor_frame.dot(x_frames)
+        core_A, core_b = as_tt_tensor(self.A.core), as_tt_tensor(self.b.core)
+        A_core = tensap.TTOperator(
+            [np.einsum("alb,lij->aijb", g, m) for g, m in zip(core_A.cores, xAx)]
+        )
+        b_core = tensap.TTTensor(
+            [np.einsum("alb,lj->ajb", g, m) for g, m in zip(core_b.cores, xb)]
+        )
+        solver = tensap.TTTensorALSLinearSolver(
+            A_core,
+            b_core,
+            algorithm=self.core_algorithm,
+            truncator=self.core_truncator,
+            x0=as_tt_tensor(x.core),
+            max_iterations=self.max_iterations_core,
+            stagnation=self.stagnation_core,
+            tolerance=0.0,
+            display=False,
+        )
+        core, output = solver.solve()
+        self._local.inner_flags.append(output["flag"])
+        return tensap.TuckerTensorVector(core, x_frames)
 
     # ---- update of the frames ----
 

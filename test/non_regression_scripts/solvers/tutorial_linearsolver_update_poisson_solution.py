@@ -3,8 +3,9 @@
 
 """
 Tutorial: updates of the greedy iterates for a 4D Poisson equation, with a
-canonical or Tucker core. Python counterpart of the MATLAB tutorial
-tutorial_LinearSolvers_updatePoissonSolution.m.
+canonical, Tucker, tree-based or TT core. Python counterpart of the MATLAB
+tutorial tutorial_LinearSolvers_updatePoissonSolution.m; the TT core part is
+an addition (Matlab uses it inside AnisotropicGreedySpaceLinearSolver).
 
 Problem
 -------
@@ -20,13 +21,16 @@ by a Galerkin problem (TuckerTensorALSLinearSolver):
 1. canonical format (diagonal core): update of the core, or of the core and
    the frames;
 2. Tucker format (full core of size 10^4 after 10 corrections, solved by the
-   conjugate gradient without assembling the matrix).
+   conjugate gradient without assembling the matrix);
+3. tree-based core (balanced tree), updated node by node;
+4. TT core, the Galerkin problem on the core being solved by
+   TTTensorALSLinearSolver (ALS, then DMRG).
 
 Acceptance: the updates must improve on the pure greedy iterate (ordering) and
 reach an absolute relative residual ||A x - b|| / ||b|| (thresholds about 4
 times the values observed with seed 0: 5e-3, 4e-3 and 2e-4 for the canonical
-variants, 3e-2 for 10 pure greedy corrections, 2e-6 for the updated Tucker
-core).
+variants, 3e-2 for 10 pure greedy corrections, 2e-6 to 3e-6 for the updated
+Tucker, tree-based and TT cores).
 """
 
 # %% Imports
@@ -35,6 +39,7 @@ import time
 import numpy as np
 import scipy.sparse as sp
 import tensap
+from tensap.tensor_algebra.tensors.tt_tensor import as_tt_tensor
 
 
 def residual(A, b, x):
@@ -124,3 +129,46 @@ assert (
     and residual(A, b, u4) < 1e-5
     and residual(A, b, u5) < 1e-5
 )
+
+# %% 3. Updates: tree-based core
+Ah = factory.make_tree_based_tensor()
+b = tensap.TuckerTensorVector(
+    ones.core.tree_based_tensor(Ah.core.tree), ones.tensor_frame
+)
+su = tensap.TuckerTensorALSLinearSolver(
+    Ah, b, max_iterations_core=3, display=False
+)
+uh, th = greedy(Ah, b, update=su.update_core, max_iterations=10)
+print("TREE-BASED CORE")
+print(
+    f"  update of the core   residual {residual(Ah, b, uh):.2e}  ({th:.1f} s), "
+    f"tree ranks {uh.core.ranks}"
+)
+assert (
+    residual(Ah, b, uh) < residual(A, b, u3)
+    and residual(Ah, b, uh) < 1e-5
+)
+
+# %% 4. Updates: TT core
+At = factory.make_tt_tucker_tensor()
+b = tensap.TuckerTensorVector(
+    as_tt_tensor(ones.core), ones.tensor_frame
+)
+for algorithm in ("als", "dmrg"):
+    su = tensap.TuckerTensorALSLinearSolver(
+        At,
+        b,
+        core_algorithm=algorithm,
+        max_iterations_core=3,
+        display=False,
+    )
+    ut, tt = greedy(At, b, update=su.update_core, max_iterations=10)
+    print(f"TT CORE ({algorithm})")
+    print(
+        f"  update of the core   residual {residual(At, b, ut):.2e}  ({tt:.1f} s), "
+        f"TT ranks of the core {ut.core.ranks}"
+    )
+    assert (
+        residual(At, b, ut) < residual(A, b, u3)
+        and residual(At, b, ut) < 1e-5
+    )
