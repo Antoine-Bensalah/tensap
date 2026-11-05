@@ -17,6 +17,7 @@ use, see :doc:`/examples/index`.
    functions
    approximation
    linear_algebra
+   solvers
    tools
    poincare_learning
 

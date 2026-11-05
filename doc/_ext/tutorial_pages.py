@@ -31,6 +31,7 @@ FOLDERS = {
     "functions": "Functions",
     "approximation": "Approximation",
     "poincare_learning": "Poincaré learning",
+    "solvers": "Linear solvers",
     "tools": "Tools",
 }
 TITLES = {
@@ -75,6 +76,16 @@ TITLES = {
     "tutorial_poincare_learning_surrogate_collective":
         "Collective Poincaré learning",
     "tutorial_MultiIndices": "Multi-indices",
+    "tutorial_linearsolver_tucker_poisson":
+        "Poisson equation in Tucker format",
+    "tutorial_linearsolver_high_dim_poisson":
+        "High-dimensional Poisson equation",
+    "tutorial_linearsolver_parametric_diffusion_reaction":
+        "Parametric diffusion-reaction equation",
+    "tutorial_linearsolver_truncation_poisson_solution":
+        "Truncation of the solution of a Poisson equation",
+    "tutorial_linearsolver_update_poisson_solution":
+        "Updates of the greedy iterates",
 }
 ORIGIN = re.compile(r"``test/non_regression_scripts/([^`]+\.py)``")
 CELL = re.compile(r"^# %%\s*(.*?)\s*$")

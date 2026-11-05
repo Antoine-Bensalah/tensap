@@ -37,6 +37,12 @@ EXAMPLES = [
     "poincare_learning_surrogate.py",
     "poincare_learning_surrogate_greedy.py",
     "poincare_learning_surrogate_collective.py",
+    # Tensap tutorials, Linear solvers
+    "tutorial_linearsolver_tucker_poisson.py",
+    "tutorial_linearsolver_high_dim_poisson.py",
+    "tutorial_linearsolver_update_poisson_solution.py",
+    "tutorial_linearsolver_truncation_poisson_solution.py",
+    "tutorial_linearsolver_parametric_diffusion_reaction.py",
 ]
 
 

@@ -12,4 +12,6 @@ Sub-package: ``tensap.linear_algebra``.
    :template: function
 
    magic_indices
+   lyapsym
+   gspai
 

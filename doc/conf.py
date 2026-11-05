@@ -154,6 +154,7 @@ sphinx_gallery_conf = {
         "_tutorials_src/functions",
         "_tutorials_src/approximation",
         "_tutorials_src/poincare_learning",
+        "_tutorials_src/solvers",
         "_tutorials_src/tools",
     ],
     "within_subsection_order": "gallery_order.ExampleOrder",
