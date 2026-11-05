@@ -44,6 +44,7 @@ packages = ["tensap",
             "tensap.functions.sets",
             "tensap.functions.polynomials",
             "tensap.linear_algebra",
+            "tensap.solvers",
            ]
 
 [project.optional-dependencies]
