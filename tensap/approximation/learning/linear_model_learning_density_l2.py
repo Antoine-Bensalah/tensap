@@ -45,7 +45,7 @@ class LinearModelLearningDensityL2(tensap.LinearModelLearning):
         None.
 
         """
-        super().__init__(tensap.SquareLossFunction())
+        super().__init__(tensap.DensityL2LossFunction())
 
         self.is_basis_orthonormal = True
 
@@ -73,8 +73,9 @@ class LinearModelLearningDensityL2(tensap.LinearModelLearning):
 
         if self.test_error:
             f_eval = np.matmul(self.basis_eval_test, sol)
+            # the L2 norm of the density, for an orthonormal basis
             output["test_error"] = self.loss_function.test_error(
-                f_eval, self.test_data, sol.norm() ** 2
+                f_eval, self.test_data, np.linalg.norm(sol)
             )
 
         if self.basis is not None:

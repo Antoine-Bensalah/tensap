@@ -186,12 +186,13 @@ class TreeBasedTensorLearning(tensap.TensorLearning):
         return self, f
 
     def randomize_exploration_strategy(self):
-        strategy = np.zeros(self._number_of_parameters)
+        # random order of the active nodes within each level
+        strategy = np.array(self._exploration_strategy)
         for level in np.arange(np.max(self.tree.level), -1, -1):
             active_nodes = np.intersect1d(
-                self.tree.nodes_with_level(level), np.nonzero(self.is_active_node)[0]
+                self.tree.nodes_with_level(level), np.nonzero(self.is_active_node)[0] + 1
             )
-            _, ind = np.intersect1d(
+            _, ind, _ = np.intersect1d(
                 self._exploration_strategy, active_nodes, return_indices=True
             )
             strategy[ind] = self._exploration_strategy[np.random.permutation(ind)]
