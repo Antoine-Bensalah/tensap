@@ -12,3 +12,10 @@ _build
 numerics/*
 prototype/*
 .vscode
+doc/api/generated/
+doc/examples/
+doc/use_cases/
+doc/tutorials/
+doc/_tutorials_src/
+doc/sg_execution_times.rst
+doc/api/backreferences/
