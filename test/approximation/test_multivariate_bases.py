@@ -97,7 +97,38 @@ def test_functional_bases_random_evaluations(bases, h):
         bases.random_dims([0], 4, tensap.LebesgueMeasure(-1, 1))
 
 
+def test_functional_bases_interpolation(bases):
+    points = bases.interpolation_points()
+    assert len(points) == D and np.size(points[0]) == 3
+    points, ind = bases.magic_points([np.linspace(-1, 1, 10)] * D)
+    for p, i in zip(points, ind):
+        npt.assert_allclose(np.ravel(p), np.linspace(-1, 1, 10)[i])
+    g, output = bases.tensor_product_interpolation(lambda z: z[:, 0] * z[:, 1] ** 2)
+    z = np.random.uniform(-1, 1, (4, D))
+    npt.assert_allclose(g(z), z[:, 0] * z[:, 1] ** 2, atol=1e-12)
+
+
 # --- tensor product bases -------------------------------------------------------------
+
+
+def test_full_tensor_product_basis(bases, h, x):
+    F = tensap.FullTensorProductFunctionalBasis(bases)
+    assert F.cardinal() == 27 and F.ndim() == D and len(F) == D
+    # first dimension varies fastest
+    hx = [h.eval(x[:, k]) for k in range(D)]
+    expected = np.einsum("ni,nj,nk->nkji", *hx).reshape(5, -1)
+    npt.assert_allclose(F.eval(x), expected, atol=1e-14)
+    npt.assert_allclose(F.mean(), np.eye(27)[0], atol=1e-14)
+    dx = [h.eval_derivative(1, x[:, 0]), hx[1], hx[2]]
+    npt.assert_allclose(F.eval_derivative([1, 0, 0], x),
+                        np.einsum("ni,nj,nk->nkji", *dx).reshape(5, -1), atol=1e-12)
+    assert F == F and F.remove_bases(0).ndim() == 2 and F.keep_bases([1]).ndim() == 1
+    assert F.transpose([2, 1, 0]).ndim() == D
+    npt.assert_array_equal(F.domain(), [[-1, 1]] * D)
+    points, grid = F.interpolation_points()
+    assert points.shape == (27, D) and len(grid) == D
+    g, _ = F.tensor_product_interpolation(_f)
+    npt.assert_allclose(g(x), _f(x), atol=1e-12)
 
 
 def test_sparse_tensor_product_basis(sparse, bases, h, indices, x):
@@ -124,7 +155,61 @@ def test_sparse_tensor_product_basis(sparse, bases, h, indices, x):
     assert G1.shape == (10, 10)
 
 
+def test_sparse_tensor_product_interpolation(sparse, x):
+    g, output = sparse.tensor_product_interpolation(_f)
+    npt.assert_allclose(g(x), _f(x), atol=1e-12)
+    assert output["number_of_evaluations"] == 10
+
+
 # --- FunctionalBasisArray ------------------------------------------------------------------
+
+
+def test_projection_reproduces_the_function(f, x):
+    assert isinstance(f, tensap.FunctionalBasisArray)
+    npt.assert_allclose(f.eval(x).ravel(), _f(x), atol=1e-14)
+    npt.assert_allclose(f(x).ravel(), _f(x), atol=1e-14)
+
+
+def test_statistics(f):
+    # E f = 1/3, Var f = Var(x0 x1) + Var(x2^2) = 1/9 + 4/45, E f^2 = 14/45
+    npt.assert_allclose(f.mean(), [[1 / 3]])
+    npt.assert_allclose(f.expectation(), [[1 / 3]])
+    npt.assert_allclose(f.variance(), [[1 / 5]])
+    npt.assert_allclose(f.std(), [[np.sqrt(1 / 5)]])
+    npt.assert_allclose(f.dot_product_expectation(f), [[14 / 45]])
+    npt.assert_allclose(f.norm_expectation(), [[np.sqrt(14 / 45)]])
+    npt.assert_allclose(f.dot(f), 14 / 45)
+    npt.assert_allclose(f.norm(), np.sqrt(14 / 45))
+    assert f.storage() == 10 and 3 <= f.sparse_storage() <= 10
+    assert f.is_random()
+
+
+def test_conditional_expectations(f, x):
+    # E(f | x0, x1) = x0 x1 + 1/3, E(f | x2) = x2^2
+    g = f.conditional_expectation([0, 1])
+    npt.assert_allclose(g.eval(x[:, :2]).ravel(), x[:, 0] * x[:, 1] + 1 / 3, atol=1e-14)
+    g = f.conditional_expectation(np.array([False, False, True]))
+    npt.assert_allclose(g.eval(x[:, [2]]).ravel(), x[:, 2] ** 2, atol=1e-14)
+    # variances of the conditional expectations: 0, 1/9 and 4/45
+    v = f.variance_conditional_expectation(np.array([[True, False, False],
+                                                     [True, True, False],
+                                                     [False, False, True]]))
+    npt.assert_allclose(np.ravel(v), [0, 1 / 9, 4 / 45], atol=1e-14)
+
+
+def test_derivatives(f, x):
+    npt.assert_allclose(f.eval_derivative([1, 0, 0], x).ravel(), x[:, 1], atol=1e-12)
+    npt.assert_allclose(f.derivative([0, 0, 1]).eval(x).ravel(), 2 * x[:, 2], atol=1e-12)
+    npt.assert_allclose(f.eval_gradient(x), np.stack([x[:, 1], x[:, 0], 2 * x[:, 2]], 1),
+                        atol=1e-12)
+
+
+def test_arithmetic(f, x):
+    npt.assert_allclose((f + f).eval(x).ravel(), 2 * _f(x))
+    npt.assert_allclose((f - f).eval(x).ravel(), 0, atol=1e-14)
+    npt.assert_allclose((-f).eval(x).ravel(), -_f(x))
+    npt.assert_allclose((f * 3).eval(x).ravel(), 3 * _f(x))
+    npt.assert_allclose(f.get_coefficients(), f.data)
 
 
 def test_vector_valued_projection(sparse, rule, x):
@@ -135,3 +220,18 @@ def test_vector_valued_projection(sparse, rule, x):
     # product with a matrix: (g M)(x) = g(x) M
     M = np.array([[1.0, 2.0], [3.0, 4.0]])
     npt.assert_allclose(g.matmul(M).eval(x), g.eval(x) @ M, atol=1e-14)
+
+
+def test_random_evaluations(f):
+    fx, z = f.random(6)
+    assert fx.shape == (6, 1)
+    npt.assert_allclose(fx.ravel(), _f(z))
+    assert isinstance(f.get_random_vector(), tensap.RandomVector)
+
+
+def test_projection_on_another_basis(f, bases, x):
+    full = tensap.FullTensorProductFunctionalBasis(bases)
+    g = f.projection(full)
+    npt.assert_allclose(g.eval(x).ravel(), _f(x), atol=1e-14)
+    g = f.sub_functional_basis()
+    assert isinstance(g, tensap.SubFunctionalBasis) and g.cardinal() == 1

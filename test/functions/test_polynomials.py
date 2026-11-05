@@ -99,6 +99,14 @@ def test_derivatives_by_finite_differences(family):
     npt.assert_allclose(p.dn_polyval(6, [5], x), 0, atol=1e-8)
 
 
+def test_roots(family):
+    _, p, _, _ = family
+    for deg in (1, 2, 5):
+        roots = p.roots(deg)
+        assert roots.size == deg and np.all(np.diff(roots) > 0)
+        npt.assert_allclose(p.polyval(deg, roots), 0, atol=1e-10)
+
+
 def test_monomial_coefficients(family):
     name, p, _, _ = family
     if isinstance(p, tensap.ShiftedOrthonormalPolynomials):
@@ -157,10 +165,55 @@ def test_equality_and_repr():
     assert p.ndim() == 1
 
 
+def test_shifted_polynomials_moments_with_another_measure():
+    # orthonormal on [0, 2]: moments with respect to the uniform measure on [0, 4]
+    p = tensap.UniformRandomVariable(0, 2).orthonormal_polynomials()
+    x, w = _gauss_legendre(20, 0.0, 4.0)
+    P = p.polyval([0, 1, 2], x)
+    expected = [np.sum(w * P[:, 1] * P[:, 2]), np.sum(w * P[:, 1] * P[:, 1])]
+    m = tensap.UniformRandomVariable(0, 4)
+    npt.assert_allclose(p.moment([[1, 2], [1, 1]], m), expected, atol=1e-12)
+    npt.assert_allclose(p.moment([[1, 1]], p.measure), [1.0])
+
+
 # --- canonical polynomials ---------------------------------------------------------
 
 
+def test_canonical_polynomials():
+    p = tensap.CanonicalPolynomials(tensap.UniformRandomVariable(-1, 1))
+    x = np.array([0.5, 2.0, -1.5])
+    npt.assert_allclose(p.polyval([0, 1, 3], x), np.stack([x**0, x, x**3], 1))
+    npt.assert_allclose(p.d_polyval([0, 1, 3], x), np.stack([0 * x, x**0, 3 * x**2], 1))
+    npt.assert_allclose(p.dn_polyval(2, [0, 1, 3], x), np.stack([0 * x, 0 * x, 6 * x], 1))
+    # moments of x^k for the uniform measure on [-1, 1]
+    npt.assert_allclose(p.moment([[2], [1], [4]]), [1 / 3, 0, 1 / 5], atol=1e-15)
+    npt.assert_allclose(p.moment([[1, 3]]), [1 / 5])
+    npt.assert_allclose(p.mean([2, 4]), [1 / 3, 1 / 5])
+    lebesgue = tensap.LebesgueMeasure(0, 2)
+    npt.assert_allclose(p.mean([1, 2], lebesgue), [1, 4 / 3])
+    assert not p.is_orthonormal() and p.one() == (1, 0)
+    npt.assert_array_equal(p.domain(), [-np.inf, np.inf])
+    assert p == tensap.CanonicalPolynomials() and not p == tensap.LegendrePolynomials()
+    with pytest.raises(ValueError):
+        tensap.CanonicalPolynomials("not a measure")
+    with pytest.raises(AssertionError):
+        tensap.CanonicalPolynomials().mean([1])
+
+
 # --- integration rules ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "measure",
+    [tensap.UniformRandomVariable(-1, 2), tensap.NormalRandomVariable(1, 2),
+     tensap.LebesgueMeasure(0, 3)],
+)
+def test_gauss_rules_are_exact_up_to_degree_2n_minus_1(measure):
+    n = 4
+    G = tensap.IntegrationRule.gauss(measure, n)
+    for k in range(2 * n):
+        exact = _exact_moment(measure, k)
+        npt.assert_allclose(G.integrate(lambda x: x**k), exact, rtol=1e-10, atol=1e-12)
 
 
 def _exact_moment(measure, k):
@@ -180,6 +233,34 @@ def test_gauss_legendre_composite():
     npt.assert_allclose(G.integrate(f), (2.0**4 + 1.0) / 4)
     G = tensap.IntegrationRule.gauss_legendre_composite(knots, [1, 2, 3])
     assert G.points.size == 6
+
+
+def test_tensorized_rule():
+    G = tensap.LebesgueMeasure(0, 1).gauss_integration_rule(3).tensorize(2)
+    assert isinstance(G, tensap.FullTensorProductIntegrationRule) and G.ndim() == 2
+    npt.assert_allclose(G.integrate(lambda x: x[:, 0] ** 2 * x[:, 1] ** 5), 1 / 18)
+    npt.assert_allclose(np.sum(G.weights_on_grid()), 1)
+
+
+def test_full_tensor_product_rule():
+    G = tensap.FullTensorProductIntegrationRule(
+        [np.array([0.0, 1.0]), np.array([0.0, 1.0, 2.0])],
+        [np.array([0.5, 0.5]), np.array([1.0, 1.0, 1.0])],
+    )
+    rule = G.integration_rule()
+    assert rule.points.shape == (6, 2)
+    npt.assert_allclose(G.integrate(lambda x: x[:, 0] + x[:, 1]), 0.5 * 3 + 3.0)
+    with pytest.raises(ValueError):
+        tensap.FullTensorProductIntegrationRule(np.zeros((2, 2)), [np.ones(2)])
+    with pytest.raises(AssertionError):
+        tensap.FullTensorProductIntegrationRule([np.zeros(2)], [np.ones(2), np.ones(2)])
+
+
+def test_composite_tensor_product_rule():
+    G = tensap.FullTensorProductIntegrationRule.gauss_legendre_composite(
+        [np.linspace(0, 1, 3), np.linspace(0, 2, 3)], 2
+    )
+    npt.assert_allclose(G.integrate(lambda x: x[:, 0] ** 3 * x[:, 1]), 1 / 4 * 2)
 
 
 def test_shifted_hermite_moments_with_another_normal_measure():
