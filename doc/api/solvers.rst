@@ -31,6 +31,7 @@ Greedy and alternating solvers
    GreedyLinearSolver
    TuckerTensorALSLinearSolver
    TTTensorALSLinearSolver
+   AnisotropicGreedySpaceLinearSolver
 
 Approximate inverses
 --------------------
