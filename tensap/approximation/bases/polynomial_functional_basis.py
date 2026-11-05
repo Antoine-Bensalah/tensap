@@ -121,7 +121,7 @@ class PolynomialFunctionalBasis(tensap.FunctionalBasis):
 
     def kron(self, q):
         m = np.max(self.indices) + np.max(q.indices)
-        b = PolynomialFunctionalBasis(self.basis, range(m))
+        b = PolynomialFunctionalBasis(self.basis, range(m + 1))
         b.measure = self.measure
 
         def fun(x):
@@ -136,8 +136,8 @@ class PolynomialFunctionalBasis(tensap.FunctionalBasis):
             )
 
         measure = b.measure
-        int_rule = measure.gauss_integration_rule(2 * m)
-        return tensap.SubFunctionalBasis(b, self.projection(fun, int_rule).data)
+        int_rule = measure.gauss_integration_rule(m + 1)
+        return tensap.SubFunctionalBasis(b, b.projection(fun, int_rule).data)
 
     def derivative(self, k, measure=None):
         """

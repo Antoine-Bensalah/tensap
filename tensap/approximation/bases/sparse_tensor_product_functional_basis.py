@@ -117,6 +117,7 @@ class SparseTensorProductFunctionalBasis(tensap.FunctionalBasis):
         """
         out = deepcopy(self)
         out.bases = out.bases.remove_bases(ind)
+        out.indices = out.indices.remove_dims(ind)
         return out
 
     def keep_bases(self, ind):
@@ -136,6 +137,7 @@ class SparseTensorProductFunctionalBasis(tensap.FunctionalBasis):
         """
         out = deepcopy(self)
         out.bases = out.bases.keep_bases(ind)
+        out.indices = out.indices.keep_dims(ind)
         return out
 
     def remove_mapping(self, ind):
@@ -174,7 +176,7 @@ class SparseTensorProductFunctionalBasis(tensap.FunctionalBasis):
 
     def conditional_expectation(self, dims, *args):
         dims = np.atleast_1d(dims)
-        if np.all([isinstance(x, bool) for x in dims]):
+        if np.asarray(dims).dtype == bool:
             dims = np.nonzero(dims)[0]
 
         dims_C = np.setdiff1d(range(self.ndim()), dims)
