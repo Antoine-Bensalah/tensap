@@ -65,4 +65,29 @@ Tucker format
 Tucker rank
   The tuple of the ranks of the matricizations $M_\nu(u)$, the smallest
   representation ranks in Tucker format. See {doc}`tucker_canonical`.
+
+alternating least squares
+  ALS: the minimization of a functional over a low-rank format, one group
+  of parameters at a time, each step being a linear problem. See
+  {doc}`greedy`.
+
+energy
+  The functional $J(v) = \frac12 (A v, v) - (b, v)$, minimized by the
+  solution of $A u = b$ for a symmetric positive definite $A$; its
+  minimization on a set of tensors is the best approximation in the energy
+  norm.
+
+Galerkin update
+  The minimization of the energy over the core or over the frames of a
+  low-rank iterate, the other parameters being fixed. See
+  {doc}`galerkin_updates`.
+
+greedy algorithm
+  The construction of an approximation by successive rank-one
+  corrections, also called proper generalized decomposition (PGD). See
+  {doc}`greedy`.
+
+truncated iteration
+  A classical iterative method (Richardson, conjugate gradient) whose
+  iterates are truncated after each step. See {doc}`truncated_iterations`.
 ```
