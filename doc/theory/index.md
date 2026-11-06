@@ -56,6 +56,7 @@ The notation is that of A. Nouy's courses and survey {cite:p}`Nouy2017book`.
 | Page | What it covers |
 | --- | --- |
 | {doc}`tucker_canonical` | Tucker and canonical formats, for tensors and operators; Tucker rank, orthonormal frames, arithmetic and rank growth |
+| {doc}`tensor_trains` | Tensor-train format: ranks, TT-SVD, orthogonality, operations, rounding, entrywise product at a given precision, TT cores of Tucker tensors |
 
 ### Methods
 
@@ -83,6 +84,7 @@ The notation is that of A. Nouy's courses and survey {cite:p}`Nouy2017book`.
 :numbered: 3
 
 tucker_canonical
+tensor_trains
 truncation
 truncated_iterations
 greedy

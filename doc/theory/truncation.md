@@ -241,6 +241,10 @@ same tree: the leaf $C^\nu$ becomes $U^{(\nu)} C^\nu$. This tensor is
 truncated by the hierarchical SVD, which never forms the full core, and its
 leaves are moved back to the frames.
 
+**TT core.** A Tucker tensor with a tensor-train core is truncated by the
+rounding of its core and truncated SVDs of its frames
+({ref}`theory-tensor-trains`).
+
 **Operators** are truncated as their vectorization, the matrices of their
 frames being seen as vectors: the norm is then the Frobenius norm.
 
