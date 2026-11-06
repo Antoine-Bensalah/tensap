@@ -18,10 +18,12 @@ $C^\nu \in \mathbb{R}^{r_{\nu-1} \times N_\nu \times r_\nu}$, with
 $r_0 = r_d = 1$:
 
 $$
+\begin{aligned}
 u(i_1, \dots, i_d)
-= \sum_{k_1 = 1}^{r_1} \cdots \sum_{k_{d-1} = 1}^{r_{d-1}}
-  C^1(i_1, k_1)\, C^2(k_1, i_2, k_2) \cdots C^d(k_{d-1}, i_d)
-= C^1(i_1)\, C^2(i_2) \cdots C^d(i_d),
+&= \sum_{k_1 = 1}^{r_1} \cdots \sum_{k_{d-1} = 1}^{r_{d-1}}
+  C^1(i_1, k_1)\, C^2(k_1, i_2, k_2) \cdots C^d(k_{d-1}, i_d) \\
+&= C^1(i_1)\, C^2(i_2) \cdots C^d(i_d),
+\end{aligned}
 $$
 
 with $C^\nu(i_\nu) \in \mathbb{R}^{r_{\nu-1} \times r_\nu}$ a matrix (the
@@ -170,8 +172,10 @@ left of the bond $(\nu, \nu + 1)$ and right-orthogonal on its right, the best
 pair of cores is given by the supercore
 
 $$
-S(s, i, j, s') = \sum L_\nu(s, a, b)\, U^\nu(a, i, a')\, W^\nu(b, i, b')\,
-U^{\nu+1}(a', j, a'')\, W^{\nu+1}(b', j, b'')\, R_{\nu+1}(s', a'', b''),
+\begin{aligned}
+S(s, i, j, s') = \sum\; & L_\nu(s, a, b)\, U^\nu(a, i, a')\, W^\nu(b, i, b') \\
+& \times U^{\nu+1}(a', j, a'')\, W^{\nu+1}(b', j, b'')\, R_{\nu+1}(s', a'', b''),
+\end{aligned}
 $$
 
 where $L_\nu$ and $R_{\nu+1}$ contract the left and right parts of $z$ with

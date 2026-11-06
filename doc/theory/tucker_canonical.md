@@ -46,9 +46,11 @@ $C \in \mathbb{R}^{R_1 \times \cdots \times R_d}$, the Tucker tensor
 $(C, \{U^{(\nu)}\})$ is
 
 $$
-u = \sum_{k_1 = 1}^{R_1} \cdots \sum_{k_d = 1}^{R_d}
-    C(k_1, \dots, k_d)\; v^{(1)}_{k_1} \otimes \cdots \otimes v^{(d)}_{k_d}
-  = C \times_1 U^{(1)} \times_2 \cdots \times_d U^{(d)} .
+\begin{aligned}
+u &= \sum_{k_1 = 1}^{R_1} \cdots \sum_{k_d = 1}^{R_d}
+    C(k_1, \dots, k_d)\; v^{(1)}_{k_1} \otimes \cdots \otimes v^{(d)}_{k_d} \\
+  &= C \times_1 U^{(1)} \times_2 \cdots \times_d U^{(d)} .
+\end{aligned}
 $$
 
 The tuple $(R_1, \dots, R_d)$ is its *representation rank*. Its storage is
@@ -98,9 +100,11 @@ decomposition (HOSVD).
 For invertible matrices $Q^{(\nu)} \in \mathbb{R}^{R_\nu \times R_\nu}$,
 
 $$
-C \times_1 U^{(1)} \cdots \times_d U^{(d)}
-= \big(C \times_1 Q^{(1)} \cdots \times_d Q^{(d)}\big)
+\begin{aligned}
+& C \times_1 U^{(1)} \cdots \times_d U^{(d)} \\
+& \quad = \big(C \times_1 Q^{(1)} \cdots \times_d Q^{(d)}\big)
   \times_1 U^{(1)} Q^{(1)-1} \cdots \times_d U^{(d)} Q^{(d)-1},
+\end{aligned}
 $$
 
 since $(C \times_\nu Q) \times_\nu (U Q^{-1}) = C \times_\nu U$: the
@@ -111,9 +115,11 @@ T^{(\nu)}$, $u = (C \times_1 T^{(1)} \cdots \times_d T^{(d)}) \times_1 Q^{(1)}
 orthonormal columns has orthonormal columns,
 
 $$
-\|u\| = \Big\|\Big(\bigotimes_\nu Q^{(\nu)}\Big)
-        \operatorname{vec}(C')\Big\| = \|C'\|,
-\qquad C' = C \times_1 T^{(1)} \cdots \times_d T^{(d)} .
+\begin{aligned}
+\|u\| &= \Big\|\Big(\bigotimes_\nu Q^{(\nu)}\Big)
+        \operatorname{vec}(C')\Big\| = \|C'\|, \\
+C' &= C \times_1 T^{(1)} \cdots \times_d T^{(d)} .
+\end{aligned}
 $$
 
 With orthonormal frames, the norms, inner products and truncations of $u$ are
@@ -161,10 +167,12 @@ For $d \ge 3$, the set $\mathcal{R}_r$ is not closed. The classical example,
 with independent vectors $a$ and $b$ and $\varepsilon > 0$, is
 
 $$
-u_\varepsilon = \frac{1}{\varepsilon}
-  \big((a + \varepsilon b)^{\otimes 3} - a^{\otimes 3}\big)
-= a \otimes a \otimes b + a \otimes b \otimes a + b \otimes a \otimes a
+\begin{aligned}
+u_\varepsilon &= \frac{1}{\varepsilon}
+  \big((a + \varepsilon b)^{\otimes 3} - a^{\otimes 3}\big) \\
+&= a \otimes a \otimes b + a \otimes b \otimes a + b \otimes a \otimes a
   + O(\varepsilon).
+\end{aligned}
 $$
 
 Each $u_\varepsilon$ has rank 2, while the limit has rank 3: the limit is
@@ -182,11 +190,12 @@ $A^{(\nu)}_k \in \mathbb{R}^{N_\nu \times N'_\nu}$ in place of vectors, and
 Kronecker products:
 
 $$
-A = \sum_{k} C_A(k)\;
-    A^{(1)}_{k_1} \otimes \cdots \otimes A^{(d)}_{k_d},
-\qquad
+\begin{aligned}
+A &= \sum_{k} C_A(k)\;
+    A^{(1)}_{k_1} \otimes \cdots \otimes A^{(d)}_{k_d}, \\
 \Big(\bigotimes_\nu A^{(\nu)}\Big) \Big(\bigotimes_\nu v^{(\nu)}\Big)
-= \bigotimes_\nu A^{(\nu)} v^{(\nu)} .
+&= \bigotimes_\nu A^{(\nu)} v^{(\nu)} .
+\end{aligned}
 $$
 
 In tensap, an operator in Tucker format is a
@@ -252,9 +261,11 @@ Kronecker product of the cores. (3) By bilinearity and the factorization of
 the inner product on elementary tensors,
 
 $$
-(u, w) = \sum_{k, l} C_u(k)\, C_w(l)
-         \prod_\nu \big(v^{(\nu)}_{k_\nu}, w^{(\nu)}_{l_\nu}\big)
-       = \sum_k C_u(k) \sum_l \prod_\nu G^{(\nu)}(k_\nu, l_\nu)\, C_w(l),
+\begin{aligned}
+(u, w) &= \sum_{k, l} C_u(k)\, C_w(l)
+         \prod_\nu \big(v^{(\nu)}_{k_\nu}, w^{(\nu)}_{l_\nu}\big) \\
+       &= \sum_k C_u(k) \sum_l \prod_\nu G^{(\nu)}(k_\nu, l_\nu)\, C_w(l),
+\end{aligned}
 $$
 
 and the inner sum is $(C_w \times_1 G^{(1)} \cdots \times_d G^{(d)})(k)$.

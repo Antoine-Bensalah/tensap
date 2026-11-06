@@ -49,12 +49,13 @@ For a rank-one operator $W = a\, v^{(1)} \otimes \cdots \otimes v^{(d)}$,
 with matrices $v^{(\nu)}$, the traces factorize:
 
 $$
+\begin{aligned}
 \operatorname{tr}(W A W^{\mathsf T})
-= a^2 \sum_i C_A(i) \prod_\nu
-  \big(A^{(\nu)}_{i_\nu}, v^{(\nu)\mathsf T} v^{(\nu)}\big),
-\qquad
+&= a^2 \sum_i C_A(i) \prod_\nu
+  \big(A^{(\nu)}_{i_\nu}, v^{(\nu)\mathsf T} v^{(\nu)}\big), \\
 \operatorname{tr}(B W^{\mathsf T})
-= a \sum_l C_B(l) \prod_\nu \big(B^{(\nu)}_{l_\nu}, v^{(\nu)}\big).
+&= a \sum_l C_B(l) \prod_\nu \big(B^{(\nu)}_{l_\nu}, v^{(\nu)}\big).
+\end{aligned}
 $$
 
 With all the factors but $v = v^{(\mu)}$ fixed, and $a$ absorbed into $v$,

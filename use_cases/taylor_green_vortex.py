@@ -45,9 +45,10 @@ from tensap.tensorized_pde_discretization.finite_volumes import (
 #
 # .. math::
 #
-#    u_1 = \sin x \cos y \, F(t), \quad u_2 = -\cos x \sin y \, F(t),
-#    \quad p = \frac{\cos 2x + \cos 2y}{4} F(t)^2, \quad
-#    F(t) = e^{-2 \nu t},
+#    \begin{aligned}
+#    u_1 &= \sin x \cos y \, F(t), & u_2 &= -\cos x \sin y \, F(t), \\
+#    p &= \frac{\cos 2x + \cos 2y}{4} F(t)^2, & F(t) &= e^{-2 \nu t},
+#    \end{aligned}
 #
 # is an exact solution: the convective term is balanced by the pressure
 # gradient, and the vortices decay at the rate :math:`2 \nu`. We take

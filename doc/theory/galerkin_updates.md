@@ -19,11 +19,13 @@ where its gradient vanishes: the Galerkin problem on
 $\operatorname{span}\{w_1, \dots, w_n\}$,
 
 $$
-G\, c = g, \qquad
-G(j, i) = (A w_i, w_j)
+\begin{aligned}
+G\, c &= g, \\
+G(j, i) &= (A w_i, w_j)
 = \sum_k a_k \prod_{\nu = 1}^{d} \big(A^{(\nu)}_k w^{(\nu)}_i,
-  w^{(\nu)}_j\big), \qquad
-g(j) = (b, w_j),
+  w^{(\nu)}_j\big), \\
+g(j) &= (b, w_j),
+\end{aligned}
 $$
 
 for $A = \sum_k a_k \bigotimes_\nu A^{(\nu)}_k$. The entries of $G$
@@ -39,9 +41,11 @@ the Galerkin problem on the core is $A_c\, C = b_c$, with the projected
 operator and right-hand side
 
 $$
-A_c = \sum_k C_A(k)\, P^{(1)}_{k_1} \otimes \cdots \otimes P^{(d)}_{k_d},
-\quad P^{(\nu)}_k = U^{(\nu)\mathsf T} A^{(\nu)}_k U^{(\nu)}, \qquad
-b_c = \sum_l C_b(l) \bigotimes_\nu U^{(\nu)\mathsf T} b^{(\nu)}_l ,
+\begin{aligned}
+A_c &= \sum_k C_A(k)\, P^{(1)}_{k_1} \otimes \cdots \otimes P^{(d)}_{k_d},
+\qquad P^{(\nu)}_k = U^{(\nu)\mathsf T} A^{(\nu)}_k U^{(\nu)}, \\
+b_c &= \sum_l C_b(l) \bigotimes_\nu U^{(\nu)\mathsf T} b^{(\nu)}_l ,
+\end{aligned}
 $$
 
 of size $\prod_\nu R_\nu$. It is assembled and solved directly for small
@@ -75,10 +79,12 @@ terms of dimension $\mu$.
 The minimizer of $J$ over $W$ solves
 
 $$
+\begin{aligned}
 \Big(\sum_k \Gamma_k \otimes A^{(\mu)}_k\Big) \operatorname{vec}(W)
-= \operatorname{vec}(F), \qquad
-\Gamma_k(j, i) = a_k \prod_{\nu \ne \mu}
+&= \operatorname{vec}(F), \\
+\Gamma_k(j, i) &= a_k \prod_{\nu \ne \mu}
 \big(A^{(\nu)}_k w^{(\nu)}_i, w^{(\nu)}_j\big),
+\end{aligned}
 $$
 
 with $F = \sum_l b^{(\mu)}_l f_l^{\mathsf T}$,

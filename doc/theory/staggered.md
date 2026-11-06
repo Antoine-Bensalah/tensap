@@ -137,10 +137,12 @@ cells, which gives exact references for explicit and implicit Euler. For the
 unsteady Stokes equations, the incremental pressure correction
 
 $$
-(I - \Delta t\, \nu L)\, u^* = u^n - \Delta t\, G p^n, \quad
-L_p \varphi = D u^*, \quad
-u^{n+1} = u^* - G \varphi, \quad
-p^{n+1} = p^n + \varphi / \Delta t,
+\begin{aligned}
+(I - \Delta t\, \nu L)\, u^* &= u^n - \Delta t\, G p^n, &
+L_p \varphi &= D u^*, \\
+u^{n+1} &= u^* - G \varphi, &
+p^{n+1} &= p^n + \varphi / \Delta t,
+\end{aligned}
 $$
 
 has the discrete steady Stokes solutions as fixed points, for every time

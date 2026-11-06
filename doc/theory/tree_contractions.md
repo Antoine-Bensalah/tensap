@@ -25,9 +25,11 @@ children $\gamma_1, \dots, \gamma_p$, the contraction of its subtree is the
 matrix $B_\beta$ of size $r_\beta(C) \times r_\beta(D)$:
 
 $$
-B_\nu = M_\nu \ \text{(leaf of the dimension } \nu\text{)}, \qquad
-B_\beta(k, l) = \sum C^\beta(k_1, \dots, k_p, k)
+\begin{aligned}
+B_\nu &= M_\nu \quad \text{(leaf of the dimension } \nu\text{)}, \\
+B_\beta(k, l) &= \sum C^\beta(k_1, \dots, k_p, k)
   \prod_{t = 1}^{p} B_{\gamma_t}(k_t, l_t)\, D^\beta(l_1, \dots, l_p, l),
+\end{aligned}
 $$
 
 computed from the leaves to the root, one node tensor at a time.
@@ -37,9 +39,11 @@ $s$ of its parent $\beta$, the contraction of everything outside its
 subtree is
 
 $$
-T_\gamma(k_s, l_s) = \sum C^\beta(k_1, \dots, k_p, k)
-  \prod_{t \ne s} B_{\gamma_t}(k_t, l_t)\, T_\beta(k, l)\,
-  D^\beta(l_1, \dots, l_p, l),
+\begin{aligned}
+T_\gamma(k_s, l_s) = \sum\; & C^\beta(k_1, \dots, k_p, k)
+  \prod_{t \ne s} B_{\gamma_t}(k_t, l_t) \\
+  & \times T_\beta(k, l)\, D^\beta(l_1, \dots, l_p, l),
+\end{aligned}
 $$
 
 without the factor $T_\beta$ when $\beta$ is the root, computed from the
@@ -51,9 +55,11 @@ root to the leaves.
 For any node $\alpha$ with the children $\gamma_1, \dots, \gamma_p$,
 
 $$
-(C, M D) = \sum C^\alpha(k_1, \dots, k_p, k)
-  \prod_{t} B_{\gamma_t}(k_t, l_t)\, T_\alpha(k, l)\,
-  D^\alpha(l_1, \dots, l_p, l).
+\begin{aligned}
+(C, M D) = \sum\; & C^\alpha(k_1, \dots, k_p, k)
+  \prod_{t} B_{\gamma_t}(k_t, l_t) \\
+  & \times T_\alpha(k, l)\, D^\alpha(l_1, \dots, l_p, l).
+\end{aligned}
 $$
 ```
 
@@ -82,9 +88,11 @@ $C$ (trial): the interfaces $L_t(i, k, j)$ of the children and of the parent
 ($i$ the test index, $k$ the index of $C_A$, $j$ the trial index) give
 
 $$
-\big(\Psi_\alpha^{\mathsf T} A_c \Psi_\alpha\, c\big)(i_1, \dots, i_p, i_0)
-= \sum C_A^\alpha(k_1, \dots, k_p, k_0) \prod_{t = 0}^{p} L_t(i_t, k_t, j_t)\,
+\begin{aligned}
+& \big(\Psi_\alpha^{\mathsf T} A_c \Psi_\alpha\, c\big)(i_1, \dots, i_p, i_0) \\
+& \quad = \sum C_A^\alpha(k_1, \dots, k_p, k_0) \prod_{t = 0}^{p} L_t(i_t, k_t, j_t)\,
   c(j_1, \dots, j_p, j_0),
+\end{aligned}
 $$
 
 with $t = 0$ the parent, absent at the root, and
@@ -114,7 +122,12 @@ inner product, is
 
 $$
 \sum_t I \otimes \cdots \otimes T_t \otimes \cdots \otimes I
-- (n - 1)\, \tau\, I, \qquad
+- (n - 1)\, \tau\, I,
+$$
+
+with
+
+$$
 T_t = \frac{\operatorname{tr}_{s \ne t}(M)}{\prod_{s \ne t} n_s}, \qquad
 \tau = \frac{\operatorname{tr} M}{\prod_s n_s},
 $$
