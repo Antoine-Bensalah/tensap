@@ -131,4 +131,24 @@ Kronecker sum
   An operator $S_1 \otimes I \otimes \cdots + \dots + I \otimes \cdots
   \otimes S_n$, inverted by fast diagonalization. See
   {doc}`tree_contractions`.
+
+closure
+  The treatment of a boundary condition by a finite volume scheme, through
+  a ghost value. See {doc}`finite_volumes`.
+
+Helmholtz-Hodge decomposition
+  The splitting of a velocity into a divergence-free part and a gradient.
+  See {doc}`staggered`.
+
+QTT
+  Quantized tensor train: the TT representation of a tensorized vector,
+  with modes of size $b$. See {doc}`qtt`.
+
+staggered grid
+  The MAC grid: the pressure at the centres of the cells, each velocity
+  component at the faces normal to its direction. See {doc}`staggered`.
+
+tensorization
+  The identification of a vector of $b^L$ values with a tensor of order
+  $L$, by the digits of its index in base $b$. See {doc}`qtt`.
 ```
