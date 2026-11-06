@@ -121,4 +121,14 @@ interface
   The contraction of the cores on one side of a core of a tensor network
   with those of the operator and of the iterate, which defines the local
   problems of the alternating solvers. See {doc}`tt_solvers`.
+
+anisotropic enrichment
+  The greedy construction of tensor subspaces in which only the
+  dimensions with the largest estimated errors are enriched. See
+  {doc}`greedy`.
+
+Kronecker sum
+  An operator $S_1 \otimes I \otimes \cdots + \dots + I \otimes \cdots
+  \otimes S_n$, inverted by fast diagonalization. See
+  {doc}`tree_contractions`.
 ```
