@@ -33,6 +33,7 @@ extensions = [
     "myst_parser",
     "sphinxcontrib.bibtex",
     "sphinx_design",  # cards and buttons of the home page
+    "sphinx_proof",  # numbered definitions, propositions and algorithms
     "sphinx_gallery.gen_gallery",
     "api_coverage",  # _ext/: every public object is in doc/api/
     "api_notes",  # _ext/: formulas of doc/api_notes/ appended to docstrings

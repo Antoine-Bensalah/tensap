@@ -6,10 +6,17 @@ links the classes it describes to their entry in the {doc}`/api/index`, and
 to the examples of the {doc}`/examples/index` that use them. References are
 listed in the {ref}`bibliography`.
 
+The pages are organised by mathematical concept and by family of methods.
+Each concept page gives definitions, properties and their proofs or
+references; each method page states the problem, the assumptions, the
+algorithm, its properties and its cost, and distinguishes established results
+from numerical observations.
+
 ```{note}
-These pages come from the tensap manual (`manual/tensap_manual.tex`), which
-they will replace. They are still organised by class, as the manual is; they
-will be reorganised by concept and by method.
+The pages of the last group come from the tensap manual
+(`manual/tensap_manual.tex`), which they will replace. They are still
+organised by class, as the manual is, and will be rewritten in the style of
+the other pages.
 ```
 
 ## Conventions
@@ -27,6 +34,20 @@ will be reorganised by concept and by method.
 
 ## Contents
 
+### Concepts
+
+| Page | What it covers |
+| --- | --- |
+| {doc}`tucker_canonical` | Tucker and canonical formats, for tensors and operators; Tucker rank, orthonormal frames, arithmetic and rank growth |
+
+### Methods
+
+| Page | What it covers |
+| --- | --- |
+| {doc}`truncation` | Truncated SVD, higher-order and hierarchical SVD, thresholding; truncation of Tucker tensors |
+
+### From the tensap manual (to be rewritten)
+
 | Page | What it covers |
 | --- | --- |
 | {doc}`full_tensors` | Full tensors: creation, entries, reshaping, norms, products and contractions |
@@ -40,6 +61,8 @@ will be reorganised by concept and by method.
 :maxdepth: 2
 :numbered: 3
 
+tucker_canonical
+truncation
 full_tensors
 tensor_formats
 functions
