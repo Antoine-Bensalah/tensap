@@ -1,9 +1,18 @@
-"""
+r"""
 Collective Poincaré learning with a surrogate
 =============================================
 
 Poincaré learning on the collective benchmark, with tensorized samples and a
 surrogate of the Poincaré loss. Requires scikit-learn.
+
+The function :math:`u(x, y)` depends on :math:`x \in \mathbb{R}^8` and on
+a parameter :math:`y \in \mathbb{R}`. We look for features
+:math:`g : \mathbb{R}^8 \to \mathbb{R}^3` of :math:`x` only, shared by the
+whole collection of functions :math:`u(\cdot, y)`:
+:math:`u(x, y) \approx f(g(x), y)`, with a small Poincaré loss
+:math:`\mathbb{E}[\|\Pi^\perp_{\nabla g(X)} \nabla_x u(X, Y)\|^2]`. We
+compare a surrogate on a tensorized sample with the plain minimization of
+the loss. See :ref:`theory-learning`.
 
 This example comes from the script
 ``test/non_regression_scripts/poincare_learning/tutorial_poincare_learning_surrogate_collective.py``.
@@ -37,8 +46,30 @@ LHS_RNG = np.random.default_rng(0)
 logging.basicConfig(level=logging.INFO)
 
 # %%
-# Function to generate samples
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Functions to generate samples
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The points are written :math:`(x, y)`, with :math:`x` the first 8
+# components of :math:`X` (indices ``ind1``) and :math:`y` the last one.
+# ``generate_samples`` draws :math:`N` independent points
+# :math:`(x_k, y_k)` and builds the Poincaré loss of the gradients
+# :math:`\nabla_x u(x_k, y_k)`, one per point, as in
+# :ref:`sphx_glr_examples_poincare_poincare_learning.py`.
+#
+# ``generate_samples_tensorized`` draws instead :math:`N_1` points
+# :math:`x_i` and :math:`N_2` points :math:`y_j`, and evaluates :math:`u`
+# on the grid of all the pairs :math:`(x_i, y_j)`. At each :math:`x_i`,
+# the :math:`N_2` gradients :math:`\nabla_x u(x_i, y_j)` form the Jacobian
+# of the vector-valued function :math:`x \mapsto (u(x, y_1), \dots,
+# u(x, y_{N_2}))`, and the loss becomes
+#
+# .. math::
+#
+#    \mathcal{L}(G) = \frac{1}{N_1} \sum_{i=1}^{N_1} \sum_{j=1}^{N_2}
+#    \big\| \Pi^\perp_{\nabla g(x_i)} \nabla_x u(x_i, y_j) \big\|^2.
+#
+# ``PoincareLossVectorSpaceTruncated`` can moreover replace these
+# gradients by their projection on their dominant directions in
+# :math:`\mathbb{R}^8`.
 
 
 def generate_samples(N, ind1, X, fun, jac_fun, basis, R=None):
@@ -89,7 +120,7 @@ def generate_samples_tensorized(
         x_set_i = np.zeros((N2, X.ndim()))
         x_set_i[:, ind1] = x1_set[i]
         x_set_i[:, ind2] = x2_set
-        x_set[i * N2 : (i + 1) * N2] = x_set_i
+        x_set[i * N2 : (i + 1) * N2] = x_set_i  # noqa: E203
         jac_fun_set_tensorized[i, :, :] = jac_fun(x_set_i)[:, ind1]
 
     fun_set = fun(x_set)
@@ -120,6 +151,13 @@ def generate_samples_tensorized(
 # %%
 # Functions to fit regressors
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Once :math:`g` is learned, the profile
+# :math:`f : \mathbb{R}^m \times \mathbb{R} \to \mathbb{R}` is fitted on
+# the pairs
+# :math:`((g(x_k), y_k), u(x_k, y_k))`, by kernel ridge regression or by
+# polynomial regression, with hyperparameters chosen by cross-validation
+# (scikit-learn). Since :math:`m` is small, this is a regression problem
+# in low dimension.
 
 
 def fit_krr_regressor(z_set, u_set):
@@ -169,8 +207,10 @@ def fit_poly_regressor(z_set, u_set):
 
 
 # %%
-# functions to build matrice list
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Functions to build lists of matrices
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Three families of symmetric matrices :math:`M_1, \dots, M_n` of size 8,
+# which define the features of the benchmark below.
 
 
 def build_mat_lst_1(dim, n_mat):
@@ -220,6 +260,18 @@ def build_mat_lst(dim, n_mat, which=1):
 # %%
 # Definition of the benchmark
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# :math:`X` is uniform on :math:`(-1, 1)^9`, and
+#
+# .. math::
+#
+#    u(x, y) = \sum_{l=1}^{3} \big(x^{\mathsf T} M_l\, x\big)^2
+#    \sin(c_l\, y), \qquad c_l = \frac{\pi l}{6},
+#
+# with :math:`M_1 = I` and :math:`M_2`, :math:`M_3` the symmetric
+# matrices with entries :math:`1/2` on the first, or second, sub- and
+# super-diagonals (``which=2``). For every :math:`y`, :math:`u(\cdot, y)`
+# is a function of the three quadratic features
+# :math:`g_l(x) = x^{\mathsf T} M_l\, x`.
 
 
 d = 8 + 1
@@ -245,8 +297,19 @@ except ImportError:
     )
 
 # %%
-# build a polynomial basis
+# Build a polynomial basis
 # ^^^^^^^^^^^^^^^^^^^^^^^^
+# The features are sought in the span of the polynomials
+# :math:`\varphi_\alpha(x) = \prod_{\nu} p^{(\nu)}_{\alpha_\nu}(x_\nu)`,
+# with :math:`p^{(\nu)}_k` the orthonormal polynomials of degree
+# :math:`k` for the law of :math:`X_\nu`, and the multi-indices
+# :math:`1 \le |\alpha|_1 \le 2` on the 8 components of :math:`x`,
+# numbered :math:`\varphi_1, \dots, \varphi_K`. The constant is left
+# out, since its gradient is zero. :math:`R` is the Gram matrix of the
+# gradients, :math:`R(i, j) = \mathbb{E}[\nabla \varphi_i(X) \cdot
+# \nabla \varphi_j(X)]`, used to normalize the features,
+# :math:`G^{\mathsf T} R G = I_m`. Since the features depend on
+# :math:`x` only, the expectation is over the law of these 8 components.
 
 p_norm = 1  # p-norm of the multi-indices
 max_deg = 2  # bound on the p_norm
@@ -257,10 +320,19 @@ R = basis.gram_matrix_h1_0()
 # %%
 # Tensorized sample with surrogate
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The quadratic features belong to the space of polynomials of degree at
+# most 2, so that they can be recovered exactly. But the surrogate can
+# only recover exactly as many features as there are gradients per point:
+# with a single gradient, :math:`\nabla_x u` gives at each point a single
+# direction of the span of :math:`\nabla g_1, \nabla g_2, \nabla g_3`.
+# The tensorized sample gives four gradients per point, enough to see the
+# three directions at once.
 
 # %%
 # Sampling
 # ^^^^^^^^
+# A tensorized training sample of :math:`25 \times 4 = 100` points, and a
+# test sample of 1000 independent points.
 
 N1_train = 25
 N2_train = 4
@@ -278,6 +350,23 @@ x_test, u_test, _, _, _, loss_test = generate_samples(
 # %%
 # Minimize the surrogate
 # ^^^^^^^^^^^^^^^^^^^^^^
+# The gradients at each :math:`x_i` are first projected on their
+# :math:`m = 3` dominant directions (``truncate``). The surrogate for a
+# vector-valued function is
+#
+# .. math::
+#
+#    \frac{1}{N_1} \sum_{i=1}^{N_1} \sigma_{\max}(x_i)^2\,
+#    \big\| \Pi^\perp_{\nabla_x u(x_i)} \nabla g(x_i)^{\mathsf T}
+#    \big\|^2,
+#
+# with :math:`\sigma_{\max}(x_i)` the largest singular value of the
+# Jacobian :math:`\nabla_x u(x_i) = (\nabla_x u(x_i, y_j))_{j}` and
+# :math:`\Pi^\perp_{\nabla_x u(x_i)}` the projection onto the orthogonal
+# complement of its rows. It is quadratic in :math:`G`, and its
+# :math:`m` minimizers under :math:`G^{\mathsf T} R G = I_m` are the
+# eigenvectors of the :math:`m` smallest eigenvalues of a generalized
+# eigenvalue problem (``minimize_surrogate``).
 
 m = len(mat_lst) - 0
 loss_train_tensorized.truncate(m)
@@ -287,6 +376,8 @@ G_surr = np.linalg.svd(G_surr, full_matrices=False)[0]
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The surrogate and the Poincaré loss on the tensorized training sample,
+# and the Poincaré loss on the test sample, of the features obtained.
 
 print(f"\nPoincare loss and Surrogate on {G_surr.shape[1]} features")
 print(
@@ -305,6 +396,8 @@ print(
 # %%
 # Plot for eyeball regression
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# :math:`u(x_k, y_k)` against each feature :math:`g_l(x_k)`. Since
+# :math:`u` also depends on :math:`y`, the points do not lie on a curve.
 
 z_surr_train = basis.eval(x_train[:, ind1]) @ G_surr
 z_surr_test = basis.eval(x_test[:, ind1]) @ G_surr
@@ -339,6 +432,8 @@ plt.show()
 # %%
 # Fit regressor with sklearn
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The profile :math:`f` takes the features and the parameter :math:`y` as
+# inputs: a polynomial regression on :math:`(g(x_k), y_k)`.
 
 # add the last parameter as a feature
 zy_surr_train = np.hstack([z_surr_train, x_train[:, ind2]])
@@ -362,6 +457,11 @@ def f_surr(z):
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The errors of the approximation in the empirical :math:`L^2` norm,
+# :math:`\big(\frac{1}{N} \sum_{k} (f(g(x_k), y_k) -
+# u(x_k, y_k))^2\big)^{1/2}`,
+# absolute and relative to the norm of :math:`u`, on the training and
+# test samples.
 
 y_train = f_surr(zy_surr_train).reshape(u_train.shape)
 err_train = np.sqrt(np.mean((y_train - u_train) ** 2))
@@ -384,6 +484,8 @@ print(f"RL2 on test set    : {rel_err_test:.3e}")
 # %%
 # Plot final regression
 # ^^^^^^^^^^^^^^^^^^^^^
+# :math:`u(x_k, y_k)` against the prediction :math:`f(g(x_k), y_k)`: the
+# closer the points are to the diagonal, the better the approximation.
 
 plt.scatter(y_test, u_test, label="test", s=5.0)
 plt.scatter(y_train, u_train, label="train", s=5.0)
@@ -398,8 +500,13 @@ plt.title(f"""
 plt.show()
 
 # %%
-# (Optional) Run Minimization of the Poincare loss on the grassmann manifold
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# (Optional) Minimization of the Poincaré loss on the Grassmann manifold
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The minimizer of the surrogate is a good initial guess for the
+# Poincaré loss itself, on the same tensorized sample, which we now
+# minimize from it as in
+# :ref:`sphx_glr_examples_poincare_poincare_learning.py`, then fit and
+# evaluate the regression in the same way.
 
 # CG on grassmann manifold using pymanopt, when installed
 try:
@@ -422,6 +529,7 @@ except ImportError:
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The same quantities for the features after the minimization.
 
 print(
     f"\nPoincare loss and Surrogate as init on {G_opt.shape[1]} "
@@ -443,6 +551,8 @@ print(
 # %%
 # Plot for eyeball regression
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The same scatter plots, for the features obtained after the
+# minimization of the Poincaré loss.
 
 z_opt_train = basis.eval(x_train[:, ind1]) @ G_opt
 z_opt_test = basis.eval(x_test[:, ind1]) @ G_opt
@@ -477,6 +587,7 @@ plt.show()
 # %%
 # Fit regressor with sklearn
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^
+# As before, a polynomial regression on :math:`(g(x_k), y_k)`.
 
 # add the last parameter as a feature
 zy_opt_train = np.hstack([z_opt_train, x_train[:, ind2]])
@@ -500,6 +611,7 @@ def f_opt(z):
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The errors in the empirical :math:`L^2` norm, as before.
 
 y_train = f_opt(zy_opt_train).reshape(u_train.shape)
 err_train = np.sqrt(np.mean((y_train - u_train) ** 2))
@@ -522,6 +634,7 @@ print(f"RL2 on test set    : {rel_err_test:.3e}")
 # %%
 # Plot final regression
 # ^^^^^^^^^^^^^^^^^^^^^
+# :math:`u(x_k, y_k)` against the prediction :math:`f(g(x_k), y_k)`.
 
 plt.scatter(y_test, u_test, label="test", s=5.0)
 plt.scatter(y_train, u_train, label="train", s=5.0)
@@ -536,19 +649,25 @@ plt.title(f"""
 plt.show()
 
 # %%
-# Compare with non tensorized sample and classical approach
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Comparison with a plain sample and the classical approach
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# For comparison, the same budget of 100 evaluations of :math:`u` and of
+# its gradient, at independent points :math:`(x_k, y_k)`, and the
+# minimization of the Poincaré loss with one gradient per point, from the
+# active subspace, as in
+# :ref:`sphx_glr_examples_poincare_poincare_learning.py`.
 
 # %%
-# resample
+# Resample
 # ^^^^^^^^
 x_train, u_train, _, _, _, loss_train = generate_samples(
     N1_train * N2_train, ind1, X, u, jac_u, basis, R
 )
 
 # %%
-# minimize the poincare based loss function
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Minimize the Poincaré loss
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The three features are learned at once, from the active subspace.
 
 # CG on grassmann manifold using pymanopt, when installed
 try:
@@ -576,6 +695,7 @@ except ImportError:
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The Poincaré loss of these features on the training and test samples.
 
 print(f"\nPoincare loss on {G_pmo.shape[1]} features")
 print(f"Poincare loss on train set:  {loss_train.eval(G_pmo):.3e}")
@@ -585,6 +705,7 @@ print(f"Poincare loss on test set:   {loss_test.eval(G_pmo):.3e}")
 # %%
 # Fit regressor with sklearn
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The same polynomial regression on :math:`(g(x_k), y_k)`.
 
 # add the last parameter as a feature
 zy_pmo_train = np.hstack(
@@ -604,6 +725,8 @@ def f_pmo(z):
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The errors in the empirical :math:`L^2` norm, to compare with those
+# obtained with the tensorized sample.
 
 
 y_train = f_pmo(zy_pmo_train).reshape(u_train.shape)
@@ -626,6 +749,7 @@ print(f"RL2 on test set    : {rel_err_test:.3e}")
 # %%
 # Plot final regression
 # ^^^^^^^^^^^^^^^^^^^^^
+# :math:`u(x_k, y_k)` against the prediction :math:`f(g(x_k), y_k)`.
 
 plt.scatter(y_test, u_test, label="test", s=5.0)
 plt.scatter(y_train, u_train, label="train", s=5.0)

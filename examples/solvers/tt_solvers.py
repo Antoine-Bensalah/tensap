@@ -1,4 +1,4 @@
-"""
+r"""
 Alternating solvers in tensor-train format
 ==========================================
 
@@ -6,6 +6,15 @@ Solve a linear system whose operator is a :class:`~tensap.TTOperator`
 and whose right-hand side is a :class:`~tensap.TTTensor` by alternating
 sweeps over the cores of the solution: ALS with fixed ranks, DMRG and
 AMEn with adapted ranks.
+
+The system is :math:`A u = b`, with
+:math:`A = \sum_{\nu=1}^{d} I \otimes \dots \otimes K \otimes \dots
+\otimes I` the discrete Laplacian in dimension :math:`d = 6`, and the
+solution is sought as a tensor train
+:math:`u(i_1, \dots, i_6) = C^1(i_1) C^2(i_2) \cdots C^6(i_6)`, with
+:math:`C^\nu(i_\nu)` a matrix of size :math:`r_{\nu-1} \times r_\nu`. We
+compare the residual and the TT ranks reached by the three algorithms.
+See :ref:`theory-tt-solvers`.
 """
 
 # Copyright (c) 2020-2026, Anthony Nouy, Erwan Grelier and contributors
@@ -23,7 +32,9 @@ np.random.seed(0)
 # The finite difference Poisson equation on :math:`(0, 1)^6` with
 # :math:`n = 16` interior points per direction (:math:`1.7 \times 10^7`
 # unknowns): the Laplacian is a TT operator of ranks 2, the right-hand
-# side :math:`b = 1 \otimes \dots \otimes 1` a TT tensor of rank 1.
+# side :math:`b = 1 \otimes \dots \otimes 1` a TT tensor of rank 1. The
+# full array of the solution would already take more than 100 MB; with TT
+# ranks below 10, its cores hold a few thousand numbers.
 n, d = 16, 6
 h = 1 / (n + 1)
 K = (2 * np.eye(n) - np.eye(n, k=1) - np.eye(n, k=-1)) / h**2
@@ -35,16 +46,28 @@ b = tensap.TTTensor.ones([n] * d)
 # The solvers
 # ^^^^^^^^^^^
 # Each sweep updates the cores of :math:`x` one after the other (two at a
-# time for DMRG), the other ones being orthogonal: the updated core solves
-# the Galerkin projection of the system, which minimizes the energy
-# :math:`\frac12 (A x, x) - (b, x)` for a symmetric positive definite
-# :math:`A`.
+# time for DMRG), the other ones being orthogonal. With the other cores
+# fixed, :math:`x` depends linearly on the core :math:`C^\nu`,
+# :math:`\mathrm{vec}(x) = U_\nu\, \mathrm{vec}(C^\nu)` with :math:`U_\nu`
+# orthonormal, and the updated core solves the Galerkin projection
+#
+# .. math::
+#
+#    U_\nu^{\mathsf T} A U_\nu\, \mathrm{vec}(C^\nu) = U_\nu^{\mathsf T} b,
+#
+# which minimizes the energy :math:`\frac12 (A x, x) - (b, x)` over
+# :math:`C^\nu` for a symmetric positive definite :math:`A`. This is a
+# small system, of size :math:`r_{\nu-1} n r_\nu`.
 #
 # - ALS keeps the ranks of the initial guess (here 4);
 # - DMRG adapts the rank of each bond by a truncated SVD of the updated
 #   pair of cores;
 # - AMEn updates one core at a time and enriches it with a few directions
 #   of the residual.
+#
+# All three start from the same random initial guess of TT ranks 4. The
+# output gives, for each one, the number of sweeps, the final residual and
+# the TT ranks of the solution.
 truncator = tensap.Truncator(tolerance=1e-6, max_rank=20)
 outputs = {}
 for algorithm in ("als", "dmrg", "amen"):

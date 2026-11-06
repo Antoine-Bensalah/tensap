@@ -1,12 +1,20 @@
-"""
+r"""
 Greedy construction of anisotropic tensor subspaces
 ===================================================
 
 Solve an anisotropic diffusion equation with
 :class:`~tensap.AnisotropicGreedySpaceLinearSolver`: the solution is
 sought in Tucker format with a TT core, on subspaces
-:math:`U_1 \\otimes \\dots \\otimes U_d` enriched greedily, only in the
+:math:`U_1 \otimes \dots \otimes U_d` enriched greedily, only in the
 dimensions where the approximation needs it.
+
+We solve :math:`A u = b` with
+:math:`A = \sum_{\nu=1}^{d} a_\nu\, I \otimes \dots \otimes K \otimes
+\dots \otimes I`, :math:`d = 4`, and look for :math:`u` in a tensor
+subspace :math:`U_1 \otimes \dots \otimes U_4`, with
+:math:`\dim U_\nu = r_\nu` chosen by the algorithm. In the end, we compare
+the residual and the storage with those of the greedy solver in canonical
+format. See :ref:`theory-greedy`.
 """
 
 # Copyright (c) 2020-2026, Anthony Nouy, Erwan Grelier and contributors
@@ -24,7 +32,9 @@ np.random.seed(0)
 # \otimes \dots \otimes I` on :math:`(0, 1)^4`, with a diffusion
 # coefficient :math:`a_\nu` per direction: 1 in the first direction,
 # :math:`10^{-2}` in the others. It is a Tucker operator with frames
-# :math:`\{a_\nu K, I\}` and the TT core of the Laplacian.
+# :math:`\{a_\nu K, I\}` and the TT core of the Laplacian. With a small
+# diffusion, the solution varies fast near the boundary in these three
+# directions, and needs more modes there than in the first one.
 n, d = 20, 4
 weights = [1.0, 0.01, 0.01, 0.01]
 K = (2 * np.eye(n) - np.eye(n, k=1) - np.eye(n, k=-1)) * (n + 1) ** 2
@@ -44,11 +54,19 @@ b = tensap.TuckerTensorVector.ones([1] * d, [n] * d)
 # Greedy enrichment of the subspaces
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # At each iteration, a rank-one correction
-# :math:`c_1 \otimes \dots \otimes c_d` of the residual is computed; the
-# space :math:`U_\nu` is enriched by :math:`c_\nu` only if the smallest
-# :math:`\nu`-singular value of the new iterate is at least ``theta``
-# times the largest of these values over the dimensions. Then the TT core
-# solves the Galerkin problem on the subspaces (by DMRG).
+# :math:`w^{(1)} \otimes \dots \otimes w^{(d)}` of the residual is
+# computed; the space :math:`U_\nu` is enriched by :math:`w^{(\nu)}` only
+# if the smallest :math:`\nu`-singular value of the current iterate,
+# which estimates the error of truncating the :math:`\nu`-rank, is large
+# enough:
+#
+# .. math::
+#
+#    \sigma^\nu_{r_\nu} \ge \theta \max_{\mu} \sigma^\mu_{r_\mu},
+#
+# with :math:`\theta` = ``theta``. Then the TT core solves the Galerkin
+# problem on :math:`U_1 \otimes \dots \otimes U_d` (by DMRG). The printed
+# lines show which dimensions are enriched at each iteration.
 solver = tensap.AnisotropicGreedySpaceLinearSolver(
     A, b, theta=0.8, max_iterations=10, tolerance=1e-6, display=False
 )

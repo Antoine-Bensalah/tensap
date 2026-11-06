@@ -5,6 +5,13 @@ Density estimation in tree-based tensor format
 Estimate a multivariate probability density from samples in tree-based
 tensor format, by least squares.
 
+From samples :math:`x_1, \\dots, x_n` of a random vector
+:math:`X = (X_1, \\dots, X_d)` of density :math:`u` with respect to a
+reference measure :math:`\\mu`, we minimize the empirical :math:`L^2`
+contrast :math:`\\|v\\|_{L^2_\\mu}^2 - \\frac2n \\sum_{k=1}^{n} v(x_k)` over
+functions :math:`v` in tree-based tensor format, here for a correlated
+gaussian vector in dimension :math:`d = 6`. See :ref:`theory-learning`.
+
 This example comes from the script
 ``test/non_regression_scripts/approximation/tutorial_tensor_learning_TreeBasedTensorDensityLearning.py``.
 """
@@ -23,6 +30,11 @@ np.random.seed(0)
 # %%
 # Function to approximate: multivariate gaussian distribution
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# A centred gaussian vector of covariance :math:`S`, whose components are
+# not independent. The reference measure :math:`\mu` is the uniform
+# probability measure on the box :math:`\prod_\nu [-5 S_{\nu\nu},
+# 5 S_{\nu\nu}]`, and ``U`` is the density with respect to :math:`\mu`: the
+# gaussian density times the volume of the box.
 ORDER = 6
 # Covariance matrix
 S = np.array(
@@ -51,6 +63,9 @@ def U(x):
 # %%
 # Training and test samples
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
+# Samples of :math:`X` to learn from and to estimate the risk, and a sample
+# of the reference measure :math:`\mu` to estimate the :math:`L^2_\mu` error
+# against the true density at the end.
 NUM_TRAIN = 1e5  # Training sample size
 X_TRAIN = multivariate_normal.rvs(np.zeros(ORDER), S, int(NUM_TRAIN))
 
@@ -63,6 +78,10 @@ XI = REF.random(NUM_REF)
 # %%
 # Approximation basis
 # ^^^^^^^^^^^^^^^^^^^
+# Polynomials :math:`\varphi^{(\nu)}_i` of degree at most 20, orthonormal
+# for the uniform measure :math:`\mu_\nu`. With an orthonormal basis,
+# :math:`\|v\|_{L^2_\mu}` is the canonical norm of the tensor of
+# coefficients of :math:`v`, which makes the contrast cheap to evaluate.
 DEGREE = 20
 # Orthonormal bases in each dimension, with respect to the reference
 # measure
@@ -77,6 +96,14 @@ BASES = tensap.FunctionalBases(BASES)
 # %%
 # Tree-based tensor learning parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# :class:`~tensap.TreeBasedTensorLearning` in tensor train Tucker format,
+# with the :class:`~tensap.DensityL2LossFunction`
+# :math:`\ell(v, x) = \|v\|_{L^2_\mu}^2 - 2 v(x)`. Its risk is
+# :math:`\mathbb{E}(\ell(v, X)) = \|v - u\|_{L^2_\mu}^2 - \|u\|_{L^2_\mu}^2`,
+# minimized by :math:`v = u`. As in regression, the minimization alternates
+# over the tensors of the network (each step is a linear problem), with rank
+# and tree adaptation; the leaves are first assigned to the variables in a
+# random order. The risk is negative, hence the tolerances below.
 SOLVER = tensap.TreeBasedTensorLearning.tensor_train_tucker(
     ORDER, tensap.DensityL2LossFunction()
 )
@@ -128,6 +155,10 @@ SOLVER.model_selection_options["type"] = "test_error"
 # %%
 # Density estimation
 # ^^^^^^^^^^^^^^^^^^
+# After the solve, the risk of the selected approximation is estimated by
+# leave-one-out and on the test sample, and the relative :math:`L^2_\mu`
+# error against the true density on the sample of :math:`\mu`. The plots
+# show the adapted tree, the variables at its leaves, and its ranks.
 T0 = time()
 F, OUTPUT = SOLVER.solve()
 T1 = time()

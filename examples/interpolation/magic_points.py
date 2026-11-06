@@ -5,6 +5,13 @@ Magic points
 Magic points of univariate and tensor product functional bases, and
 interpolation of a function on them.
 
+For a basis :math:`\\{\\varphi_i\\}_{i \\in I}`, the magic points
+:math:`x_1, \\dots, x_{\\#I}` are chosen greedily among candidate points and
+define the interpolation :math:`\\mathcal{I} f = \\sum_{i \\in I} a(i)\\,
+\\varphi_i`, :math:`\\mathcal{I} f(x_k) = f(x_k)`. We look at them for
+univariate, full and sparse tensor product polynomial bases. See
+:ref:`theory-functions` and :ref:`theory-multi-indices`.
+
 This example comes from the script
 ``test/non_regression_scripts/approximation/tutorial_magic_points.py``.
 """
@@ -22,6 +29,14 @@ np.random.seed(0)
 # %%
 # Magic points associated with a Functional Basis (1D)
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# ``magic_points`` evaluates the basis on the candidate points and runs a
+# greedy algorithm (empirical interpolation): at each step, it adds the
+# candidate where the interpolation error of the basis functions on the
+# points already chosen is the largest. For the Legendre polynomials of
+# degree at most 20 on :math:`[-1, 1]`, 21 magic points are selected among
+# 200 uniformly spaced points (black). The
+# selected points (red circles) are denser near the endpoints of the
+# interval, as the Chebyshev points are.
 P1 = tensap.PolynomialFunctionalBasis(
     tensap.LegendrePolynomials(), range(21)
 )
@@ -39,8 +54,12 @@ plt.show()
 # %%
 # Magic points associated with a FullTensorProductFunctionalBasis
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Tensorization of 1D uniform grids for the selection of magic points in
-# dimension d
+# In dimension :math:`d = 2`, for the full tensor product basis
+# :math:`\varphi_i(x) = \varphi^{(1)}_{i_1}(x_1) \varphi^{(2)}_{i_2}(x_2)`,
+# :math:`0 \le i_1, i_2 \le 20`, the candidates are the points of the
+# tensor product grid of two uniform grids of 30 points
+# (:class:`~tensap.FullTensorGrid`), and :math:`21^2` magic points are
+# selected among them.
 D = 2
 P1 = tensap.PolynomialFunctionalBasis(
     tensap.LegendrePolynomials(), range(21)
@@ -62,9 +81,18 @@ if D == 2:
 # %%
 # Magic points associated with a SparseTensorProductFunctionalBasis
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Selection of magic points in dimension d in
-# - a tensorization of 1D uniform grids
-# - or a tensorization of 1D magic points
+# A sparse basis is indexed by an anisotropic set of multi-indices, here
+#
+# .. math::
+#
+#    \Lambda = \{i \in \mathbb{N}_0^2 : i_1 + 2 i_2 \le 20\},
+#
+# a weighted :math:`\ell^1` ball which allows higher degrees in
+# :math:`x_1` than in :math:`x_2`. The candidates are either the tensor
+# product of univariate uniform grids, or, as below
+# (``TENSORIZATION_OF_MAGIC_POINTS = True``), the tensor product of the 21
+# univariate magic points. The magic points of the sparse basis are then a
+# subset of this grid, with :math:`\#\Lambda` points.
 TENSORIZATION_OF_MAGIC_POINTS = True
 D = 2
 P1 = tensap.PolynomialFunctionalBasis(
@@ -98,6 +126,11 @@ if D == 2:
 # %%
 # Interpolation of a function using magic points
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The function :math:`f(x) = \cos(x_1) + x_2^6 + x_1^2 x_2` is interpolated
+# in the sparse basis on its magic points. The polynomial part of :math:`f`
+# is in the span of the basis, and :math:`\cos(x_1)` is well approximated
+# by polynomials of degree 20: the relative error on a test sample is close
+# to machine precision.
 D = 2
 
 

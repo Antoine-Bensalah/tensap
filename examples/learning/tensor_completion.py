@@ -4,6 +4,13 @@ Tensor completion
 
 Recover a tensor from some of its entries, in tree-based tensor format.
 
+A tensor :math:`u \\in \\mathbb{R}^{I_1 \\times \\cdots \\times I_d}` is known
+only through its entries :math:`u(i)`, :math:`i \\in \\Omega`, for a random
+set :math:`\\Omega` of 30% of the indices. We solve
+:math:`\\min_{v} \\sum_{i \\in \\Omega} (u(i) - v(i))^2` over tensors
+:math:`v` in tree-based format, of order :math:`d = 5`, and look at the error
+on all the entries. See :ref:`theory-tensor-learning`.
+
 This example comes from the script
 ``test/non_regression_scripts/approximation/tutorial_tensor_learning_tensor_completion.py``.
 """
@@ -21,6 +28,10 @@ np.random.seed(0)
 # %%
 # Generation of the tensor to recover
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# A random :class:`~tensap.TreeBasedTensor` of size
+# :math:`5 \times 8 \times 4 \times 3 \times 6`, for a linear dimension tree
+# :math:`T` and given ranks :math:`(r_\alpha)_{\alpha \in T}`: the tensor to
+# recover has an exact low-rank structure.
 sz = [5, 8, 4, 3, 6]  # Size of the tensor
 ORDER = len(sz)  # Order of the tensor
 T = tensap.DimensionTree.linear(ORDER)
@@ -32,6 +43,9 @@ F = FTBT.full()
 # %%
 # Training and test samples
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
+# The training sample is the set :math:`\Omega` of known entries, drawn
+# without replacement. The test sample is made of all the entries, so that
+# the test error is the relative error on the whole tensor.
 p = 0.3  # Proportion of known entries of the tensor
 
 N = np.prod(sz)
@@ -56,8 +70,14 @@ print(
 print(FTBT)
 
 # %%
-# Features creation: matrices containing non zero entries if the relative entry is known
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Features: indicator vectors of the indices
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Completion is a learning problem on a discrete set: an entry is
+# :math:`v(i) = (v, e^{(1)}_{i_1} \otimes \cdots \otimes e^{(d)}_{i_d})`,
+# with :math:`e^{(\nu)}_{i_\nu}` the canonical basis vectors of
+# :math:`\mathbb{R}^{N_\nu}`. The features of dimension :math:`\nu` are
+# therefore, for each sample, the indicator vector of its index
+# :math:`i_\nu`: one row per sample, with a single 1.
 FEATURES_TRAIN = []
 for i in range(ORDER):
     M = np.zeros((NUM_TRAIN, sz[i]))
@@ -74,7 +94,8 @@ for i in range(ORDER):
 # %%
 # Tree-based tensor format
 # ^^^^^^^^^^^^^^^^^^^^^^^^
-# Tensor format
+# The format of the approximation: a random tree, the tensor-train format,
+# the tensor train Tucker format (the default) or a balanced binary tree.
 
 
 class TensorFormat(str, Enum):
@@ -119,6 +140,7 @@ IS_ACTIVE_NODE = SOLVER.is_active_node
 # %%
 # Random shuffling of the dimensions associated to the leaves
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Off here: the variables keep their natural order along the tree.
 RANDOMIZE = False
 if RANDOMIZE:
     SOLVER.tree.dim2ind = np.random.permutation(SOLVER.tree.dim2ind)
@@ -127,6 +149,10 @@ if RANDOMIZE:
 # %%
 # Initial guess: known entries in a rank-1 tree-based tensor
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# A natural starting point: the tensor equal to :math:`u` on :math:`\Omega`
+# and to 0 elsewhere, truncated to rank 1 by the hierarchical SVD
+# (``Truncator.hsvd``). It is only built here: the solver below starts from
+# its own ``"canonical"`` initialization.
 guess = np.zeros(np.prod(sz))
 guess[loc_TRAIN] = Y_TRAIN
 guess = guess.reshape(sz, order="F")
@@ -137,6 +163,11 @@ guess = tr.hsvd(guess, SOLVER.tree, SOLVER.is_active_node)
 # %%
 # Learning in tree-based tensor format
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# :class:`~tensap.TreeBasedTensorLearning` with the square loss, the
+# indicator features as evaluated bases, and rank adaptation from rank 1:
+# at each iteration, the ranks of the nodes with the largest estimated
+# truncation errors are increased, and the tensors of the network are
+# updated by alternating least squares. The tree is kept fixed.
 SOLVER.bases_eval = FEATURES_TRAIN
 SOLVER.training_data = [None, Y_TRAIN]
 
@@ -205,6 +236,11 @@ Fpred = Fpred.tensor
 # %%
 # Displays
 # ^^^^^^^^
+# The ranks found, to compare with the ranks of :math:`u`, the
+# leave-one-out error on the known entries, and the error on all the
+# entries of the tensor. The rank adaptation finds the ranks of :math:`u`,
+# and the tensor is recovered from 30% of its entries up to a relative
+# error of the order of :math:`10^{-10}`.
 TEST_ERROR = SOLVER.loss_function.test_error(
     Fpred.eval_at_indices(indices_TEST.array), [None, Y_TEST]
 )

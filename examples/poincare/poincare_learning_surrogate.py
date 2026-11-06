@@ -1,9 +1,18 @@
-"""
+r"""
 Poincaré learning with a surrogate
 ==================================
 
 Learn a feature map by minimisation of a surrogate of the Poincaré loss.
 Requires scikit-learn.
+
+We look for one feature :math:`g : \mathbb{R}^8 \to \mathbb{R}` such that
+:math:`u(X) \approx f(g(X))`. Instead of the Poincaré loss
+:math:`\mathbb{E}[\|\Pi^\perp_{\nabla g(X)} \nabla u(X)\|^2]`, which is not
+convex, we minimize the surrogate of Nouy and Pasco (2025),
+:math:`\mathbb{E}[\|\nabla u(X)\|^2 \|\Pi^\perp_{\nabla u(X)} \nabla
+g(X)\|^2]`, quadratic in :math:`g`, by solving an eigenvalue problem. We
+then use its minimizer as an initial guess for the Poincaré loss. See
+:ref:`theory-learning`.
 
 This example comes from the script
 ``test/non_regression_scripts/poincare_learning/tutorial_poincare_learning_surrogate.py``.
@@ -38,6 +47,24 @@ logging.basicConfig(level=logging.INFO)
 # %%
 # Function to generate samples
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# For a sample :math:`x_1, \dots, x_N` of :math:`X`, drawn by Latin
+# hypercube sampling, we evaluate :math:`u`, its gradient, the basis
+# :math:`\varphi = (\varphi_1, \dots, \varphi_K)` and its Jacobian. The
+# feature map is :math:`g(x) = G^{\mathsf T} \varphi(x)`, with a matrix of
+# coefficients :math:`G \in \mathbb{R}^{K \times m}`, so that
+# :math:`\nabla g(x) = G^{\mathsf T} \nabla \varphi(x)`, and
+# ``PoincareLossVectorSpace`` evaluates the empirical Poincaré loss
+#
+# .. math::
+#
+#    \mathcal{L}_N(G) = \frac{1}{N} \sum_{k=1}^{N}
+#    \big\| \Pi^\perp_{\nabla g(x_k)} \nabla u(x_k) \big\|^2,
+#
+# where :math:`\Pi^\perp_{\nabla g(x)}` is the orthogonal projection onto
+# the orthogonal complement of
+# :math:`\mathrm{span}\{\nabla g_1(x), \dots, \nabla g_m(x)\}` in
+# :math:`\mathbb{R}^d`: the part of :math:`\nabla u(x)` that the features
+# do not see.
 
 
 def generate_samples(N, X, fun, jac_fun, basis, R=None):
@@ -70,6 +97,12 @@ def generate_samples(N, X, fun, jac_fun, basis, R=None):
 # %%
 # Functions to fit regressors
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Once :math:`g` is learned, the profile
+# :math:`f : \mathbb{R}^m \to \mathbb{R}` is fitted on the pairs
+# :math:`(g(x_k), u(x_k))`, by kernel ridge regression or by polynomial
+# regression, with hyperparameters chosen by cross-validation
+# (scikit-learn). Since :math:`m` is small, this is a regression problem
+# in low dimension.
 
 
 def fit_krr_regressor(z_set, u_set):
@@ -121,6 +154,17 @@ def fit_poly_regressor(z_set, u_set):
 # %%
 # Definition of the benchmark
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# With PyTorch, :math:`u` is the borehole function of 8 random
+# parameters, whose gradient is computed by automatic differentiation.
+# Otherwise, with :math:`X` uniform on :math:`(-1, 1)^8`,
+#
+# .. math::
+#
+#    u(x) = \exp\Big(\frac{1}{8} \sum_{\nu=1}^{8} \sin(x_\nu)\,
+#    e^{\cos(x_\nu)}\Big),
+#
+# a function of a single feature, the sum inside the exponential, which
+# is not a polynomial.
 
 # if pytorch is installed
 try:
@@ -135,8 +179,18 @@ except ImportError:
 
 
 # %%
-# build a polynomial basis
+# Build a polynomial basis
 # ^^^^^^^^^^^^^^^^^^^^^^^^
+# The features are sought in the span of the polynomials
+# :math:`\varphi_\alpha(x) = \prod_{\nu} p^{(\nu)}_{\alpha_\nu}(x_\nu)`,
+# with :math:`p^{(\nu)}_k` the orthonormal polynomials of degree
+# :math:`k` for the law of :math:`X_\nu`, and the multi-indices
+# :math:`1 \le |\alpha|_1 \le 3`, numbered :math:`\varphi_1, \dots,
+# \varphi_K`. The constant is left out, since its gradient is zero.
+# :math:`R` is the Gram matrix of the gradients,
+# :math:`R(i, j) = \mathbb{E}[\nabla \varphi_i(X) \cdot \nabla
+# \varphi_j(X)]`, used to normalize the features,
+# :math:`G^{\mathsf T} R G = I_m`.
 
 p_norm = 1  # p-norm of the multi-indices
 max_deg = 3  # bound on the p_norm
@@ -147,6 +201,9 @@ R = basis.gram_matrix_h1_0()
 # %%
 # Sampling
 # ^^^^^^^^
+# A training sample of size 300, on which the loss is minimized, and an
+# independent test sample of size 500, to check that the learned features
+# generalize.
 
 N_train = 300
 (
@@ -168,6 +225,30 @@ x_test, u_test, jac_u_test, basis_test, jac_basis_test, loss_test = (
 # %%
 # Minimize the surrogate
 # ^^^^^^^^^^^^^^^^^^^^^^
+# For a single feature, the two losses are related pointwise by
+#
+# .. math::
+#
+#    \|\nabla g(x)\|^2\, \|\Pi^\perp_{\nabla g(x)} \nabla u(x)\|^2
+#    = \|\nabla u(x)\|^2\, \|\Pi^\perp_{\nabla u(x)} \nabla g(x)\|^2,
+#
+# both sides being :math:`\|\nabla u(x)\|^2 \|\nabla g(x)\|^2
+# \sin^2\theta(x)`, with :math:`\theta(x)` the angle between the two
+# gradients. The surrogate drops the normalization by
+# :math:`\|\nabla g(x)\|^2`, which makes the Poincaré loss non-convex.
+# With :math:`g = G^{\mathsf T} \varphi`, the empirical surrogate is then
+# a quadratic form :math:`G^{\mathsf T} H G`, with
+#
+# .. math::
+#
+#    H = \frac{1}{N} \sum_{k=1}^{N} \|\nabla u(x_k)\|^2\,
+#    \nabla \varphi(x_k)\, \Pi^\perp_{\nabla u(x_k)}\,
+#    \nabla \varphi(x_k)^{\mathsf T},
+#
+# and its minimizer under :math:`G^{\mathsf T} R G = 1` is the
+# eigenvector of the smallest eigenvalue of :math:`H G = \lambda R G`
+# (``minimize_surrogate``). The coefficients are then normalized, which
+# only rescales the feature.
 m = 1
 G_surr, _, _ = loss_train.minimize_surrogate(m=m)
 G_surr = np.linalg.svd(G_surr, full_matrices=False)[0]
@@ -175,6 +256,8 @@ G_surr = np.linalg.svd(G_surr, full_matrices=False)[0]
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The surrogate and the Poincaré loss of this feature, on the training and
+# test samples.
 
 print(f"\nPoincare loss and Surrogate on {G_surr.shape[1]} features")
 print(
@@ -191,6 +274,9 @@ print(f"Poincare loss on test set:   {loss_test.eval(G_surr):.3e}")
 # %%
 # Plot for eyeball regression
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Scatter plots of :math:`u(x_k)` against each feature
+# :math:`g_j(x_k)`, on the two samples: when :math:`u` is close to a
+# function of a single feature, the points lie close to a curve.
 
 z_surr_train = basis.eval(x_train) @ G_surr
 z_surr_test = basis.eval(x_test) @ G_surr
@@ -220,6 +306,8 @@ plt.show()
 # %%
 # Fit regressor with sklearn
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^
+# A polynomial regression of :math:`u(x_k)` on the features (the kernel
+# ridge regression is an alternative, commented out).
 
 # regressor_surr = fit_krr_regressor(z_surr_train, u_train)
 regressor_surr = fit_poly_regressor(z_surr_train, u_train)
@@ -232,6 +320,10 @@ def f_surr(z):
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The errors of :math:`f \circ g` in the empirical :math:`L^2` norm,
+# :math:`\big(\frac{1}{N} \sum_{k} (f(g(x_k)) - u(x_k))^2\big)^{1/2}`,
+# absolute and relative to the norm of :math:`u`, on the training and
+# test samples.
 
 y_train = f_surr(z_surr_train)
 err_train = np.sqrt(np.mean((y_train - u_train) ** 2))
@@ -253,6 +345,8 @@ print(f"RL2 on test set    : {rel_err_test:.3e}")
 # %%
 # Plot final regression
 # ^^^^^^^^^^^^^^^^^^^^^
+# :math:`u(x_k)` against the prediction :math:`f(g(x_k))`: the closer
+# the points are to the diagonal, the better the approximation.
 
 plt.scatter(y_train, u_train, label="train")
 plt.scatter(y_test, u_test, label="test")
@@ -268,8 +362,12 @@ plt.show()
 
 
 # %%
-# (Optional) Run Minimization of the Poincare loss on the grassmann manifold
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# (Optional) Minimization of the Poincaré loss on the Grassmann manifold
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The minimizer of the surrogate is a good initial guess for the
+# Poincaré loss itself, which we now minimize from it as in
+# :ref:`sphx_glr_examples_poincare_poincare_learning.py`, then fit and
+# evaluate the regression in the same way.
 
 # CG on grassmann manifold using pymanopt, when installed
 try:
@@ -292,6 +390,8 @@ except ImportError:
 # %%
 # Plot for eyeball regression
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The same scatter plots, for the features obtained after the
+# minimization of the Poincaré loss.
 
 z_opt_train = basis.eval(x_train) @ G_opt
 z_opt_test = basis.eval(x_test) @ G_opt
@@ -321,6 +421,8 @@ plt.show()
 # %%
 # Fit regression with sklearn
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# A polynomial regression of :math:`u(x_k)` on the features (the kernel
+# ridge regression is an alternative, commented out).
 
 # regressor_opt = fit_krr_regressor(z_opt_train, u_train)
 regressor_opt = fit_poly_regressor(z_opt_train, u_train)
@@ -333,6 +435,10 @@ def f_opt(z):
 # %%
 # Evaluate performances
 # ^^^^^^^^^^^^^^^^^^^^^
+# The errors of :math:`f \circ g` in the empirical :math:`L^2` norm,
+# :math:`\big(\frac{1}{N} \sum_{k} (f(g(x_k)) - u(x_k))^2\big)^{1/2}`,
+# absolute and relative to the norm of :math:`u`, on the training and
+# test samples.
 
 y_train = f_opt(z_opt_train)
 err_train = np.sqrt(np.mean((y_train - u_train) ** 2))
@@ -355,6 +461,8 @@ print(f"RL2 on test set    : {rel_err_test:.3e}")
 # %%
 # Plot final regression
 # ^^^^^^^^^^^^^^^^^^^^^
+# :math:`u(x_k)` against the prediction :math:`f(g(x_k))`: the closer
+# the points are to the diagonal, the better the approximation.
 
 plt.scatter(y_train, u_train, label="train")
 plt.scatter(y_test, u_test, label="test")
