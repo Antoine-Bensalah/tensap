@@ -223,6 +223,18 @@ $u_r = \sum_{k \le r} \sigma_k\, (U^{(1)} w_k) \otimes (U^{(2)} z_k)$,
 whatever the type of the core. The result has a diagonal core: the canonical
 format is preserved.
 
+**Diagonal core.** The canonical format has no SVD, and the set of tensors
+of canonical rank at most $r$ is not closed for $d \ge 3$
+({ref}`theory-tucker-canonical`). A tensor $u$ with a diagonal core is
+recompressed by the greedy algorithm ({ref}`theory-greedy`) applied to the
+identity operator, $I v = u$: the energy is then
+$\frac12 \|v - u\|^2 - \frac12 \|u\|^2$, so that each correction is a
+best rank-one approximation of the remainder $u - u^{n-1}$, computed by
+alternating least squares, and is followed by an update of all the rank-one
+factors ({ref}`theory-galerkin-updates`). The algorithm stops when
+$\|u - u^n\| \le \varepsilon \|u\|$, or after as many terms as $u$ has;
+there is no guarantee that the precision is reached with fewer terms.
+
 **Tree-based core.** If the core is a tree-based tensor, absorbing the frames
 into its leaves gives a tree-based tensor in the physical variables, on the
 same tree: the leaf $C^\nu$ becomes $U^{(\nu)} C^\nu$. This tensor is
