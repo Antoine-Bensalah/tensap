@@ -48,6 +48,18 @@ of size $\prod_\nu R_\nu$. It is assembled and solved directly for small
 ranks; beyond, it is solved by the conjugate gradient, $A_c$ being applied by
 mode products over the non-zero entries of $C_A$, without being assembled.
 
+**Structured cores.** For large $d$, the core of $v$ is sought in the format
+of the core of $A$:
+
+- **TT core**: $A_c$ is a TT operator, whose cores $\sum_l G^\nu_A(a, l, b)
+  P^{(\nu)}_l$ absorb the projected frames, and $b_c$ a TT tensor: the
+  problem on the core is solved by the solvers in tensor-train format
+  ({ref}`theory-tt-solvers`), ALS at fixed ranks, DMRG or AMEn with rank
+  adaptation, from the current core;
+- **tree-based core**: alternating minimization over the nodes of the tree,
+  the local problem of each node being built by the contractions along the
+  tree, without forming the full core ({ref}`theory-tree-contractions`).
+
 ## Update of the frames
 
 With the coefficients and the frames of the other dimensions fixed, the

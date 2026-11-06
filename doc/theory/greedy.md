@@ -173,12 +173,26 @@ $n$, with a set $D_n$ of dimensions to enrich:
 With all the dimensions enriched at each step, this is the greedy algorithm
 with an update of the core. Enriching only the dimensions with the largest
 estimated errors gives anisotropic subspaces, smaller for the same accuracy.
+With $\sigma^\mu_k$ the $\mu$-singular values of $u^n$, the smallest one,
+$\sigma^\mu_{r^n_\mu}$, estimates the error of the best approximation with a
+$\mu$-rank $r^n_\mu$; for a bulk parameter $0 \le \theta \le 1$,
+
+$$
+D_{n+1} = \Big\{\mu : \sigma^\mu_{r^n_\mu} \ge \theta \max_{\nu}
+\sigma^\nu_{r^n_\nu} \Big\}
+$$
+
+enriches only the dimensions with the largest estimated errors ($\theta = 0$:
+all of them).
 
 ## In tensap
 
 - {py:class}`~tensap.RankOneALSLinearSolver`,
   {py:class}`~tensap.GreedyLinearSolver`; the updates are methods of
   {py:class}`~tensap.TuckerTensorALSLinearSolver`.
+- {py:class}`~tensap.AnisotropicGreedySpaceLinearSolver` builds anisotropic
+  tensor subspaces, with a TT core.
 - Examples: {ref}`sphx_glr_examples_solvers_poisson_tucker.py`,
-  {ref}`sphx_glr_examples_solvers_greedy_with_updates.py`.
+  {ref}`sphx_glr_examples_solvers_greedy_with_updates.py`,
+  {ref}`sphx_glr_examples_solvers_anisotropic_greedy.py`.
 - Use case: {ref}`sphx_glr_use_cases_parametric_diffusion_reaction.py`.
