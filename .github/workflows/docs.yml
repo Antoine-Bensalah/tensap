@@ -1,4 +1,8 @@
 name: Documentation
+# The documentation runs every example, which takes a long time when tensap
+# changes (the cache of the gallery is then invalid). It is therefore built
+# on demand only: by "Run workflow" in the Actions tab, on a push whose
+# commit message contains "[docs]", and on pull requests.
 on:
   push:
   pull_request:
@@ -13,6 +17,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[docs]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +50,7 @@ jobs:
   # ab/site. Anthony's site is not touched.
   deploy:
     needs: build
-    if: github.event_name == 'push' && github.repository == 'Antoine-Bensalah/tensap' && github.ref == 'refs/heads/ab/site'
+    if: github.event_name != 'pull_request' && github.repository == 'Antoine-Bensalah/tensap' && github.ref == 'refs/heads/ab/site'
     runs-on: ubuntu-latest
     permissions:
       pages: write

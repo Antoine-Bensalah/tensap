@@ -170,16 +170,27 @@ html[data-theme="dark"] {
   margin-left: 0;
 }
 
-/* Right column: lighter. Smaller text, tighter entries, and class names in
-   the font of the text (not in bold monospace). */
+/* Right column: lighter, but airy enough to read long titles. Smaller text,
+   space between the entries and between the sections, the subsections
+   indented, and class names in the font of the text (not in bold
+   monospace). */
 .bd-sidebar-secondary nav.page-toc {
-  font-size: 0.85rem;
+  font-size: 0.875rem;
 }
 
 .bd-sidebar-secondary nav.page-toc .toc-entry a.nav-link {
-  padding-top: 0.15rem;
-  padding-bottom: 0.15rem;
-  line-height: 1.35;
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+  line-height: 1.45;
+}
+
+.bd-sidebar-secondary nav.page-toc > ul > li.toc-entry + li.toc-entry {
+  margin-top: 0.35rem;
+}
+
+.bd-sidebar-secondary nav.page-toc ul ul {
+  padding-left: 0.9rem;
+  margin-top: 0.15rem;
 }
 
 .bd-sidebar-secondary nav.page-toc code,
