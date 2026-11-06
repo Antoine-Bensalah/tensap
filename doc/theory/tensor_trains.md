@@ -165,7 +165,7 @@ The exact product $z = u \odot w$ has ranks $r_u r_w$, and its rounding
 orthogonalizes cores of that size: $O(d N r^6)$ for $r_u = r_w = r$. It can
 be computed directly at the precision $\varepsilon$ by a two-site fit of the
 projection, in the manner of the two-site DMRG algorithm for linear
-systems. With the cores of $z$ left-orthogonal on the
+systems ({ref}`theory-tt-solvers`). With the cores of $z$ left-orthogonal on the
 left of the bond $(\nu, \nu + 1)$ and right-orthogonal on its right, the best
 pair of cores is given by the supercore
 

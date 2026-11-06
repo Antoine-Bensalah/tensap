@@ -66,6 +66,7 @@ The notation is that of A. Nouy's courses and survey {cite:p}`Nouy2017book`.
 | {doc}`truncated_iterations` | Truncated Richardson iterations and preconditioned conjugate gradient, and the effect of the truncation |
 | {doc}`greedy` | Rank-one alternating least squares, greedy algorithms (PGD), greedy construction of tensor subspaces |
 | {doc}`galerkin_updates` | Galerkin updates of the core and of the frames of a low-rank iterate |
+| {doc}`tt_solvers` | Alternating solvers in tensor-train format: ALS, DMRG and AMEn, and their local solvers |
 | {doc}`inverse_approximation` | Low-rank approximation of the inverse of an operator, for preconditioning |
 
 ### From the tensap manual (to be rewritten)
@@ -89,6 +90,7 @@ truncation
 truncated_iterations
 greedy
 galerkin_updates
+tt_solvers
 inverse_approximation
 full_tensors
 tensor_formats
