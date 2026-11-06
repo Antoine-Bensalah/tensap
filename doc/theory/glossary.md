@@ -107,4 +107,18 @@ tensor train
 TT rank
   The ranks $r_\nu$ of a tensor train, those of its sequential
   matricizations. See {doc}`tensor_trains`.
+
+AMEn
+  Alternating minimal energy: ALS in TT format with the cores enriched by
+  directions of the residual, which adapts the ranks. See {doc}`tt_solvers`.
+
+DMRG
+  Density matrix renormalization group: ALS in TT format over two
+  neighbouring cores, whose truncated SVD adapts the rank. See
+  {doc}`tt_solvers`.
+
+interface
+  The contraction of the cores on one side of a core of a tensor network
+  with those of the operator and of the iterate, which defines the local
+  problems of the alternating solvers. See {doc}`tt_solvers`.
 ```
