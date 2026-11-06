@@ -6,18 +6,15 @@ links the classes it describes to their entry in the {doc}`/api/index`, and
 to the examples of the {doc}`/examples/index` that use them. References are
 listed in the {ref}`bibliography`.
 
-The pages are organised by mathematical concept and by family of methods.
-Each concept page gives definitions, properties and their proofs or
-references; each method page states the problem, the assumptions, the
-algorithm, its properties and its cost, and distinguishes established results
-from numerical observations.
-
-```{note}
-The pages of the last group come from the tensap manual
-(`manual/tensap_manual.tex`), which they will replace. They are still
-organised by class, as the manual is, and will be rewritten in the style of
-the other pages.
-```
+The pages follow the plan of A. Nouy's course on tensor networks for
+scientific computing, restricted to what tensap implements: tensors and
+tensor networks, tensorization, truncation, learning, equations in tensor
+formats, and the approximation of functions, followed by the discretization
+of PDEs in QTT format. Each concept page gives definitions, properties and
+their proofs or references; each method page states the problem, the
+assumptions, the algorithm, its properties and its cost, and distinguishes
+established results from numerical observations. The pages replace the tensap
+manual (`manual/tensap_manual.tex`).
 
 ## Conventions
 
@@ -51,67 +48,30 @@ The notation is that of A. Nouy's courses and survey {cite:p}`Nouy2017book`.
 
 ## Contents
 
-### Concepts
-
-| Page | What it covers |
+| Part | What it covers |
 | --- | --- |
-| {doc}`tucker_canonical` | Tucker and canonical formats, for tensors and operators; Tucker rank, orthonormal frames, arithmetic and rank growth |
-| {doc}`tensor_trains` | Tensor-train format: ranks, TT-SVD, orthogonality, operations, rounding, entrywise product at a given precision, TT cores of Tucker tensors |
-| {doc}`qtt` | Tensorization of vectors, tensors and functions; QTT ranks of functions; the shift and other QTT matrices |
-
-### Methods
-
-| Page | What it covers |
-| --- | --- |
-| {doc}`truncation` | Truncated SVD, higher-order and hierarchical SVD, thresholding; truncation of Tucker tensors |
-| {doc}`truncated_iterations` | Truncated Richardson iterations and preconditioned conjugate gradient, and the effect of the truncation |
-| {doc}`greedy` | Rank-one alternating least squares, greedy algorithms (PGD), greedy construction of tensor subspaces |
-| {doc}`galerkin_updates` | Galerkin updates of the core and of the frames of a low-rank iterate |
-| {doc}`tree_contractions` | Contractions along a dimension tree, local problems on tree-based cores, Kronecker-sum preconditioner |
-| {doc}`tt_solvers` | Alternating solvers in tensor-train format: ALS, DMRG and AMEn, and their local solvers |
-| {doc}`inverse_approximation` | Low-rank approximation of the inverse of an operator, for preconditioning |
-| {doc}`finite_volumes` | Cell-centred finite volumes in QTT format: closures, spectra, singular problems |
-| {doc}`staggered` | Staggered (MAC) grid in QTT format: exact identities, Helmholtz-Hodge projection, convective term, time integration |
-
-### From the tensap manual (to be rewritten)
-
-| Page | What it covers |
-| --- | --- |
-| {doc}`full_tensors` | Full tensors: creation, entries, reshaping, norms, products and contractions |
-| {doc}`tensor_formats` | Canonical, diagonal, sparse and tree-based tensors, dimension trees and truncation |
-| {doc}`functions` | Random variables and vectors, polynomials, functional bases and functional tensors |
-| {doc}`multi_indices_grids` | Multi-indices and tensor grids |
-| {doc}`learning` | Principal component analysis, loss functions and learning algorithms |
-
-```{toctree}
-:hidden:
-:maxdepth: 2
-:numbered: 3
-
-tucker_canonical
-tensor_trains
-qtt
-truncation
-truncated_iterations
-greedy
-galerkin_updates
-tree_contractions
-tt_solvers
-inverse_approximation
-finite_volumes
-staggered
-full_tensors
-tensor_formats
-functions
-multi_indices_grids
-learning
-```
+| {doc}`part_tensors` | Tensors and ranks; canonical, Tucker, tree-based and tensor-train formats; low-rank formats for functions |
+| {doc}`part_tensorization` | Tensorization of vectors and functions, quantized tensor trains |
+| {doc}`part_truncation` | Truncation by singular value decompositions in every format |
+| {doc}`part_learning` | Learning with linear models and tensor formats, principal component analysis |
+| {doc}`part_equations` | Linear systems in tensor formats: truncated iterations, greedy and alternating solvers, preconditioning |
+| {doc}`part_pde` | Discretization of PDEs in QTT format: finite volumes, staggered grid |
+| {doc}`part_approximation` | Multi-indices and grids for sparse approximation |
 
 The {doc}`glossary` gives short definitions of the terms used in these
 pages, with links to the pages that develop them.
 
 ```{toctree}
 :hidden:
+:maxdepth: 2
+:numbered: 3
 
+part_tensors
+part_tensorization
+part_truncation
+part_learning
+part_equations
+part_pde
+part_approximation
 glossary
 ```

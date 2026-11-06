@@ -7,6 +7,20 @@ develops each of them. The terms are also listed in the {ref}`genindex`.
 ```{glossary}
 :sorted:
 
+dimension tree
+  A tree of subsets of the dimensions $\{1, \dots, d\}$, whose root is the
+  set of all the dimensions and whose leaves are the singletons. See
+  {doc}`tensor_formats`.
+
+functional tensor
+  A function of several variables whose coefficients on a tensor product
+  basis form a tensor, possibly in a low-rank format. See {doc}`functions`.
+
+tree-based format
+  The set of tensors whose $\alpha$-ranks are bounded for the nodes
+  $\alpha$ of a dimension tree, represented by a tree tensor network. See
+  {doc}`tensor_formats`.
+
 alpha-rank
   The rank of the matricization $M_\alpha(u)$ of a tensor $u$ for a set
   $\alpha$ of dimensions. See {doc}`tucker_canonical`.
