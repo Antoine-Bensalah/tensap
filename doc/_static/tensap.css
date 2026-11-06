@@ -406,3 +406,56 @@ p.rubric.tutorial-folder {
     width: 18rem;
   }
 }
+
+/* Download buttons of the galleries: in the colours of the thumbnails (teal,
+   orange on hover) instead of the yellow of sphinx-gallery, side by side. */
+.bd-content div.sphx-glr-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 1.5rem 0;
+}
+.bd-content div.sphx-glr-download {
+  margin: 0;
+}
+.bd-content div.sphx-glr-download p {
+  margin: 0;
+}
+.bd-content div.sphx-glr-download a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #127a8a;
+  background-image: none;
+  border: none;
+  border-radius: 10px;
+  padding: 0.5rem 0.9rem;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 1px 3px rgba(31, 58, 95, 0.25);
+  transition: background-color 0.15s ease;
+}
+.bd-content div.sphx-glr-download a.reference.download::before {
+  /* the download icon of the theme, in the colour of the text */
+  color: inherit;
+  font-size: 0.95em;
+  padding: 0;
+}
+.bd-content div.sphx-glr-download a:hover {
+  background: #e8862a;
+  box-shadow: 0 2px 6px rgba(31, 58, 95, 0.3);
+  text-decoration: none;
+}
+.bd-content div.sphx-glr-download a code.download {
+  color: inherit;
+  font-family: var(--pst-font-family-base);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0;
+}
+.bd-content div.sphx-glr-download a:hover code.download {
+  text-decoration: none;
+}
