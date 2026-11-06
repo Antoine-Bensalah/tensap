@@ -8,9 +8,9 @@ drawings are made from the SVG files of the same folder; see its README.
 
 After sphinx-gallery has generated the galleries, this extension copies
 each drawing over the thumbnail of its example, and over the thumbnail of
-the original tutorial the example comes from. The scripts are not changed,
-so the gallery cache is not invalidated. The Use Cases keep the thumbnails
-made from their figures.
+the original tutorial the example comes from, and over the thumbnail of a
+Use Case of the same name (``use_cases/<name>.py``). The scripts are not
+changed, so the gallery cache is not invalidated.
 """
 
 import re
@@ -42,6 +42,9 @@ def _targets(src):
                 folder, _, stem = match.group(1).rpartition("/")
                 thumb = _thumb(src, "tutorials", folder, stem)
                 pairs.append((drawing, thumb))
+        if (repo / "use_cases" / f"{name}.py").is_file():
+            images = src / "use_cases" / "images" / "thumb"
+            pairs.append((drawing, images / f"sphx_glr_{name}_thumb.png"))
     return pairs
 
 
