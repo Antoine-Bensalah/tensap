@@ -10,8 +10,8 @@ After sphinx-gallery has generated the galleries, this extension copies
 each drawing over the thumbnail of its example, and over the thumbnail of
 the original tutorial the example comes from, and over the thumbnail of a
 Use Case of the same name (``use_cases/<name>.py``) and of its original
-tutorial. A tutorial with no example nor Use Case has its own drawing,
-named after its script (``tutorial_<...>.png``). The scripts are not
+tutorial. A tutorial can also have its own drawing, named after its script
+(``tutorial_<...>.png``), which then takes precedence. The scripts are not
 changed, so the gallery cache is not invalidated.
 """
 
@@ -29,6 +29,12 @@ def _thumb(src, gallery, folder, stem):
     return images / f"sphx_glr_{stem}_thumb.png"
 
 
+def _own_drawing(src, script):
+    """Whether the tutorial folder/stem has a drawing of its own."""
+    stem = script.rpartition("/")[2]
+    return (src / THUMB_DIR / f"{stem}.png").is_file()
+
+
 def _targets(src):
     """Pairs (drawing, thumbnail to replace)."""
     repo = src.parent
@@ -40,7 +46,7 @@ def _targets(src):
             pairs.append((drawing, _thumb(src, "examples", section, name)))
             # The original tutorial named in the docstring of the example.
             match = ORIGIN.search(script.read_text(encoding="utf-8"))
-            if match:
+            if match and not _own_drawing(src, match.group(1)):
                 folder, _, stem = match.group(1).rpartition("/")
                 thumb = _thumb(src, "tutorials", folder, stem)
                 pairs.append((drawing, thumb))
@@ -50,7 +56,7 @@ def _targets(src):
             pairs.append((drawing, images / f"sphx_glr_{name}_thumb.png"))
             # The original tutorial of the Use Case.
             match = ORIGIN.search(use_case.read_text(encoding="utf-8"))
-            if match:
+            if match and not _own_drawing(src, match.group(1)):
                 folder, _, stem = match.group(1).rpartition("/")
                 pairs.append((drawing, _thumb(src, "tutorials", folder, stem)))
         # A tutorial with no example: the drawing has the name of the script.
