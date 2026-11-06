@@ -90,4 +90,21 @@ greedy algorithm
 truncated iteration
   A classical iterative method (Richardson, conjugate gradient) whose
   iterates are truncated after each step. See {doc}`truncated_iterations`.
+
+orthogonality center
+  The core of a tensor train whose left cores are left-orthogonal and
+  right cores right-orthogonal; the norm of the tensor is that of this core.
+  See {doc}`tensor_trains`.
+
+rounding
+  The truncation of a tensor train by a sweep of truncated SVDs of its
+  cores. See {doc}`tensor_trains`.
+
+tensor train
+  TT: a tensor written as a product of matrices $C^1(i_1) \cdots
+  C^d(i_d)$, one core per dimension. See {doc}`tensor_trains`.
+
+TT rank
+  The ranks $r_\nu$ of a tensor train, those of its sequential
+  matricizations. See {doc}`tensor_trains`.
 ```
