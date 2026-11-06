@@ -69,3 +69,12 @@ functions
 multi_indices_grids
 learning
 ```
+
+The {doc}`glossary` gives short definitions of the terms used in these
+pages, with links to the pages that develop them.
+
+```{toctree}
+:hidden:
+
+glossary
+```
