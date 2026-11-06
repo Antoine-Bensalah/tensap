@@ -9,7 +9,9 @@ drawings are made from the SVG files of the same folder; see its README.
 After sphinx-gallery has generated the galleries, this extension copies
 each drawing over the thumbnail of its example, and over the thumbnail of
 the original tutorial the example comes from, and over the thumbnail of a
-Use Case of the same name (``use_cases/<name>.py``). The scripts are not
+Use Case of the same name (``use_cases/<name>.py``) and of its original
+tutorial. A tutorial with no example nor Use Case has its own drawing,
+named after its script (``tutorial_<...>.png``). The scripts are not
 changed, so the gallery cache is not invalidated.
 """
 
@@ -42,9 +44,20 @@ def _targets(src):
                 folder, _, stem = match.group(1).rpartition("/")
                 thumb = _thumb(src, "tutorials", folder, stem)
                 pairs.append((drawing, thumb))
-        if (repo / "use_cases" / f"{name}.py").is_file():
+        use_case = repo / "use_cases" / f"{name}.py"
+        if use_case.is_file():
             images = src / "use_cases" / "images" / "thumb"
             pairs.append((drawing, images / f"sphx_glr_{name}_thumb.png"))
+            # The original tutorial of the Use Case.
+            match = ORIGIN.search(use_case.read_text(encoding="utf-8"))
+            if match:
+                folder, _, stem = match.group(1).rpartition("/")
+                pairs.append((drawing, _thumb(src, "tutorials", folder, stem)))
+        # A tutorial with no example: the drawing has the name of the script.
+        scripts = repo / "test" / "non_regression_scripts"
+        for script in scripts.glob(f"*/{name}.py"):
+            folder = script.parent.name
+            pairs.append((drawing, _thumb(src, "tutorials", folder, name)))
     return pairs
 
 

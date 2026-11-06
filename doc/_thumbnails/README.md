@@ -2,8 +2,11 @@
 
 One simple drawing per example of `examples/`, used on its card in the
 Examples Gallery and on the card of the original tutorial it comes from, and
-one per Use Case of `use_cases/`, which shows the test case and its equation
-(see `doc/_ext/gallery_thumbnails.py`).
+one per Use Case of `use_cases/`, which shows the test case and its equation,
+also used on the card of its original tutorial. The tutorials with neither
+an example nor a Use Case have their own drawing, `tutorial_<...>.svg`, named
+after their script in `test/non_regression_scripts/` (see
+`doc/_ext/gallery_thumbnails.py`).
 
 - `<name>.svg` is the drawing of `examples/<section>/<name>.py`: 400 x 280,
   light background `#f4f7fa`, strokes of 3 to 6 px, colours of the site
