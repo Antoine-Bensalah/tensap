@@ -57,6 +57,7 @@ The notation is that of A. Nouy's courses and survey {cite:p}`Nouy2017book`.
 | --- | --- |
 | {doc}`tucker_canonical` | Tucker and canonical formats, for tensors and operators; Tucker rank, orthonormal frames, arithmetic and rank growth |
 | {doc}`tensor_trains` | Tensor-train format: ranks, TT-SVD, orthogonality, operations, rounding, entrywise product at a given precision, TT cores of Tucker tensors |
+| {doc}`qtt` | Tensorization of vectors, tensors and functions; QTT ranks of functions; the shift and other QTT matrices |
 
 ### Methods
 
@@ -69,6 +70,8 @@ The notation is that of A. Nouy's courses and survey {cite:p}`Nouy2017book`.
 | {doc}`tree_contractions` | Contractions along a dimension tree, local problems on tree-based cores, Kronecker-sum preconditioner |
 | {doc}`tt_solvers` | Alternating solvers in tensor-train format: ALS, DMRG and AMEn, and their local solvers |
 | {doc}`inverse_approximation` | Low-rank approximation of the inverse of an operator, for preconditioning |
+| {doc}`finite_volumes` | Cell-centred finite volumes in QTT format: closures, spectra, singular problems |
+| {doc}`staggered` | Staggered (MAC) grid in QTT format: exact identities, Helmholtz-Hodge projection, convective term, time integration |
 
 ### From the tensap manual (to be rewritten)
 
@@ -87,6 +90,7 @@ The notation is that of A. Nouy's courses and survey {cite:p}`Nouy2017book`.
 
 tucker_canonical
 tensor_trains
+qtt
 truncation
 truncated_iterations
 greedy
@@ -94,6 +98,8 @@ galerkin_updates
 tree_contractions
 tt_solvers
 inverse_approximation
+finite_volumes
+staggered
 full_tensors
 tensor_formats
 functions
